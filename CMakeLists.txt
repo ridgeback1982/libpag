@@ -210,6 +210,9 @@ if (PAG_USE_HARFBUZZ)
     list(APPEND PAG_INCLUDES third_party/harfbuzz/src)
 endif ()
 
+#zzy
+list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/include)
+
 function(find_include_dirs out)
     file(GLOB_RECURSE headers ${ARGN})
     foreach (path ${headers})
@@ -289,6 +292,15 @@ elseif (MACOS)
     list(APPEND PAG_SHARED_LIBS ${VIDEOTOOLBOX})
     find_library(CORE_MEDIA CoreMedia)
     list(APPEND PAG_SHARED_LIBS ${CORE_MEDIA})
+
+    #zzy
+    list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavutil.xcframework/macos-arm64_x86_64/libavutil.framework
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavcodec.xcframework/macos-arm64_x86_64/libavcodec.framework 
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswscale.xcframework/macos-arm64_x86_64/libswscale.framework
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswresample.xcframework/macos-arm64_x86_64/libswresample.framework
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavfilter.xcframework/macos-arm64_x86_64/libavfilter.framework)
+    message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
 
     if (USE_NATIVE_PLATFORM)
         if (PAG_USE_OPENGL)

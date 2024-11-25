@@ -532,6 +532,8 @@ class PAG_API PAGLayer : public Content {
   friend class ContentVersion;
 
   friend class PAGDecoder;
+
+  friend class JSONComposition;       //zzy
 };
 
 class SolidLayer;
@@ -818,9 +820,39 @@ class PAG_API PAGImageLayer : public PAGLayer {
   friend class AudioClip;
 };
 
+//zzy
+class FFAudioReader;
+class PAG_API PAGAudioSource {
+public:
+  PAGAudioSource(const std::string& path, float volume = 1.0f);
+  ~PAGAudioSource();
+
+  void setStartFrame(Frame startFrame) { _startFrame = startFrame; }
+  Frame startFrame() const { return _startFrame; }
+  void setDuration(Frame duration) { _duration = duration; }
+  Frame endFrame() const { return _startFrame + _duration; }
+
+  float volume() const { return _volume; }
+  //TBD: set cut from and cut to
+
+  int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+
+private:
+  Frame _startFrame = 0;
+  Frame _duration = 0;
+  float _volume = 1.0f;
+  uint8_t** _sourceBuffer = nullptr;
+  int _sourceBufferSize = 0;
+  int _wantedSourceSamples = 0;
+  std::shared_ptr<FFAudioReader> _ffAudioReader;
+  void* _audioFifo = nullptr;
+};
+
 class PreComposeLayer;
 
 class VectorComposition;
+
+class FFAudioMixer;   //zzy
 
 class PAG_API PAGComposition : public PAGLayer {
  public:
@@ -945,12 +977,21 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
+  //zzy
+  void setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer);
+  void addAudioSource(std::shared_ptr<PAGAudioSource> audioSource);
+  int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+
  protected:
   int _width = 0;
   int _height = 0;
   int64_t _frameDuration = 1;
   float _frameRate = 60;
   std::vector<std::shared_ptr<PAGLayer>> layers;
+  //zzy
+  std::vector<std::shared_ptr<PAGAudioSource>> audios;
+  std::shared_ptr<FFAudioMixer> audioMixer;
+  int64_t _accumulatedAudioSamples = 0;
 
   PAGComposition(int width, int height);
   std::vector<std::shared_ptr<PAGLayer>> getLayersBy(
@@ -976,6 +1017,9 @@ class PAG_API PAGComposition : public PAGLayer {
   void updateRootLocker(std::shared_ptr<std::mutex> locker) override;
   virtual bool doAddLayer(std::shared_ptr<PAGLayer> pagLayer, int index);
   virtual std::shared_ptr<PAGLayer> doRemoveLayer(int index);
+
+  //zzy
+  int getAudioFrameNumber(int targetSampleRate) const;
 
  private:
   VectorComposition* emptyComposition = nullptr;
@@ -1015,6 +1059,16 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class AudioClip;
 
   friend class PAGDecoder;
+};
+
+//zzy, JSONComposition definition
+class PAG_API JSONComposition : public PAGComposition {
+public:
+  static std::shared_ptr<JSONComposition> Load(const std::string& json);
+  static void WriteToFile(const std::string& path, std::shared_ptr<JSONComposition> jsonComposition);
+
+protected:
+  JSONComposition(PreComposeLayer* layer);
 };
 
 class PAG_API PAGFile : public PAGComposition {

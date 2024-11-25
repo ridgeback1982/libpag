@@ -28,6 +28,8 @@
 #include "rendering/renderers/LayerRenderer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
+//zzy
+#include "rendering/utils/media/FFAudioMixer.h"
 
 namespace pag {
 std::shared_ptr<PAGComposition> PAGComposition::Make(int width, int height) {
@@ -55,6 +57,9 @@ PAGComposition::PAGComposition(std::shared_ptr<File> file, PreComposeLayer* laye
     _height = layer->composition->height;
     if (file != nullptr) {
       _frameRate = file->frameRate();
+    } else {
+      //zzy, set framerate by composition
+      _frameRate = layer->composition->frameRate;
     }
     _frameDuration = layer->duration;
   }
@@ -506,6 +511,66 @@ std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float
   std::vector<std::shared_ptr<PAGLayer>> results;
   getLayersUnderPointInternal(localX, localY, &results);
   return results;
+}
+
+//zzy
+void PAGComposition::setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer) {
+  this->audioMixer = audioMixer;
+}
+
+//zzy
+void PAGComposition::addAudioSource(std::shared_ptr<PAGAudioSource> audioSource) {
+  audios.push_back(audioSource);
+}
+
+//zzy
+int PAGComposition::getAudioFrameNumber(int targetSampleRate) const {
+    return (int)(_accumulatedAudioSamples / (targetSampleRate / _frameRate));
+}
+int PAGComposition::readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
+  int res = 0;
+  int frame = getAudioFrameNumber(targetSampleRate);
+
+  //do mix here
+  std::vector<std::unique_ptr<uint8_t[]>> srcBuffers2;
+  for (size_t index=0; index<audios.size(); index++) {
+    auto audio = audios[index];
+    if (frame >= audio->startFrame() && frame < audio->endFrame()) {
+//      return audio->readAudioByFrame(buffer, bufferSize, targetSampleRate);
+
+       auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
+        if (srcBuffer == nullptr) {
+            goto end;
+        }
+       
+       if (audio->readAudioBySamples(samples, srcBuffer.get(), bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
+         goto end;
+       }
+      srcBuffers2.push_back(std::move(srcBuffer));
+    }
+  }
+
+  if (srcBuffers2.size() > 1) {
+    if (audioMixer) {
+      std::vector<uint8_t*> tmpBuffers;
+      for (auto& srcBuffer : srcBuffers2) {
+        tmpBuffers.push_back(srcBuffer.get());
+      }
+
+      if (audioMixer->mixAudio(tmpBuffers, buffer, bufferSize) < 0) {
+        goto end;
+      }
+      res = bufferSize;
+    }
+  } else if (srcBuffers2.size() == 1) {
+    memcpy(buffer, srcBuffers2[0].get(), bufferSize);
+    res = bufferSize;
+  }
+   
+
+end:
+  _accumulatedAudioSamples += samples;
+  return res;
 }
 
 bool PAGComposition::GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,

@@ -22,6 +22,7 @@
 
 namespace pag {
 VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha);
+VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath);  //zzy
 TagCode WriteVideoSequence(EncodeStream* stream, std::pair<VideoSequence*, bool>* parameter);
 ByteData* ReadMp4Header(DecodeStream* stream);
 TagCode WriteMp4Header(EncodeStream* stream, ByteData* byteData);

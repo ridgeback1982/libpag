@@ -2097,6 +2097,8 @@ class PAG_API Composition {
 
   friend class VectorComposition;
 
+  friend class JSONComposition;   //zzy
+
   RTTR_ENABLE()
 };
 
@@ -2119,6 +2121,8 @@ class PAG_API VectorComposition : public Composition {
 
  protected:
   void updateStaticTimeRanges() override;
+
+  friend class JSONComposition;   //zzy
 
   RTTR_ENABLE(Composition)
 };
@@ -2361,6 +2365,8 @@ class PAG_API VideoComposition : public Composition {
 
  protected:
   void updateStaticTimeRanges() override;
+
+  friend class JSONComposition;   //zzy
 
   RTTR_ENABLE(Composition)
 };

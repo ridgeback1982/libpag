@@ -31,13 +31,14 @@
     [view setPath:path];
     [view setRepeatCount:-1];
     [view play];
-    PAGFile* pagFile = (PAGFile*)[view getComposition];
-    if ([pagFile numTexts] > 0) {
-        PAGText* textData = [pagFile getTextData:0];
-        textData.fontSize = textData.fontSize*0.5;
-        textData.text = @"运动文字遮罩替换😀文本";
-        [pagFile replaceText:0 data:textData];
-    }
+    //zzy, json composition is not PAGFile
+    // PAGFile* pagFile = (PAGFile*)[view getComposition];
+    // if ([pagFile numTexts] > 0) {
+    //     PAGText* textData = [pagFile getTextData:0];
+    //     textData.fontSize = textData.fontSize*0.5;
+    //     textData.text = @"运动文字遮罩替换😀文本";
+    //     [pagFile replaceText:0 data:textData];
+    // }
     
     [self.view addSubview:view];
     //[self testPixelBufferMode];

@@ -52,18 +52,27 @@ SequenceInfo::SequenceInfo(Sequence* sequence) : sequence(sequence) {
 
 std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> file,
                                                          PAGFile* pagFile, bool useDiskCache) {
-  if (sequence == nullptr || file == nullptr) {
+  //zzy
+  if (sequence == nullptr) {
     return nullptr;
   }
   std::shared_ptr<SequenceReader> reader = nullptr;
   auto composition = sequence->composition;
   if (useDiskCache) {
+    //zzy, slim protect
+    if (file == nullptr) {
+      return nullptr;
+    }
     reader = DiskSequenceReader::Make(std::move(file), sequence);
     if (reader) {
       return reader;
     }
   }
   if (composition->type() == CompositionType::Bitmap) {
+    //zzy, slim protect
+    if (file == nullptr) {
+      return nullptr;
+    }
     reader = std::make_shared<BitmapSequenceReader>(std::move(file),
                                                     static_cast<BitmapSequence*>(sequence));
   } else {
@@ -72,6 +81,7 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
     auto demuxer =
         std::make_unique<WebVideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
 #else
+    //zzy, in case of json input, file and pagFile both are null
     auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
 #endif
     reader = std::make_shared<VideoReader>(std::move(demuxer));
