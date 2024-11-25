@@ -36,6 +36,9 @@ build/
 .externalNativeBuild
 local.properties
 
+# Patches
+*.patch
+
 # IDEA Projects
 !.idea
 **/.idea/*
