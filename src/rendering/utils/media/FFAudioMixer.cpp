@@ -114,8 +114,7 @@ int FFAudioMixer::mixAudio(const std::vector<uint8_t*> &srcBuffers, uint8_t* dst
 
     memcpy(dstBuffer, filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
     
-    printf("Mixed frame with %d samples\n", filt_frame->nb_samples);
-    //printf("Samples: %d,%d,%d,%d,%d,%d,%d,%d\n", dstBuffer[0], dstBuffer[1], dstBuffer[2], dstBuffer[3], dstBuffer[4], dstBuffer[5], dstBuffer[6], dstBuffer[7]);
+    //printf("Mixed frame with %d samples\n", filt_frame->nb_samples);
     av_frame_unref(filt_frame);
   }
 

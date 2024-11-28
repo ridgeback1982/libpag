@@ -260,7 +260,13 @@ float PAGLayer::frameRate() const {
 }
 
 float PAGLayer::frameRateInternal() const {
-  return file ? file->frameRate() : 60;
+  return file ? file->frameRate() : internalFrameRate;
+}
+
+//zzy, called from null PAGFile case
+void PAGLayer::setFrameRate(float value) {
+  LockGuard autoLock(rootLocker);
+  internalFrameRate = value;
 }
 
 int64_t PAGLayer::currentTime() const {

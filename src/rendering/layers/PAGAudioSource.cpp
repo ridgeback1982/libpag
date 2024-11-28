@@ -124,7 +124,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
         *src_data = _sourceBuffer[0];
         int src_nb_samples = src_samples;
         ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t **)src_data, src_nb_samples);
-        printf("audio swr_convert, samples:%d|%d, sr:%d|%d, size:%d|%d, ret:%d \n", dst_nb_samples, src_nb_samples, out_sample_rate, in_sample_rate, bufferSize, _sourceBufferSize, ret);
+        //printf("audio swr_convert, samples:%d|%d, sr:%d|%d, size:%d|%d, ret:%d \n", dst_nb_samples, src_nb_samples, out_sample_rate, in_sample_rate, bufferSize, _sourceBufferSize, ret);
         if (ret < 0) {
             fprintf(stderr, "Error while converting\n");
             return 0;

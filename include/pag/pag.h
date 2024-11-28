@@ -352,6 +352,11 @@ class PAG_API PAGLayer : public Content {
   float frameRate() const;
 
   /**
+   * zzy, set frame rate of this layer, used in null PAGFile case
+   */
+  void setFrameRate(float value);
+
+  /**
    * The start time of the layer in microseconds, indicates the start position of the visible range
    * in parent composition. It could be negative value.
    */
@@ -434,6 +439,7 @@ class PAG_API PAGLayer : public Content {
   PAGComposition* _parent = nullptr;
   Frame startFrame = 0;
   Frame contentFrame = 0;
+  float internalFrameRate = 60;   //zzy
   // It could be nullptr when the layer is created by PAGComposition(width, height),
   // check before using it!
   std::shared_ptr<File> file = nullptr;
@@ -981,6 +987,7 @@ class PAG_API PAGComposition : public PAGLayer {
   void setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer);
   void addAudioSource(std::shared_ptr<PAGAudioSource> audioSource);
   int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+  int getAudioFrameNumber(int targetSampleRate) const;
 
  protected:
   int _width = 0;
@@ -1017,9 +1024,6 @@ class PAG_API PAGComposition : public PAGLayer {
   void updateRootLocker(std::shared_ptr<std::mutex> locker) override;
   virtual bool doAddLayer(std::shared_ptr<PAGLayer> pagLayer, int index);
   virtual std::shared_ptr<PAGLayer> doRemoveLayer(int index);
-
-  //zzy
-  int getAudioFrameNumber(int targetSampleRate) const;
 
  private:
   VectorComposition* emptyComposition = nullptr;
@@ -1065,7 +1069,6 @@ class PAG_API PAGComposition : public PAGLayer {
 class PAG_API JSONComposition : public PAGComposition {
 public:
   static std::shared_ptr<JSONComposition> Load(const std::string& json);
-  static void WriteToFile(const std::string& path, std::shared_ptr<JSONComposition> jsonComposition);
 
 protected:
   JSONComposition(PreComposeLayer* layer);

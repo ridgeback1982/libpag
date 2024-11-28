@@ -8,7 +8,7 @@
 //zzy
 namespace pag {
 
-class FFAudioMixer {
+class PAG_API FFAudioMixer {
 public:
     FFAudioMixer(int sampleRate, int channelCount, int format);
     ~FFAudioMixer();
