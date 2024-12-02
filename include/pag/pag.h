@@ -1068,6 +1068,7 @@ class PAG_API PAGComposition : public PAGLayer {
 //zzy, JSONComposition definition
 class PAG_API JSONComposition : public PAGComposition {
 public:
+  static std::shared_ptr<JSONComposition> LoadTest(const std::string& json);
   static std::shared_ptr<JSONComposition> Load(const std::string& json);
 
 protected:

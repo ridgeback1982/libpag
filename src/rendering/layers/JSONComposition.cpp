@@ -32,14 +32,17 @@
 
 //ffmpeg
 extern "C" {
-  #include <libavcodec/avcodec.h>
-  #include <libavformat/avformat.h>
-  #include <libavutil/avutil.h>
-  #include <libavutil/channel_layout.h>
-  #include <libavutil/audio_fifo.h>
-  #include <libswscale/swscale.h>
-  #include <libavutil/imgutils.h>
+  #include "libavcodec/avcodec.h"
+  #include "libavformat/avformat.h"
+  #include "libavutil/avutil.h"
+  #include "libavutil/channel_layout.h"
+  #include "libavutil/audio_fifo.h"
+  #include "libswscale/swscale.h"
+  #include "libavutil/imgutils.h"
 }
+#include "MovieObject.h"
+#include <cmath>
+
 
 //NOTE:
 //1. 关注下各个类的析构函数
@@ -53,6 +56,111 @@ namespace pag {
 #define TEST_COMPOSITION_HEIGHT 1920
 #define TEST_IMAGE_WIDTH 512
 #define TEST_IMAGE_HEIGHT 512
+
+int TimeToFrame(int time, int fps) {
+    return (int)std::floor(time / 1000.0f * fps);
+}
+
+int LifetimeToFrameDuration(const movie::LifeTime& lifetime, int fps) {
+    return TimeToFrame(lifetime.end_time, fps) - TimeToFrame(lifetime.begin_time, fps);
+}
+
+PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec) {
+    int visual_width = spec.width * track->content.location.w;   //visual width, not video og width
+    int visual_height = spec.height * track->content.location.h;
+    int video_width = track->content.width();
+    int video_height = track->content.height();
+    auto vidComposition = new VideoComposition();
+    vidComposition->id = UniqueID::Next();
+    vidComposition->width = video_width;
+    vidComposition->height = video_height;
+    vidComposition->frameRate = track->content.fps();   //video og fps
+    vidComposition->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
+    
+    vidComposition->backgroundColor = {0, 0, 0};     //hard code
+    auto videoSequence = ReadVideoSequenceFromFile(track->content.path);
+    videoSequence->composition = vidComposition;
+    vidComposition->sequences.push_back(videoSequence);
+
+    auto vidPreComposeLayer = new PreComposeLayer();
+    vidPreComposeLayer->id = UniqueID::Next();
+    vidPreComposeLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
+    vidPreComposeLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
+    vidPreComposeLayer->transform = Transform2D::MakeDefault().release();
+    //set transform
+    vidPreComposeLayer->transform->anchorPoint->value.set(video_width/2, video_height/2);
+    vidPreComposeLayer->transform->position->value.set(spec.width*track->content.location.center_x, spec.height*track->content.location.center_y);
+    float scale_x = (float)visual_width/video_width;
+    float scale_y = (float)visual_height/video_height;
+    vidPreComposeLayer->transform->scale->value.set(scale_x, scale_y);
+    vidPreComposeLayer->timeRemap = new Property<float>(0);      //hard code
+    vidPreComposeLayer->composition = vidComposition;
+
+    return vidPreComposeLayer;
+}
+
+std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str) {
+    json nmjson = json::parse(json_str);
+    movie::Movie movie = nmjson.get<movie::Movie>();
+    movie::Story story = movie.video.stories[0];
+
+    auto vecComposition = new VectorComposition();
+    vecComposition->id = UniqueID::Next();
+    vecComposition->width = movie.video.width;
+    vecComposition->height = movie.video.height;
+    vecComposition->duration = TimeToFrame(story.duration, movie.video.fps);   //set by json
+    vecComposition->frameRate = movie.video.fps;           //set by json
+    vecComposition->backgroundColor = {0, 0, 0};     //hard code
+
+    //create JSONComposition
+    auto preComposeLayer = PreComposeLayer::Wrap(vecComposition).release();
+    auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
+    jsonComposition->rootLocker = std::make_shared<std::mutex>();
+    
+    //sort tracks by zorder
+    std::sort(story.tracks.begin(), story.tracks.end(), [](const auto& a, const auto& b) {
+        return a->zorder < b->zorder;
+    });
+    
+    //add track to PAGLayer one by one
+    for (auto& t : story.tracks) {
+        if (t->type == "video") {
+            auto track = static_cast<movie::VideoTrack*>(t);
+            track->content.init();
+            printf("video track, path:%s\n", track->content.path.c_str());
+            auto vidPreComposeLayer = createVideoLayer(track, movie.video);
+            vecComposition->layers.push_back(vidPreComposeLayer);
+            auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
+            jsonComposition->addLayer(pagVideoLayer);
+        } else if (t->type == "gif") {
+            auto track = static_cast<movie::GifTrack*>(t);
+            printf("gif track, path:%s\n", track->content.path.c_str());
+        } else if (t->type == "voice") {
+            auto track = static_cast<movie::VoiceTrack*>(t);
+            printf("voice track, path:%s\n", track->content.path.c_str());
+        } else if (t->type == "music") {
+            auto track = static_cast<movie::MusicTrack*>(t);
+            printf("music track, path:%s\n", track->content.path.c_str());
+        } else if (t->type == "image") {
+            auto track = static_cast<movie::ImageTrack*>(t);
+            printf("image track, path:%s\n", track->content.path.c_str());
+        } else if (t->type == "Title") {
+            auto track = static_cast<movie::TitleTrack*>(t);
+            printf("title track, text:%s\n", track->content.text.c_str());
+        } else if (t->type == "Subtitle") {
+            auto track = static_cast<movie::SubtitleTrack*>(t);
+            printf("subtitle track, count:%zu\n", track->content.sentences.size());
+        }
+    }
+
+    //update static time range, I am not sure if it is necessary
+    if (!vecComposition->staticTimeRangeUpdated) {
+      vecComposition->updateStaticTimeRanges();
+      vecComposition->staticTimeRangeUpdated = true;
+    }
+
+    return jsonComposition;
+}
 
 std::vector<std::string> splitStringBy(const std::string &s, char delimiter) {
   std::vector<std::string> tokens;
@@ -68,9 +176,9 @@ std::vector<std::string> splitStringBy(const std::string &s, char delimiter) {
   return tokens;
 }
 
-std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json) {
+std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& json) {
   //pass the process of parsing json file
-  printf("JSONComposition::Load, json:%s", json.c_str());
+  printf("JSONComposition::LoadTest, json:%s", json.c_str());
 
   
   const std::vector<std::string> tokens = splitStringBy(json, ';');
@@ -275,3 +383,59 @@ JSONComposition::JSONComposition(PreComposeLayer* layer)
 
 
 }  // namespace pag
+
+
+namespace movie {
+
+
+int VideoContent::init() {
+  AVFormatContext *fmt_ctx = NULL;
+  int video_stream_index = -1;
+
+  // 初始化 FFmpeg 库
+  avformat_network_init();
+
+  // 打开输入文件
+  if (avformat_open_input(&fmt_ctx, path.c_str(), NULL, NULL) < 0) {
+    printf("Could not open input file: %s\n", path.c_str());
+    return -1;
+  }
+
+  // 查找流信息
+  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+    printf("Could not find stream information.\n");
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+  // 查找视频流
+  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      video_stream_index = i;
+      break;
+    }
+  }
+
+  if (video_stream_index == -1) {
+    printf("Could not find a video stream.\n");
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+    // Get codec parameters for the video stream
+    AVStream* video_stream = fmt_ctx->streams[video_stream_index];
+    AVCodecParameters* codec_params = video_stream->codecpar;
+    _width = codec_params->width;
+    _height = codec_params->height;
+
+    // Retrieve FPS
+    AVRational frame_rate = video_stream->avg_frame_rate;
+    _fps = (frame_rate.den && frame_rate.num) ? 
+                 static_cast<double>(frame_rate.num) / frame_rate.den : 0;
+
+    return 0;
+}
+
+
+
+}  // namespace movie

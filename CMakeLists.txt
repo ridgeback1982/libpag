@@ -212,6 +212,7 @@ endif ()
 
 #zzy 
 list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/include)
+list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../nlohmann_json/single_include)
 
 function(find_include_dirs out)
     file(GLOB_RECURSE headers ${ARGN})
