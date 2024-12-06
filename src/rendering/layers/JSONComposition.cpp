@@ -70,15 +70,21 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     int visual_height = spec.height * track->content.location.h;
     int video_width = track->content.width();
     int video_height = track->content.height();
+    int video_fps = track->content.fps();
     auto vidComposition = new VideoComposition();
     vidComposition->id = UniqueID::Next();
     vidComposition->width = video_width;
     vidComposition->height = video_height;
-    vidComposition->frameRate = track->content.fps();   //video og fps
+    vidComposition->frameRate = video_fps;   //video og fps
     vidComposition->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
-    
     vidComposition->backgroundColor = {0, 0, 0};     //hard code
-    auto videoSequence = ReadVideoSequenceFromFile(track->content.path);
+
+    int ogCutFrom = track->content.cutFrom * track->content.speed;
+    int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
+    auto videoSequence = ReadVideoSequenceFromFile(track->content.path, 
+      TimeToFrame(ogCutFrom, video_fps), 
+      TimeToFrame(ogCutFrom + ogDuration, video_fps), 
+      (int)vidComposition->duration);
     videoSequence->composition = vidComposition;
     vidComposition->sequences.push_back(videoSequence);
 
@@ -132,6 +138,14 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             vecComposition->layers.push_back(vidPreComposeLayer);
             auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
             jsonComposition->addLayer(pagVideoLayer);
+
+            if (track->content.mixVolume > MIN_VOLUME) {
+              auto audioSource = std::make_shared<PAGAudioSource>(track->content.path.c_str());
+              audioSource->setStartFrame(0);
+              audioSource->setDuration(TEST_DURATION);
+              audioSource->setVolumeForMix(track->content.mixVolume);
+              jsonComposition->addAudioSource(audioSource);
+            }
         } else if (t->type == "gif") {
             auto track = static_cast<movie::GifTrack*>(t);
             printf("gif track, path:%s\n", track->content.path.c_str());
@@ -300,7 +314,7 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   vidComposition->duration = TEST_DURATION;       //set by json
   vidComposition->frameRate = TEST_FPS;           //set by json
   vidComposition->backgroundColor = {0, 0, 0};     //hard code
-  auto videoSequence = ReadVideoSequenceFromFile(tokens[2]);
+  auto videoSequence = ReadVideoSequenceFromFile(tokens[2], 0, TEST_DURATION, TEST_DURATION);
   // TimeRange range = {0, TEST_DURATION - 1};      //set by json, the range is probably not same as video composition
   // videoSequence->staticTimeRanges.push_back(range);
   videoSequence->composition = vidComposition;

@@ -145,14 +145,16 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
 }
 
 //zzy
-VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath) {
-  printf("ReadVideoSequenceFromFile: %s\n", filePath.c_str());
+VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const int targetFrames) {
+  printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d, targetFrames:%d\n", filePath.c_str(), cutFrom, cutTo, targetFrames);
   AVFormatContext *fmt_ctx = NULL;
   AVCodecContext *codec_ctx = NULL;
   const AVCodec *codec = NULL;
   AVPacket *pkt = NULL;
   int video_stream_index = -1;
   int64_t frame_interval = 0;
+  int accuSrcFrames = -1;
+  int64_t startPTS = -1;
 
   auto sequence = new VideoSequence();
 
@@ -226,6 +228,20 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath) {
     frame_interval = (fmt_ctx->streams[video_stream_index]->duration / fmt_ctx->streams[video_stream_index]->nb_frames);
   }
 
+  //seek to start frame and flush frames before
+  float seekTarget = cutFrom/sequence->frameRate;
+//  int64_t seekTargetStreamTime = av_rescale_q(seekTarget * AV_TIME_BASE, AV_TIME_BASE_Q, fmt_ctx->streams[video_stream_index]->time_base);
+//  if (av_seek_frame(fmt_ctx, video_stream_index, seekTargetStreamTime, AVSEEK_FLAG_BACKWARD) < 0) {
+//    printf("Seeking failed\n");
+//    return nullptr;
+//  }
+  if (av_seek_frame(fmt_ctx, -1, seekTarget*AV_TIME_BASE, AVSEEK_FLAG_BACKWARD) < 0) {
+    printf("Seeking failed\n");
+    return nullptr;
+  }
+  startPTS = -1;
+  //avcodec_flush_buffers(codec_ctx);
+
   // 分配 AVPacket
   pkt = av_packet_alloc();
   if (!pkt) {
@@ -240,58 +256,45 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath) {
   const int extradata_size = fmt_ctx->streams[video_stream_index]->codecpar->extradata_size;
   parse_h264_extradata(extradata, extradata_size, sequence);
 
-  // 读取帧数据
-  while (av_read_frame(fmt_ctx, pkt) >= 0) {
+  while (accuSrcFrames < cutTo - cutFrom) {
+    if (av_read_frame(fmt_ctx, pkt) < 0) {
+        printf("Failed to read frame, drains\n");
+        break;
+    }
     if (pkt->stream_index == video_stream_index) {
+      if (startPTS == -1) {
+        startPTS = pkt->pts;
+      }
+      accuSrcFrames ++;
+
       // 分析 NAL 单元
       // printf("NAL Unit, flags:%d, size:%d, dts:%lld, pts:%lld\n", pkt->flags, pkt->size, pkt->dts, pkt->pts);
       int start_bit = 0;
-      int nal_length = pkt->data[start_bit] << 24 | pkt->data[start_bit + 1] << 16 | pkt->data[start_bit + 2] << 8 | pkt->data[start_bit + 3];
-      start_bit += 4;
-      // printf("read nal length:%d\n", nal_length);
-      const uint8_t* nal = pkt->data + start_bit;
-      //debug
-      // for (int i = 0; i < 8; i++) {
-      //   printf("%02X ", nal[i]);
-      // }
-      // printf(" ... \n");
-      //push to frames
-      if ((nal[0] & 0x1F) == 6/*SEI*/) {
-        //ignore
-      } else {
-        auto videoFrame = new VideoFrame();
-        videoFrame->isKeyframe = (pkt->flags & AV_PKT_FLAG_KEY) != 0;
-        videoFrame->frame = frame_interval > 0 ? pkt->pts / frame_interval : 0;
-        videoFrame->fileBytes = ConvertToByteDataWithStartCode(nal, nal_length).release();
-        sequence->frames.push_back(videoFrame);
-      }
-      while (nal_length + start_bit < pkt->size) {
+      int nal_length = 0;
+
+      while (/*got == false &&*/ nal_length + start_bit < pkt->size) {
         start_bit += nal_length;
         nal_length = pkt->data[start_bit] << 24 | pkt->data[start_bit + 1] << 16 | pkt->data[start_bit + 2] << 8 | pkt->data[start_bit + 3];
         start_bit += 4;
-        // printf("read nal length:%d\n", nal_length);
-        nal = pkt->data + start_bit;
-        //debug
-        // for (int i = 0; i < 8; i++) {
-        //   printf("%02X ", nal[i]);
-        // }
-        // printf(" ... \n");
+        const uint8_t* nal = pkt->data + start_bit;
         //push to frames
-        if ((nal[0] & 0x1F) == 6/*SEI*/) {
+        if ((nal[0] & 0x1F) == 6/*SEI*/ ||
+          (nal[0] & 0x1F) == 7/*SEI*/   ||
+          (nal[0] & 0x1F) == 8/*SEI*/) {
           //ignore
         } else {
           auto videoFrame = new VideoFrame();
           videoFrame->isKeyframe = (pkt->flags & AV_PKT_FLAG_KEY) != 0;
-          videoFrame->frame = frame_interval > 0 ? pkt->pts / frame_interval : 0;
+          videoFrame->frame = frame_interval > 0 ? (pkt->pts - startPTS) / frame_interval : 0;
           videoFrame->fileBytes = ConvertToByteDataWithStartCode(nal, nal_length).release();
           sequence->frames.push_back(videoFrame);
         }
       }
-      
-      // printf("\n");
     }
     av_packet_unref(pkt);
   }
+
+
 
   // 清理资源
   av_packet_free(&pkt);

@@ -130,7 +130,7 @@ public:
     void SetSeekPreRoll(size_t samples); /* the number of samples to cache before the position being fast forwarded to, default is 200k samples */
     bool GetExactDuration();
     const AudioProperties &GetAudioProperties() const;
-    int GetAudio(uint8_t * const * const Data, int64_t Start, int64_t Count); // Audio outside the existing range is zeroed
+    int64_t GetAudio(uint8_t * const * const Data, int64_t Start, int64_t Count); // Audio outside the existing range is zeroed
 };
 
 #endif

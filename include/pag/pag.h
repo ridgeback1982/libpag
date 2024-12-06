@@ -828,17 +828,19 @@ class PAG_API PAGImageLayer : public PAGLayer {
 
 //zzy
 class FFAudioReader;
+class FFAudioResampler;
 class PAG_API PAGAudioSource {
 public:
-  PAGAudioSource(const std::string& path, float volume = 1.0f);
+  PAGAudioSource(const std::string& path);
   ~PAGAudioSource();
 
   void setStartFrame(Frame startFrame) { _startFrame = startFrame; }
   Frame startFrame() const { return _startFrame; }
   void setDuration(Frame duration) { _duration = duration; }
   Frame endFrame() const { return _startFrame + _duration; }
+  void setVolumeForMix(int volume);
 
-  float volume() const { return _volume; }
+  int volumeForMix() const { return _mixVolume; }
   //TBD: set cut from and cut to
 
   int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
@@ -846,12 +848,14 @@ public:
 private:
   Frame _startFrame = 0;
   Frame _duration = 0;
-  float _volume = 1.0f;
+  int _maxVolume = -1;
+  int _mixVolume = -1;
   uint8_t** _sourceBuffer = nullptr;
   int _sourceBufferSize = 0;
   int _wantedSourceSamples = 0;
-  std::shared_ptr<FFAudioReader> _ffAudioReader;
+  std::unique_ptr<FFAudioReader> _ffAudioReader;
   void* _audioFifo = nullptr;
+  std::unique_ptr<FFAudioResampler> _ffAudioResampler;
 };
 
 class PreComposeLayer;

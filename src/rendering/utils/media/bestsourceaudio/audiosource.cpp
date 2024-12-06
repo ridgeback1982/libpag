@@ -377,8 +377,8 @@ bool BestAudioSource::FillInBlock(CacheBlock &Block, uint8_t *Data[], int64_t &S
     return false;
 }
 
-int BestAudioSource::GetAudio(uint8_t * const * const Data, int64_t Start, int64_t Count) {
-    int res = (int)Count;
+int64_t BestAudioSource::GetAudio(uint8_t * const * const Data, int64_t Start, int64_t Count) {
+    int64_t res = Count;
     if (Count <= 0)
         return 0;
 

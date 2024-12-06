@@ -21,7 +21,11 @@
 
 namespace pag {
 VideoFrame::~VideoFrame() {
-  delete fileBytes;
+  //zzy
+  if (fileBytes!= nullptr) {
+    delete fileBytes;
+    fileBytes = nullptr;
+  }
 }
 
 VideoSequence::~VideoSequence() {

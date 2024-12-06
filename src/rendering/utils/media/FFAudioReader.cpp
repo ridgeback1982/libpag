@@ -7,6 +7,7 @@ FFAudioReader::FFAudioReader(const std::string& path) {
   _source.reset(new BestAudioSource(path.c_str(), -1));
   _properties = _source->GetAudioProperties();
   _start = 0;
+  _volumeDetector.reset(new FFVolumeDetector(path));
 }
 
 FFAudioReader::~FFAudioReader() {}
@@ -17,6 +18,10 @@ int FFAudioReader::getFormat() {
 
 int FFAudioReader::getChannels() {
   return _properties.Channels;
+}
+
+int FFAudioReader::getSampleRate() {
+  return _properties.SampleRate;
 }
 
 int64_t FFAudioReader::getSamplesPerChannelOfDuration(int64_t durationMicroSec) {
@@ -33,9 +38,16 @@ void FFAudioReader::seek(int64_t timeMicroSec) {
 
 int FFAudioReader::readSamples(uint8_t** data, int sampleCount) {
 //  printf("FFAudioReader::readSamples, sample count:%d, data:%p\n", sampleCount, (void*)data);
-  int res = _source->GetAudio(data, _start, sampleCount);
+  int res = (int)_source->GetAudio(data, _start, sampleCount);
   _start += res;
   return res;
+}
+
+int FFAudioReader::getMaxVolume() {
+  if (_volumeDetector == nullptr) {
+    return 0;
+  }
+  return _volumeDetector->getMaxVolumeForDuration(1000000*5, 1000000*10);
 }
 
 void FFAudioReader::test(const std::string inputPath, const std::string outputPath) {

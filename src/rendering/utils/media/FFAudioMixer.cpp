@@ -111,7 +111,7 @@ int FFAudioMixer::mixAudio(const std::vector<uint8_t*> &srcBuffers, uint8_t* dst
   AVFrame *filt_frame = av_frame_alloc();
   while (av_buffersink_get_frame(sink_ctx, filt_frame) >= 0) {
     // Process filt_frame (e.g., write to output)
-
+    // just handle the first channel
     memcpy(dstBuffer, filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
     
     //printf("Mixed frame with %d samples\n", filt_frame->nb_samples);
