@@ -57,11 +57,11 @@ namespace pag {
 #define TEST_IMAGE_WIDTH 512
 #define TEST_IMAGE_HEIGHT 512
 
-int TimeToFrame(int time, int fps) {
+int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
 }
 
-int LifetimeToFrameDuration(const movie::LifeTime& lifetime, int fps) {
+int LifetimeToFrameDuration(const movie::LifeTime& lifetime, float fps) {
     return TimeToFrame(lifetime.end_time, fps) - TimeToFrame(lifetime.begin_time, fps);
 }
 
@@ -75,23 +75,26 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     vidComposition->id = UniqueID::Next();
     vidComposition->width = video_width;
     vidComposition->height = video_height;
-    vidComposition->frameRate = video_fps;   //video og fps
+    vidComposition->frameRate = video_fps * track->content.speed;
     vidComposition->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
     vidComposition->backgroundColor = {0, 0, 0};     //hard code
 
     int ogCutFrom = track->content.cutFrom * track->content.speed;
     int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
     auto videoSequence = ReadVideoSequenceFromFile(track->content.path, 
-      TimeToFrame(ogCutFrom, video_fps), 
-      TimeToFrame(ogCutFrom + ogDuration, video_fps), 
+      TimeToFrame(ogCutFrom, video_fps),
+      TimeToFrame(ogCutFrom + ogDuration, video_fps),
       (int)vidComposition->duration);
+    videoSequence->frameRate = vidComposition->frameRate;   //modify fps of video sequence
     videoSequence->composition = vidComposition;
     vidComposition->sequences.push_back(videoSequence);
 
     auto vidPreComposeLayer = new PreComposeLayer();
     vidPreComposeLayer->id = UniqueID::Next();
-    vidPreComposeLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
-    vidPreComposeLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
+    vidPreComposeLayer->startTime = TimeToFrame(track->lifetime.begin_time, vidComposition->frameRate);
+    //zzy, must set compositionStartTime same as startTime, or it will be zero, and cause video start play from some middle point
+    vidPreComposeLayer->compositionStartTime = vidPreComposeLayer->startTime;
+    vidPreComposeLayer->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
     vidPreComposeLayer->transform = Transform2D::MakeDefault().release();
     //set transform
     vidPreComposeLayer->transform->anchorPoint->value.set(video_width/2, video_height/2);
@@ -325,7 +328,8 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   // }
   auto vidPreComposeLayer = new PreComposeLayer();
   vidPreComposeLayer->id = UniqueID::Next();
-  vidPreComposeLayer->startTime = 0;              //set by json
+  vidPreComposeLayer->startTime = 30;              //set by json
+  vidPreComposeLayer->compositionStartTime = vidPreComposeLayer->startTime;
   vidPreComposeLayer->duration = TEST_DURATION;   //set by json
   vidPreComposeLayer->transform = Transform2D::MakeDefault().release();
 //  auto videoWidth = vidComposition->sequences[0]->getVideoWidth();
