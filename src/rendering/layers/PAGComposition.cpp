@@ -532,7 +532,8 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
   int frame = getAudioFrameNumber(targetSampleRate);
 
   //collect all visible audio sources
-  std::vector<std::unique_ptr<uint8_t[]>> srcBuffers2;
+  //std::vector<std::unique_ptr<uint8_t[]>> srcBuffers2;
+    std::vector<AudioPreMixData>srcBuffers2;
   for (size_t index=0; index<audios.size(); index++) {
     auto audio = audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
@@ -544,25 +545,20 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
        if (audio->readAudioBySamples(samples, srcBuffer.get(), bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
          goto end;
        }
-      srcBuffers2.push_back(std::move(srcBuffer));
+        srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
     }
   }
 
   //do mix here
   if (srcBuffers2.size() > 1) {
     if (audioMixer) {
-      std::vector<uint8_t*> tmpBuffers;
-      for (auto& srcBuffer : srcBuffers2) {
-        tmpBuffers.push_back(srcBuffer.get());
-      }
-
-      if (audioMixer->mixAudio(tmpBuffers, buffer, bufferSize) < 0) {
+      if (audioMixer->mixAudio(srcBuffers2, buffer, bufferSize) < 0) {
         goto end;
       }
       res = bufferSize;
     }
   } else if (srcBuffers2.size() == 1) {
-    memcpy(buffer, srcBuffers2[0].get(), bufferSize);
+    memcpy(buffer, srcBuffers2[0].buffer.get(), bufferSize);
     res = bufferSize;
   }
    

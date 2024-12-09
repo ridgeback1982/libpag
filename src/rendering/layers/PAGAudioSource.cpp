@@ -32,10 +32,11 @@ PAGAudioSource::~PAGAudioSource() {
 
 void PAGAudioSource::setVolumeForMix(int volume) {
     printf("PAGAudioSource::setVolumeForMix, volume:%d\n", volume);
-    if (_maxVolume == -1) {
-        // get max volume
-        _ffAudioReader->getMaxVolume();
-    }
+    _mixVolume = volume;
+    // if (_maxVolume == -1) {
+    //     // get max volume
+    //     _ffAudioReader->getMaxVolume();
+    // }
 }
 
 int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
@@ -97,6 +98,8 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
         dst_filled_samples = src_samples;
         memcpy(buffer, _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
     }
+
+    //change speed here, use fifo
     
     return dst_filled_samples;
 }

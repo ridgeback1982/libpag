@@ -838,6 +838,8 @@ public:
   Frame startFrame() const { return _startFrame; }
   void setDuration(Frame duration) { _duration = duration; }
   Frame endFrame() const { return _startFrame + _duration; }
+
+  void setSpeed(float speed) { _speed = speed; }
   void setVolumeForMix(int volume);
 
   int volumeForMix() const { return _mixVolume; }
@@ -848,8 +850,9 @@ public:
 private:
   Frame _startFrame = 0;
   Frame _duration = 0;
-  int _maxVolume = -1;
+  // int _maxVolume = -1;
   int _mixVolume = -1;
+  float _speed = 1.0f;
   uint8_t** _sourceBuffer = nullptr;
   int _sourceBufferSize = 0;
   int _wantedSourceSamples = 0;

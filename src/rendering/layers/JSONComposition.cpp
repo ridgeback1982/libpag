@@ -144,8 +144,9 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
 
             if (track->content.mixVolume > MIN_VOLUME) {
               auto audioSource = std::make_shared<PAGAudioSource>(track->content.path.c_str());
-              audioSource->setStartFrame(0);
-              audioSource->setDuration(TEST_DURATION);
+              audioSource->setStartFrame(TimeToFrame(track->lifetime.begin_time, movie.video.fps));
+              audioSource->setDuration(LifetimeToFrameDuration(track->lifetime, movie.video.fps));
+              audioSource->setSpeed(track->content.speed);
               audioSource->setVolumeForMix(track->content.mixVolume);
               jsonComposition->addAudioSource(audioSource);
             }
@@ -158,6 +159,14 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "music") {
             auto track = static_cast<movie::MusicTrack*>(t);
             printf("music track, path:%s\n", track->content.path.c_str());
+            if (track->content.mixVolume > MIN_VOLUME) {
+              auto audioSource = std::make_shared<PAGAudioSource>(track->content.path.c_str());
+              audioSource->setStartFrame(TimeToFrame(track->lifetime.begin_time, movie.video.fps));
+              audioSource->setDuration(LifetimeToFrameDuration(track->lifetime, movie.video.fps));
+              audioSource->setSpeed(track->content.speed);
+              audioSource->setVolumeForMix(track->content.mixVolume);
+              jsonComposition->addAudioSource(audioSource);
+            }
         } else if (t->type == "image") {
             auto track = static_cast<movie::ImageTrack*>(t);
             printf("image track, path:%s\n", track->content.path.c_str());
