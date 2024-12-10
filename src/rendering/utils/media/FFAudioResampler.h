@@ -13,7 +13,7 @@ public:
     FFAudioResampler(int dstSampleRate, int dstChannels, int dstFormat);
     ~FFAudioResampler();
 
-    int resample(uint8_t* dst, int dstLength, 
+    int process(uint8_t* dst, int dstLength, 
         const uint8_t* src, int srcLength, int srcSamples, int srcSampleRate, int srcChannels, int srcFormat);
 
 private:

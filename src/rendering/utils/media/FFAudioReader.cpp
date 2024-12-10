@@ -6,8 +6,10 @@ namespace pag {
 FFAudioReader::FFAudioReader(const std::string& path) {
   _source.reset(new BestAudioSource(path.c_str(), -1));
   _properties = _source->GetAudioProperties();
-  _start = 0;
+  _from = 0;
+  _to = -1;
   _volumeDetector.reset(new FFVolumeDetector(path));
+  _speed = 1.0f;
 }
 
 FFAudioReader::~FFAudioReader() {}
@@ -32,15 +34,80 @@ int FFAudioReader::getBytesPerSample() {
   return _properties.BytesPerSample;
 }
 
-void FFAudioReader::seek(int64_t timeMicroSec) {
-  _start = timeMicroSec * _properties.SampleRate / 1000000;
+void FFAudioReader::setCutFrom(int64_t timeMicroSec) {
+  _from = timeMicroSec * _properties.SampleRate / 1000000;
 }
 
+void FFAudioReader::setCutTo(int64_t timeMicroSec) {
+  _to = timeMicroSec * _properties.SampleRate / 1000000;
+}
+
+//returns sample count
 int FFAudioReader::readSamples(uint8_t** data, int sampleCount) {
 //  printf("FFAudioReader::readSamples, sample count:%d, data:%p\n", sampleCount, (void*)data);
-  int res = (int)_source->GetAudio(data, _start, sampleCount);
-  _start += res;
-  return res;
+  int processedCount = 0;
+  int res = 0;
+
+  if (_speed != 1.0f) {
+    if (_atempo == nullptr) {
+      _atempo = std::make_unique<FFAudioAtempo>(_properties.SampleRate, _properties.Channels, _properties.Format);
+      _atempo->setSpeed(_speed);
+    }
+    _atempo->setOuputSamples(sampleCount);
+    AVFrame* input = nullptr;
+    if (_atempo->availableSamples() >= sampleCount) {
+      AVFrame* output = nullptr;
+      res = _atempo->process(nullptr, &output);
+      if (res == ErrorCode::SUCCESS) {
+        memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
+        // printf("FFAudioAtempo::process OK(enough available), output samples:%d\n", output->nb_samples);
+        processedCount += output->nb_samples;
+      } else {
+        printf("FFAudioAtempo::process failed, res:%d\n", res);
+      } 
+    } else {
+      do {
+        input = av_frame_alloc();
+        input->nb_samples = sampleCount;
+        input->format = _properties.Format;
+        av_channel_layout_default(&input->ch_layout, _properties.Channels);
+        input->sample_rate = _properties.SampleRate;
+        if (av_frame_get_buffer(input, 0) < 0) {
+          printf("Failed to allocate the input frame\n");
+          av_frame_free(&input);
+          return 0;
+        }
+
+        int count = (int)_source->GetAudio(input->data, _from, sampleCount);
+        if (count == 0) {
+          printf("FFAudioReader::readSamples, audio source drains\n");
+          av_frame_free(&input);
+        }
+        _from += count;
+        AVFrame* output = nullptr;
+        res = _atempo->process(input, &output);
+        if (res == ErrorCode::SUCCESS) {
+          memcpy(data[0], output->data[0], _properties.BytesPerSample * output->nb_samples);
+          // printf("FFAudioAtempo::process OK, output samples:%d\n", output->nb_samples);
+          processedCount += output->nb_samples;
+        } else {
+          if (res == ErrorCode::AGAIN) {
+            // printf("FFAudioAtempo::process AGAIN, need more input samples\n");
+          } else {
+            printf("FFAudioAtempo::process failed, res:%d\n", res);
+          }
+        }        
+        av_frame_free(&input);
+        av_frame_free(&output);
+      } while (res == ErrorCode::AGAIN);
+    }
+  } else {
+    int count = (int)_source->GetAudio(data, _from, sampleCount);
+    _from += count;
+    processedCount += count;
+  }
+
+  return processedCount;
 }
 
 int FFAudioReader::getMaxVolume() {

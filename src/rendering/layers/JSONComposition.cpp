@@ -108,6 +108,28 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     return vidPreComposeLayer;
 }
 
+#define CREATE_AUDIO_SOURCE(typedTrack, spec) \
+    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.path.c_str()); \
+    audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
+    audioSource->setDuration(LifetimeToFrameDuration(typedTrack->lifetime, spec.fps)); \
+    audioSource->setSpeed(typedTrack->content.speed); \
+    audioSource->setCutFrom(1000*(int64_t)(typedTrack->content.cutFrom * typedTrack->content.speed)); \
+    audioSource->setVolumeForMix(typedTrack->content.mixVolume); \
+    return audioSource; 
+
+std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie::Track* track, const movie::MovieSpec& spec) {
+  if (type == "music") {
+    auto typedTrack = static_cast<movie::MusicTrack*>(track);
+    CREATE_AUDIO_SOURCE(typedTrack, spec);
+  } else if (type == "voice") {
+
+  } else if (type == "video") {
+    auto typedTrack = static_cast<movie::VideoTrack*>(track);
+    CREATE_AUDIO_SOURCE(typedTrack, spec);
+  }
+  return nullptr;
+}
+
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str) {
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
@@ -134,6 +156,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     //add track to PAGLayer one by one
     for (auto& t : story.tracks) {
         if (t->type == "video") {
+            //create video PAGComposition and add to JSONComposition
             auto track = static_cast<movie::VideoTrack*>(t);
             track->content.init();
             printf("video track, path:%s\n", track->content.path.c_str());
@@ -142,12 +165,9 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
             jsonComposition->addLayer(pagVideoLayer);
 
+            //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
-              auto audioSource = std::make_shared<PAGAudioSource>(track->content.path.c_str());
-              audioSource->setStartFrame(TimeToFrame(track->lifetime.begin_time, movie.video.fps));
-              audioSource->setDuration(LifetimeToFrameDuration(track->lifetime, movie.video.fps));
-              audioSource->setSpeed(track->content.speed);
-              audioSource->setVolumeForMix(track->content.mixVolume);
+              auto audioSource = createAudioSource(t->type, track , movie.video);
               jsonComposition->addAudioSource(audioSource);
             }
         } else if (t->type == "gif") {
@@ -159,12 +179,9 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "music") {
             auto track = static_cast<movie::MusicTrack*>(t);
             printf("music track, path:%s\n", track->content.path.c_str());
+            //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
-              auto audioSource = std::make_shared<PAGAudioSource>(track->content.path.c_str());
-              audioSource->setStartFrame(TimeToFrame(track->lifetime.begin_time, movie.video.fps));
-              audioSource->setDuration(LifetimeToFrameDuration(track->lifetime, movie.video.fps));
-              audioSource->setSpeed(track->content.speed);
-              audioSource->setVolumeForMix(track->content.mixVolume);
+              auto audioSource = createAudioSource(t->type, track , movie.video);
               jsonComposition->addAudioSource(audioSource);
             }
         } else if (t->type == "image") {

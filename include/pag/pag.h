@@ -839,11 +839,13 @@ public:
   void setDuration(Frame duration) { _duration = duration; }
   Frame endFrame() const { return _startFrame + _duration; }
 
-  void setSpeed(float speed) { _speed = speed; }
+  void setSpeed(float speed);
   void setVolumeForMix(int volume);
 
   int volumeForMix() const { return _mixVolume; }
-  //TBD: set cut from and cut to
+  
+  void setCutFrom(int64_t timeMicroSec);
+  void setCutTo(int64_t timeMicroSec);
 
   int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
 
@@ -852,12 +854,10 @@ private:
   Frame _duration = 0;
   // int _maxVolume = -1;
   int _mixVolume = -1;
-  float _speed = 1.0f;
   uint8_t** _sourceBuffer = nullptr;
   int _sourceBufferSize = 0;
   int _wantedSourceSamples = 0;
   std::unique_ptr<FFAudioReader> _ffAudioReader;
-  void* _audioFifo = nullptr;
   std::unique_ptr<FFAudioResampler> _ffAudioResampler;
 };
 

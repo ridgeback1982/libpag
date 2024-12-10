@@ -25,26 +25,34 @@ PAGAudioSource::PAGAudioSource(const std::string& path) {
 }
 
 PAGAudioSource::~PAGAudioSource() {
-  if (_audioFifo != nullptr) {
-    av_audio_fifo_free((AVAudioFifo*)_audioFifo);
-  }
+}
+
+void PAGAudioSource::setSpeed(float speed) {
+    if (_ffAudioReader) {
+        _ffAudioReader->setSpeed(speed);
+    }
 }
 
 void PAGAudioSource::setVolumeForMix(int volume) {
     printf("PAGAudioSource::setVolumeForMix, volume:%d\n", volume);
     _mixVolume = volume;
-    // if (_maxVolume == -1) {
-    //     // get max volume
-    //     _ffAudioReader->getMaxVolume();
-    // }
+}
+
+void PAGAudioSource::setCutFrom(int64_t timeMicroSec) {
+    if (_ffAudioReader) {
+        _ffAudioReader->setCutFrom(timeMicroSec);
+    }
+}
+
+void PAGAudioSource::setCutTo(int64_t timeMicroSec) {
+    if (_ffAudioReader) {
+        _ffAudioReader->setCutTo(timeMicroSec);
+    }
 }
 
 int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
     if (targetSampleRate == 0 || targetChannels == 0)
         return 0;
-    if (_audioFifo == nullptr) {
-        _audioFifo = av_audio_fifo_alloc((AVSampleFormat)targetFormat, targetChannels, (int)samples);
-    }
     if (_ffAudioResampler == nullptr) {
         //do not change the format of the dst audio
         _ffAudioResampler = std::make_unique<FFAudioResampler>(targetSampleRate, targetChannels, targetFormat);
@@ -86,20 +94,18 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
     }
     
     //resample/enhance here
-    auto srcSampleRate = _ffAudioReader->getSamplesPerChannelOfDuration(1000000);
+    auto srcSampleRate = _ffAudioReader->getSampleRate();
     auto srcFormat = (AVSampleFormat)_ffAudioReader->getFormat();
     auto srcChannels = 1;   //_ffAudioReader->getChannels();    //zzy, hardcode mono channel
     int dst_filled_samples = 0;
     if (srcSampleRate != targetSampleRate ||
         srcFormat != targetFormat ||
         srcChannels != targetChannels) {
-        dst_filled_samples = _ffAudioResampler->resample(buffer, bufferSize, _sourceBuffer[0], _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
+        dst_filled_samples = _ffAudioResampler->process(buffer, bufferSize, _sourceBuffer[0], _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
     } else {
         dst_filled_samples = src_samples;
         memcpy(buffer, _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
     }
-
-    //change speed here, use fifo
     
     return dst_filled_samples;
 }

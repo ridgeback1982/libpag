@@ -26,7 +26,7 @@ FFAudioResampler::~FFAudioResampler() {
     }
 }
 
-int FFAudioResampler::resample(uint8_t* dst, int dstLength,
+int FFAudioResampler::process(uint8_t* dst, int dstLength,
         const uint8_t* src, int srcLength, int srcSamples, int srcSampleRate, int srcChannels, int srcFormat) {
     int ret = -1;
     if (srcSampleRate != _dstSampleRate ||

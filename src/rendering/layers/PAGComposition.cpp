@@ -532,20 +532,19 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
   int frame = getAudioFrameNumber(targetSampleRate);
 
   //collect all visible audio sources
-  //std::vector<std::unique_ptr<uint8_t[]>> srcBuffers2;
-    std::vector<AudioPreMixData>srcBuffers2;
+  std::vector<AudioPreMixData>srcBuffers2;
   for (size_t index=0; index<audios.size(); index++) {
     auto audio = audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
-       auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
-        if (srcBuffer == nullptr) {
-            goto end;
-        }
+      auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
+      if (srcBuffer == nullptr) {
+        goto end;
+      }
        
-       if (audio->readAudioBySamples(samples, srcBuffer.get(), bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
-         goto end;
-       }
-        srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
+      if (audio->readAudioBySamples(samples, srcBuffer.get(), bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
+        goto end;
+      }
+      srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
     }
   }
 
