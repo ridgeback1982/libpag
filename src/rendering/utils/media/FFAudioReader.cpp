@@ -8,7 +8,7 @@ FFAudioReader::FFAudioReader(const std::string& path) {
   _properties = _source->GetAudioProperties();
   _from = 0;
   _to = -1;
-  _volumeDetector.reset(new FFVolumeDetector(path));
+  // _volumeDetector.reset(new FFVolumeDetector(path));   //no need for volume detection
   _speed = 1.0f;
 }
 

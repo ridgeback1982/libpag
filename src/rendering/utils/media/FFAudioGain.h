@@ -16,19 +16,20 @@ extern "C" {
 //zzy
 namespace pag {
 
-class FFAudioAtempo : public FFBufferedFilter {
+
+class PAG_API FFAudioGain : public FFBufferedFilter {
 public:
-    FFAudioAtempo(int sampleRate, int channels, int format);
-    virtual ~FFAudioAtempo();
+    FFAudioGain(int sampleRate, int channels, int format);
+    virtual ~FFAudioGain();
     int setupCoreFilter() override;
 
-    void setSpeed(float speed) { _speed = speed; }
+    void setGain(int gain) { _gain = gain; }
 
 private:
-    float _speed = 1.0f;
-    AVFilterContext *_atempo_ctx = NULL;
+    int _gain = 17;
+    bool _setUp = false;
+//    AVFilterContext *_gain_ctx = NULL;
 };
-
 
 
 

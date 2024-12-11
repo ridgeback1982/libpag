@@ -104,6 +104,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
         dst_filled_samples = _ffAudioResampler->process(buffer, bufferSize, _sourceBuffer[0], _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
     } else {
         dst_filled_samples = src_samples;
+        //zzy, hardcode mono channel
         memcpy(buffer, _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
     }
     

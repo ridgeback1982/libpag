@@ -847,6 +847,7 @@ public:
   void setCutFrom(int64_t timeMicroSec);
   void setCutTo(int64_t timeMicroSec);
 
+  //return samples
   int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
 
 private:
@@ -866,6 +867,7 @@ class PreComposeLayer;
 class VectorComposition;
 
 class FFAudioMixer;   //zzy
+class FFAudioGain;    //zzy
 
 class PAG_API PAGComposition : public PAGLayer {
  public:
@@ -992,8 +994,12 @@ class PAG_API PAGComposition : public PAGLayer {
 
   //zzy
   void setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer);
+  void setAudioGain(std::shared_ptr<FFAudioGain> audioGain);
   void addAudioSource(std::shared_ptr<PAGAudioSource> audioSource);
+  //return ErrorCode
   int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+  //return samples
+  int readMixedAudioSamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
   int getAudioFrameNumber(int targetSampleRate) const;
 
  protected:
@@ -1005,7 +1011,8 @@ class PAG_API PAGComposition : public PAGLayer {
   //zzy
   std::vector<std::shared_ptr<PAGAudioSource>> audios;
   std::shared_ptr<FFAudioMixer> audioMixer;
-  int64_t _accumulatedAudioSamples = 0;
+  std::shared_ptr<FFAudioGain> audioGain;
+  int64_t _audioTimelineBySamples = 0;
 
   PAGComposition(int width, int height);
   std::vector<std::shared_ptr<PAGLayer>> getLayersBy(
