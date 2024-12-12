@@ -43,7 +43,7 @@ void FFAudioReader::setCutTo(int64_t timeMicroSec) {
 }
 
 //returns sample count
-int FFAudioReader::readSamples(uint8_t** data, int sampleCount) {
+int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
 //  printf("FFAudioReader::readSamples, sample count:%d, data:%p\n", sampleCount, (void*)data);
   int processedCount = 0;
   int res = 0;
@@ -59,7 +59,19 @@ int FFAudioReader::readSamples(uint8_t** data, int sampleCount) {
       AVFrame* output = nullptr;
       res = _atempo->process(nullptr, &output);
       if (res == ErrorCode::SUCCESS) {
-        memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
+        if (output->ch_layout.nb_channels == 1) {
+          for (int i = 0; i < channels; i++) {
+            memcpy(data[i], output->data[0], _properties.BytesPerSample * sampleCount);
+          }
+        } else {
+          if (channels == 1) {
+            memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
+          } else {
+            for(int i = 0; i < output->ch_layout.nb_channels; i++) {
+              memcpy(data[i], output->data[i], _properties.BytesPerSample * sampleCount);
+            }
+          }
+        }
         // printf("FFAudioAtempo::process OK(enough available), output samples:%d\n", output->nb_samples);
         processedCount += output->nb_samples;
       } else {
@@ -87,7 +99,19 @@ int FFAudioReader::readSamples(uint8_t** data, int sampleCount) {
         AVFrame* output = nullptr;
         res = _atempo->process(input, &output);
         if (res == ErrorCode::SUCCESS) {
-          memcpy(data[0], output->data[0], _properties.BytesPerSample * output->nb_samples);
+          if (output->ch_layout.nb_channels == 1) {
+            for (int i = 0; i < channels; i++) {
+              memcpy(data[i], output->data[0], _properties.BytesPerSample * sampleCount);
+            }
+          } else {
+            if (channels == 1) {
+              memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
+            } else {
+              for(int i = 0; i < output->ch_layout.nb_channels; i++) {
+                memcpy(data[i], output->data[i], _properties.BytesPerSample * sampleCount);
+              }
+            }
+          }
           // printf("FFAudioAtempo::process OK, output samples:%d\n", output->nb_samples);
           processedCount += output->nb_samples;
         } else {
@@ -137,7 +161,7 @@ void FFAudioReader::test(const std::string inputPath, const std::string outputPa
     }
     int samples = wantedSamples;
     do {
-        samples = reader.readSamples(data, wantedSamples);
+        samples = reader.readSamples(data, channels, wantedSamples);
         if (samples > 0) {
             fwrite(data[0], reader.getBytesPerSample(), samples, outputFile);
         }

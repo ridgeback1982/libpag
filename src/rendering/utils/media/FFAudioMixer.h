@@ -23,7 +23,7 @@ public:
     FFAudioMixer(int sampleRate, int channelCount, int format);
     ~FFAudioMixer();
 
-    int mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t* dstBuffer, int bufferSize);
+    int mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffer, int bufferSize, int channels);
 
 private:
     int setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffers, AVFilterGraph* graph, AVFilterContext*** sources, AVFilterContext** sink);

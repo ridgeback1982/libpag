@@ -25,6 +25,19 @@ PAGAudioSource::PAGAudioSource(const std::string& path) {
 }
 
 PAGAudioSource::~PAGAudioSource() {
+    releaseSourceBuffer();
+}
+
+void PAGAudioSource::releaseSourceBuffer() {
+    if (_sourceBuffer) {
+        for (int i = 0; i < _ffAudioReader->getChannels(); i++) {
+            if (_sourceBuffer[i]) {
+                delete[] _sourceBuffer[i];
+                _sourceBuffer[i] = NULL;
+            }
+        }
+        delete[] _sourceBuffer;
+    }
 }
 
 void PAGAudioSource::setSpeed(float speed) {
@@ -50,7 +63,7 @@ void PAGAudioSource::setCutTo(int64_t timeMicroSec) {
     }
 }
 
-int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
+int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
     if (targetSampleRate == 0 || targetChannels == 0)
         return 0;
     if (_ffAudioResampler == nullptr) {
@@ -58,18 +71,10 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
         _ffAudioResampler = std::make_unique<FFAudioResampler>(targetSampleRate, targetChannels, targetFormat);
     }
     int samplerate = (int)_ffAudioReader->getSampleRate();
+    int channels = _ffAudioReader->getChannels();
     int wanted_samples = (int)av_rescale_rnd(samples, samplerate, targetSampleRate, AV_ROUND_UP);
     if (_wantedSourceSamples < wanted_samples) {
-        if (_sourceBuffer) {
-            for (int i = 0; i < _ffAudioReader->getChannels(); i++) {
-                if (_sourceBuffer[i]) {
-                    delete[] _sourceBuffer[i];
-                    _sourceBuffer[i] = NULL;
-                }
-            }
-            delete[] _sourceBuffer;
-        }
-        int channels = _ffAudioReader->getChannels();
+        releaseSourceBuffer();
         if (channels <= 0)
             return 0;
         _sourceBuffer = new uint8_t*[channels];
@@ -88,7 +93,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
         }
     }
     
-    int src_samples = _ffAudioReader->readSamples(_sourceBuffer, _wantedSourceSamples);
+    int src_samples = _ffAudioReader->readSamples(_sourceBuffer, channels, _wantedSourceSamples);
     if (src_samples <= 0) {
         return 0;
     }
@@ -96,16 +101,27 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t* buffer, int buf
     //resample/enhance here
     auto srcSampleRate = _ffAudioReader->getSampleRate();
     auto srcFormat = (AVSampleFormat)_ffAudioReader->getFormat();
-    auto srcChannels = 1;   //_ffAudioReader->getChannels();    //zzy, hardcode mono channel
+    auto srcChannels = _ffAudioReader->getChannels();
     int dst_filled_samples = 0;
     if (srcSampleRate != targetSampleRate ||
         srcFormat != targetFormat ||
         srcChannels != targetChannels) {
-        dst_filled_samples = _ffAudioResampler->process(buffer, bufferSize, _sourceBuffer[0], _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
+        dst_filled_samples = _ffAudioResampler->process(buffers, bufferSize, _sourceBuffer, _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
     } else {
         dst_filled_samples = src_samples;
-        //zzy, hardcode mono channel
-        memcpy(buffer, _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
+        if (channels == 1) {
+          for (int i = 0; i < targetChannels; i++) {
+            memcpy(buffers[i], _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
+          }
+        } else {
+          if (targetChannels == 1) {
+            memcpy(buffers[0], _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
+          } else {
+            for(int i = 0; i < targetChannels; i++) {
+              memcpy(buffers[i], _sourceBuffer[i], _ffAudioReader->getBytesPerSample() * src_samples);
+            }
+          }
+        }
     }
     
     return dst_filled_samples;
