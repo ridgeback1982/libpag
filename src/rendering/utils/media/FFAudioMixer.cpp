@@ -117,7 +117,7 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     return 0;
 }
 
-int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t* dstBuffer, int bufferSize) {
+int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffer, int bufferSize) {
   AVFilterGraph *filter_graph = avfilter_graph_alloc();
   int srcCount = (int)srcBuffers.size();
   //std::vector<AVFilterContext*> src_ctx(srcCount, nullptr);

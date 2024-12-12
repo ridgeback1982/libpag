@@ -22,7 +22,7 @@ public:
   int getSampleRate();
   int64_t getSamplesPerChannelOfDuration(int64_t durationMicroSec);
   int getBytesPerSample();
-  int readSamples(uint8_t** data, int sampleCount);
+  int readSamples(uint8_t** data, int channels, int sampleCount);
   int getMaxVolume();
   void setSpeed(float speed) { _speed = speed; }
 

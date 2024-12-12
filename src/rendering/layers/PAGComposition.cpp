@@ -534,7 +534,7 @@ int PAGComposition::getAudioFrameNumber(int targetSampleRate) const {
     return (int)(_audioTimelineBySamples / (targetSampleRate / _frameRate));
 }
 
-int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
+int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
   int output = 0;
   int frame = getAudioFrameNumber(targetSampleRate);
 
@@ -584,10 +584,10 @@ end:
   return output;
 }
 
-int PAGComposition::readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
+int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
   int ret = ErrorCode::SUCCESS;
   if (audioGain == nullptr) {
-    int outputSamples = readMixedAudioSamples(samples, buffer, bufferSize, targetSampleRate, targetFormat, targetChannels);
+    int outputSamples = readMixedAudioSamples(samples, buffers, bufferSize, targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
       printf("failed to read mixed audio samples\n");
       return ErrorCode::UNKNOWN_ERROR;

@@ -848,9 +848,10 @@ public:
   void setCutTo(int64_t timeMicroSec);
 
   //return samples
-  int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+  int readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
 
 private:
+  void releaseSourceBuffer();
   Frame _startFrame = 0;
   Frame _duration = 0;
   // int _maxVolume = -1;
@@ -997,7 +998,7 @@ class PAG_API PAGComposition : public PAGLayer {
   void setAudioGain(std::shared_ptr<FFAudioGain> audioGain);
   void addAudioSource(std::shared_ptr<PAGAudioSource> audioSource);
   //return ErrorCode
-  int readAudioBySamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+  int readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
   //return samples
   int readMixedAudioSamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
   int getAudioFrameNumber(int targetSampleRate) const;

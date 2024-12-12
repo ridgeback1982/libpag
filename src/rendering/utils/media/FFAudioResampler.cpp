@@ -26,8 +26,8 @@ FFAudioResampler::~FFAudioResampler() {
     }
 }
 
-int FFAudioResampler::process(uint8_t* dst, int dstLength,
-        const uint8_t* src, int srcLength, int srcSamples, int srcSampleRate, int srcChannels, int srcFormat) {
+int FFAudioResampler::process(uint8_t** dst, int dstLength,
+        const uint8_t** src, int srcLength, int srcSamples, int srcSampleRate, int srcChannels, int srcFormat) {
     int ret = -1;
     if (srcSampleRate != _dstSampleRate ||
         srcChannels != _dstChannels ||
@@ -69,20 +69,20 @@ int FFAudioResampler::process(uint8_t* dst, int dstLength,
             return ret;
         }
 
-        //hardcode mono channel for now
-        uint8_t ** dst_data = new uint8_t*[1];
-        *dst_data = dst;
+        // //hardcode mono channel for now
+        // uint8_t ** dst_data = new uint8_t*[1];
+        // *dst_data = dst;
         int dst_nb_samples = (int)av_rescale_rnd(swr_get_delay(swr_ctx, in_sample_rate) + srcSamples,
                                         out_sample_rate, in_sample_rate, AV_ROUND_UP);
         if (dst_nb_samples * av_get_bytes_per_sample((AVSampleFormat)_dstFormat) > dstLength) {
             return -1;
         }
 
-        //hardcode mono channel for now
-        uint8_t ** src_data = new uint8_t*[1];
-        *src_data = (uint8_t*)src;
+        // //hardcode mono channel for now
+        // uint8_t ** src_data = new uint8_t*[1];
+        // *src_data = (uint8_t*)src;
         int src_nb_samples = srcSamples;
-        ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t **)src_data, src_nb_samples);
+        ret = swr_convert(swr_ctx, dst, dst_nb_samples, src, src_nb_samples);
         //printf("audio swr_convert, samples:%d|%d, sr:%d|%d, size:%d|%d, ret:%d \n", dst_nb_samples, src_nb_samples, out_sample_rate, in_sample_rate, bufferSize, _sourceBufferSize, ret);
         if (ret < 0) {
             fprintf(stderr, "Error while converting\n");
@@ -90,46 +90,61 @@ int FFAudioResampler::process(uint8_t* dst, int dstLength,
         }
         if (ret > 0) {
             //put in the converted data into the audio fifo
-            uint8_t** audioChunks = new uint8_t*[1];
-            audioChunks[0] = dst_data[0];
+            // uint8_t** audioChunks = new uint8_t*[1];
+            // audioChunks[0] = dst_data[0];
             if (av_audio_fifo_realloc((AVAudioFifo*)_audioFifo, av_audio_fifo_size((AVAudioFifo*)_audioFifo) + ret) < 0) {
               printf("cannot reallocate audio fifo\n");
               return 0;
             }
-            if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)audioChunks, ret) < 0) {
+            if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)dst, ret) < 0) {
               printf("failed to write to audio fifo\n");
               return 0;
             }
             //check if there is some left in swr's internal cache, and must flush it out. Or it will be dropped next convert
             if (ret < dst_nb_samples) {
                 //flush using null input
-                ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t **)nullptr, 0);
+                ret = swr_convert(swr_ctx, dst, dst_nb_samples, (const uint8_t **)nullptr, 0);
                 if (av_audio_fifo_realloc((AVAudioFifo*)_audioFifo, av_audio_fifo_size((AVAudioFifo*)_audioFifo) + ret) < 0) {
                     printf("cannot reallocate audio fifo\n");
                     return 0;
                 }
-                if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)audioChunks, ret) < 0) {
+                if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)dst, ret) < 0) {
                     printf("failed to write to audio fifo\n");
                     return 0;
                 }
             }
             //read out the converted data from the audio fifo if there is enough
             if (av_audio_fifo_size((AVAudioFifo*)_audioFifo) >= dst_nb_samples) {
-              if (av_audio_fifo_read((AVAudioFifo*)_audioFifo, (void**)audioChunks, (int)dst_nb_samples) < 0) {
+              if (av_audio_fifo_read((AVAudioFifo*)_audioFifo, (void**)dst, (int)dst_nb_samples) < 0) {
                 return 0;
               }
               ret = (int)dst_nb_samples;
             } else {
               ret = 0;
             }
-            delete[] audioChunks;
+            // delete[] audioChunks;
         }
         
-        free(src_data);
-        free(dst_data);
+        // free(src_data);
+        // free(dst_data);
         swr_free(&swr_ctx);
     } else {
-        memcpy(dst, src, srcLength);
+        int bytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(srcFormat));
+        if (srcChannels == 1) {
+          for (int i = 0; i < _dstChannels; i++) {
+            memcpy(dst[i], src[0], bytesPerSample * srcSamples);
+          }
+        } else {
+          if (_dstChannels == 1) {
+            memcpy(dst[0], src[0], bytesPerSample * srcSamples);
+          } else {
+            for(int i = 0; i < _dstChannels; i++) {
+              memcpy(dst[i], src[i], bytesPerSample * srcSamples);
+            }
+          }
+        }
+
+        // memcpy(dst, src, srcLength);
         ret = srcSamples;
     }
     return ret;
