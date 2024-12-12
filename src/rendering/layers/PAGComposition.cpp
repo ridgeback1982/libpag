@@ -543,17 +543,19 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t* buffer, int 
   for (size_t index=0; index<audios.size(); index++) {
     auto audio = audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
-      auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
+      //auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
+      auto srcBuffer = (uint8_t*)malloc(bufferSize);
       if (srcBuffer == nullptr) {
         output = 0;
         goto end;
       }
        
-      if (audio->readAudioBySamples(samples, srcBuffer.get(), bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
+      if (audio->readAudioBySamples(samples, srcBuffer, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
         //skip it, no more data
         continue;
       }
-      srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
+      //srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
+      srcBuffers2.push_back({audio->volumeForMix(), srcBuffer});
     }
   }
 
@@ -578,6 +580,12 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t* buffer, int 
     //no audio, but it is valid, so set buffer to silence
     output = (int)samples;
     memset(buffer, 0, bufferSize);
+  }
+
+  for (auto srcBuffer : srcBuffers2) {
+    if (srcBuffer.buffer) {
+      free(srcBuffer.buffer);
+    }
   }
    
 end:

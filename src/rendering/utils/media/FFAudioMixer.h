@@ -14,7 +14,8 @@ namespace pag {
 
 struct AudioPreMixData {
     int volume = 0;
-    std::unique_ptr<uint8_t[]> buffer;
+    //std::unique_ptr<uint8_t[]> buffer;
+    uint8_t* buffer;
 };
 
 class PAG_API FFAudioMixer {

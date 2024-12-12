@@ -145,7 +145,8 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
     if (av_frame_get_buffer(frames[i], 0) < 0) {
       return -1;
     }
-    memcpy(frames[i]->data[0], srcBuffers[i].buffer.get(), bufferSize);
+    //memcpy(frames[i]->data[0], srcBuffers[i].buffer.get(), bufferSize);
+    memcpy(frames[i]->data[0], srcBuffers[i].buffer, bufferSize);
 
     // Send frame to the source filter
     if (av_buffersrc_add_frame_flags(src_ctx[i], frames[i], AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
