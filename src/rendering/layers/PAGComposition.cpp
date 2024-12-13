@@ -543,26 +543,27 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
   for (size_t index=0; index<audios.size(); index++) {
     auto audio = audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
-      //auto srcBuffer = std::make_unique<uint8_t[]>(bufferSize);
-      auto srcBuffer = (uint8_t*)malloc(bufferSize);
-      if (srcBuffer == nullptr) {
-        output = 0;
-        goto end;
+      uint8_t** srcBuffers = new uint8_t*[targetChannels];
+      for(int i=0; i<targetChannels; i++) {
+        srcBuffers[i] = new uint8_t[bufferSize];
+        if (srcBuffers[i] == nullptr) {
+          output = 0;
+          goto end;
+        }
       }
        
-      if (audio->readAudioBySamples(samples, srcBuffer, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
+      if (audio->readAudioBySamples(samples, srcBuffers, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
         //skip it, no more data
         continue;
       }
-      //srcBuffers2.push_back({audio->volumeForMix(), std::move(srcBuffer)});
-      srcBuffers2.push_back({audio->volumeForMix(), srcBuffer});
+      srcBuffers2.push_back({audio->volumeForMix(), targetChannels, srcBuffers});
     }
   }
 
   //do mix here
   if (srcBuffers2.size() > 0) {
     if (audioMixer) {
-      if (audioMixer->mixAudio(srcBuffers2, buffer, bufferSize) < 0) {
+      if (audioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
         output = 0;
         goto end;
       }
@@ -579,12 +580,21 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
   else {
     //no audio, but it is valid, so set buffer to silence
     output = (int)samples;
-    memset(buffer, 0, bufferSize);
+    for (int i = 0; i < targetChannels; i++) {
+      memset(buffers[i], 0, bufferSize);
+    }
   }
 
   for (auto srcBuffer : srcBuffers2) {
-    if (srcBuffer.buffer) {
-      free(srcBuffer.buffer);
+    if (srcBuffer.buffers) {
+      for (int i = 0; i < srcBuffer.channels; i++) {
+        if (srcBuffer.buffers[i]) {
+          delete[] srcBuffer.buffers[i];
+          srcBuffer.buffers[i] = nullptr;
+        }
+      }
+      delete[] srcBuffer.buffers;
+      srcBuffer.buffers = nullptr;
     }
   }
    
@@ -614,7 +624,7 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
       return ErrorCode::OUT_OF_MEMORY;
     }
     //hard code mono channel
-    int outputSamples = readMixedAudioSamples(samples, input->data[0], input->linesize[0], targetSampleRate, targetFormat, targetChannels);
+    int outputSamples = readMixedAudioSamples(samples, input->data, input->linesize[0], targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
       printf("failed to read mixed audio samples\n");
       return ErrorCode::UNKNOWN_ERROR;
@@ -624,7 +634,19 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
     ret = audioGain->process(input, &output);
     if (ret == ErrorCode::SUCCESS) {
       int bytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(targetFormat));
-      memcpy(buffer, output->data[0], bytesPerSample * output->nb_samples);
+      if (output->ch_layout.nb_channels == 1) {
+        for (int i = 0; i < targetChannels; i++) {
+          memcpy(buffers[i], output->data[0], bytesPerSample * output->nb_samples);
+        }
+      } else {
+        if (targetChannels == 1) {
+          memcpy(buffers[0], output->data[0], bytesPerSample * output->nb_samples);
+        } else {
+          for(int i = 0; i < targetChannels; i++) {
+            memcpy(buffers[i], output->data[i], bytesPerSample * output->nb_samples);
+          }
+        }
+      }
     } else {
       //printf("failed to get gained audio samples, %d\n", ret);
     }

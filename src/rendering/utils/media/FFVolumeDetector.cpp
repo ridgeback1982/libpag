@@ -153,7 +153,7 @@ int FFVolumeDetector::getMaxVolumeForDuration(int64_t startMicroSec, int64_t dur
         if (_resampler == nullptr) {
             _resampler = std::make_unique<FFAudioResampler>(dstSampleRate, dstChannel, dstFormat);
         }
-        ret = _resampler->process(targetFrame->data[0], targetFrame->linesize[0], frame->data[0], frame->linesize[0], (int)samples,
+        ret = _resampler->process(targetFrame->data, targetFrame->linesize[0], (const uint8_t**)frame->data, frame->linesize[0], (int)samples,
             srcSampleRate, srcChannel, srcFormat);
         if (ret < 0) {
             printf("Failed to resample audio data\n");

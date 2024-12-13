@@ -117,7 +117,7 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     return 0;
 }
 
-int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffer, int bufferSize) {
+int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffers, int bufferSize, int channels) {
   AVFilterGraph *filter_graph = avfilter_graph_alloc();
   int srcCount = (int)srcBuffers.size();
   //std::vector<AVFilterContext*> src_ctx(srcCount, nullptr);
@@ -146,7 +146,9 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
       return -1;
     }
     //memcpy(frames[i]->data[0], srcBuffers[i].buffer.get(), bufferSize);
-    memcpy(frames[i]->data[0], srcBuffers[i].buffer, bufferSize);
+    for(int j=0; j<_channelCount; j++) {
+      memcpy(frames[i]->data[j], srcBuffers[i].buffers[j], bufferSize);
+    }
 
     // Send frame to the source filter
     if (av_buffersrc_add_frame_flags(src_ctx[i], frames[i], AV_BUFFERSRC_FLAG_KEEP_REF) < 0) {
@@ -158,8 +160,19 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
   AVFrame *filt_frame = av_frame_alloc();
   while ((ret = av_buffersink_get_frame(sink_ctx, filt_frame)) >= 0) {
     // Process filt_frame (e.g., write to output)
-    // just handle the first channel
-    memcpy(dstBuffer, filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
+    if (filt_frame->ch_layout.nb_channels == 1) {
+      for (int i = 0; i < channels; i++) {
+        memcpy(dstBuffers[i], filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
+      }
+    } else {
+      if (channels == 1) {
+        memcpy(dstBuffers[0], filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
+      } else {
+        for(int i = 0; i < filt_frame->ch_layout.nb_channels; i++) {
+          memcpy(dstBuffers[i], filt_frame->data[i], std::min(filt_frame->linesize[0], bufferSize));
+        }
+      }
+    }
     
     //printf("Mixed frame with %d samples\n", filt_frame->nb_samples);
     av_frame_unref(filt_frame);

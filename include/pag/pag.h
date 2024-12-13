@@ -1000,7 +1000,7 @@ class PAG_API PAGComposition : public PAGLayer {
   //return ErrorCode
   int readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
   //return samples
-  int readMixedAudioSamples(int64_t samples, uint8_t* buffer, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
+  int readMixedAudioSamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
   int getAudioFrameNumber(int targetSampleRate) const;
 
  protected:

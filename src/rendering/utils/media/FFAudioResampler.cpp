@@ -69,18 +69,12 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
             return ret;
         }
 
-        // //hardcode mono channel for now
-        // uint8_t ** dst_data = new uint8_t*[1];
-        // *dst_data = dst;
         int dst_nb_samples = (int)av_rescale_rnd(swr_get_delay(swr_ctx, in_sample_rate) + srcSamples,
                                         out_sample_rate, in_sample_rate, AV_ROUND_UP);
         if (dst_nb_samples * av_get_bytes_per_sample((AVSampleFormat)_dstFormat) > dstLength) {
             return -1;
         }
 
-        // //hardcode mono channel for now
-        // uint8_t ** src_data = new uint8_t*[1];
-        // *src_data = (uint8_t*)src;
         int src_nb_samples = srcSamples;
         ret = swr_convert(swr_ctx, dst, dst_nb_samples, src, src_nb_samples);
         //printf("audio swr_convert, samples:%d|%d, sr:%d|%d, size:%d|%d, ret:%d \n", dst_nb_samples, src_nb_samples, out_sample_rate, in_sample_rate, bufferSize, _sourceBufferSize, ret);
@@ -130,6 +124,9 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
         swr_free(&swr_ctx);
     } else {
         int bytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(srcFormat));
+        if (bytesPerSample * srcSamples > srcLength) {
+            return -1;
+        }
         if (srcChannels == 1) {
           for (int i = 0; i < _dstChannels; i++) {
             memcpy(dst[i], src[0], bytesPerSample * srcSamples);
@@ -143,8 +140,6 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
             }
           }
         }
-
-        // memcpy(dst, src, srcLength);
         ret = srcSamples;
     }
     return ret;

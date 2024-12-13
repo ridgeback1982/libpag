@@ -106,7 +106,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
     if (srcSampleRate != targetSampleRate ||
         srcFormat != targetFormat ||
         srcChannels != targetChannels) {
-        dst_filled_samples = _ffAudioResampler->process(buffers, bufferSize, _sourceBuffer, _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
+        dst_filled_samples = _ffAudioResampler->process(buffers, bufferSize, (const uint8_t**)_sourceBuffer, _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
     } else {
         dst_filled_samples = src_samples;
         if (channels == 1) {

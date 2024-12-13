@@ -15,7 +15,8 @@ namespace pag {
 struct AudioPreMixData {
     int volume = 0;
     //std::unique_ptr<uint8_t[]> buffer;
-    uint8_t* buffer;
+    int channels = 0;
+    uint8_t** buffers = nullptr;
 };
 
 class PAG_API FFAudioMixer {
@@ -23,7 +24,7 @@ public:
     FFAudioMixer(int sampleRate, int channelCount, int format);
     ~FFAudioMixer();
 
-    int mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffer, int bufferSize, int channels);
+    int mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8_t** dstBuffers, int bufferSize, int channels);
 
 private:
     int setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffers, AVFilterGraph* graph, AVFilterContext*** sources, AVFilterContext** sink);
