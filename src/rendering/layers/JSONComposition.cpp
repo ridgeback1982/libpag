@@ -122,7 +122,8 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
     auto typedTrack = static_cast<movie::MusicTrack*>(track);
     CREATE_AUDIO_SOURCE(typedTrack, spec);
   } else if (type == "voice") {
-
+    auto typedTrack = static_cast<movie::VoiceTrack*>(track);
+    CREATE_AUDIO_SOURCE(typedTrack, spec);
   } else if (type == "video") {
     auto typedTrack = static_cast<movie::VideoTrack*>(track);
     CREATE_AUDIO_SOURCE(typedTrack, spec);
@@ -176,6 +177,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "voice") {
             auto track = static_cast<movie::VoiceTrack*>(t);
             printf("voice track, path:%s\n", track->content.path.c_str());
+            //add audio source
+            if (track->content.mixVolume > MIN_VOLUME) {
+              auto audioSource = createAudioSource(t->type, track , movie.video);
+              jsonComposition->addAudioSource(audioSource);
+            }
         } else if (t->type == "music") {
             auto track = static_cast<movie::MusicTrack*>(t);
             printf("music track, path:%s\n", track->content.path.c_str());
