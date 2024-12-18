@@ -372,6 +372,16 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     find_package(Threads)
     list(APPEND PAG_SHARED_LIBS ${CMAKE_THREAD_LIBS_INIT})
     list(APPEND PAG_SHARED_LIBS dl)
+
+    #zzy
+    list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavcodec.so 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavfilter.so 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavformat.so 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavutil.so 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswscale.so 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswresample.so)
+    message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
+
     list(APPEND PAG_COMPILE_OPTIONS -fPIC -pthread)
     if (USE_NATIVE_PLATFORM)
         find_library(GLESV2_LIB GLESv2)

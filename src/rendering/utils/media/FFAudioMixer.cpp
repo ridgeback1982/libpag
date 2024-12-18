@@ -68,23 +68,23 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
 
     AVFilterContext** source_ctxs = (AVFilterContext**)malloc(sizeof(AVFilterContext*) * srcBuffers.size());
-    for (size_t i = 0; i < srcBuffers.size(); i++) {
+    for (int i = 0; i < (int)srcBuffers.size(); i++) {
         char args[512];
         snprintf(args, sizeof(args),
                 "time_base=1/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
                 _sampleRate, _sampleRate, av_get_sample_fmt_name((AVSampleFormat)_format), _channelCount == 1 ? "mono" : "stereo");
         char name[16];
-        snprintf(name, sizeof(name), "a%zu", i);
+        snprintf(name, sizeof(name), "a%d", i);
         ret = avfilter_graph_create_filter(&source_ctxs[i], abuffersrc, name, args, NULL, graph);
         if (ret < 0) {
-            printf("Error creating buffer source for input %zu\n", i);
+            printf("Error creating buffer source for input %d\n", i);
             return -1;
         }
 
         // Connect the source to the corresponding input
         ret = avfilter_link(source_ctxs[i], 0, inputs->filter_ctx, inputs->pad_idx);
         if (ret < 0) {
-            printf("Error linking buffer source for input %zu\n", i);
+            printf("Error linking buffer source for input %d\n", i);
             return -1;
         }
 

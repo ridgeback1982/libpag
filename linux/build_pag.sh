@@ -14,7 +14,7 @@ elif [[ $(uname) == 'Linux' ]]; then
   PLATFORM="linux"
 fi
 
-node ../build_pag -p $PLATFORM -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_SHARED=OFF -DPAG_BUILD_FRAMEWORK=OFF -o vendor/libpag/$PLATFORM
+node ../build_pag -p $PLATFORM -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_SHARED=ON -o vendor/libpag/$PLATFORM
 
 make_dir vendor/libpag/include
 cp -a ../include/* vendor/libpag/include
