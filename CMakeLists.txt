@@ -295,12 +295,16 @@ elseif (MACOS)
     list(APPEND PAG_SHARED_LIBS ${CORE_MEDIA})
 
     #zzy
+    file(GLOB_RECURSE UTILS_FILES src/utils/macos/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES})
+    list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/)
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavutil.xcframework/macos-arm64_x86_64/libavutil.framework
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavcodec.xcframework/macos-arm64_x86_64/libavcodec.framework 
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswscale.xcframework/macos-arm64_x86_64/libswscale.framework
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswresample.xcframework/macos-arm64_x86_64/libswresample.framework
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavfilter.xcframework/macos-arm64_x86_64/libavfilter.framework)
+    list(APPEND PAG_SHARED_LIBS /opt/homebrew/opt/curl/lib/libcurl.dylib)
     message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
 
     if (USE_NATIVE_PLATFORM)

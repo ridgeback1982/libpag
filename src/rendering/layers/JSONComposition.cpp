@@ -24,8 +24,9 @@
 #include "pag/pag.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
-
+#include <fstream>
 #include <sstream>
+#include <curl/curl.h>
 #include "codec/tags/VideoSequence.h"
 #include "rendering/utils/media/FFAudioReader.h"
 #include "rendering/utils/media/FFAudioMixer.h"
@@ -41,7 +42,21 @@ extern "C" {
   #include "libavutil/imgutils.h"
 }
 #include "MovieObject.h"
+#include "file_util.h"
 #include <cmath>
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
+
+
+#if defined(__linux__)
+#include <sys/stat.h>
+#include <sys/types.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 
 //NOTE:
@@ -81,10 +96,14 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
     int ogCutFrom = track->content.cutFrom * track->content.speed;
     int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
-    auto videoSequence = ReadVideoSequenceFromFile(track->content.path, 
+    auto videoSequence = ReadVideoSequenceFromFile(track->content.localPath(), 
       TimeToFrame(ogCutFrom, video_fps),
       TimeToFrame(ogCutFrom + ogDuration, video_fps),
       (int)vidComposition->duration);
+    if (videoSequence == nullptr) {
+        printf("Error reading video file\n");
+        return nullptr;
+    }
     videoSequence->frameRate = vidComposition->frameRate;   //modify fps of video sequence
     videoSequence->composition = vidComposition;
     vidComposition->sequences.push_back(videoSequence);
@@ -109,7 +128,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 }
 
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
-    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.path.c_str()); \
+    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str()); \
     audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
     audioSource->setDuration(LifetimeToFrameDuration(typedTrack->lifetime, spec.fps)); \
     audioSource->setSpeed(typedTrack->content.speed); \
@@ -136,6 +155,20 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     movie::Movie movie = nmjson.get<movie::Movie>();
     movie::Story story = movie.video.stories[0];
 
+    std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
+    char tempTemplate[] = "tmp_XXXXXX";
+    std::string tempFolder(mkdtemp(tempTemplate));
+    std::string tmpDir = tmpDir1 + "/" + tempFolder;
+#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
+    if (mkdir(tmpDir.c_str(), 0755) == 0) {
+        printf("Temp Directory created\n");
+    } else {
+        printf("Error creating directory\n");
+    }
+#else
+    #error "Unsupported platform"
+#endif
+
     auto vecComposition = new VectorComposition();
     vecComposition->id = UniqueID::Next();
     vecComposition->width = movie.video.width;
@@ -159,23 +192,28 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         if (t->type == "video") {
             //create video PAGComposition and add to JSONComposition
             auto track = static_cast<movie::VideoTrack*>(t);
-            track->content.init();
+            track->content.init(tmpDir);
             printf("video track, path:%s\n", track->content.path.c_str());
             auto vidPreComposeLayer = createVideoLayer(track, movie.video);
-            vecComposition->layers.push_back(vidPreComposeLayer);
-            auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
-            jsonComposition->addLayer(pagVideoLayer);
+            if (vidPreComposeLayer != nullptr) {
+              vecComposition->layers.push_back(vidPreComposeLayer);
+              auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
+              jsonComposition->addLayer(pagVideoLayer);
 
-            //add audio source
-            if (track->content.mixVolume > MIN_VOLUME) {
-              auto audioSource = createAudioSource(t->type, track , movie.video);
-              jsonComposition->addAudioSource(audioSource);
+              //add audio source
+              if (track->content.mixVolume > MIN_VOLUME) {
+                auto audioSource = createAudioSource(t->type, track , movie.video);
+                jsonComposition->addAudioSource(audioSource);
+              }
+            } else {
+              printf("Error creating video layer, maybe codec not support\n");
             }
         } else if (t->type == "gif") {
             auto track = static_cast<movie::GifTrack*>(t);
             printf("gif track, path:%s\n", track->content.path.c_str());
         } else if (t->type == "voice") {
             auto track = static_cast<movie::VoiceTrack*>(t);
+            track->content.init(tmpDir);
             printf("voice track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
@@ -184,6 +222,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "music") {
             auto track = static_cast<movie::MusicTrack*>(t);
+            track->content.init(tmpDir);
             printf("music track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
@@ -437,17 +476,69 @@ JSONComposition::JSONComposition(PreComposeLayer* layer)
 
 namespace movie {
 
+bool starts_with(const std::string& str, const std::string& prefix) {
+    return str.compare(0, prefix.size(), prefix) == 0;
+}
 
-int VideoContent::init() {
+std::string getFileNameFromUrl(const std::string& url) {
+    size_t pos = url.find_last_of('/');
+    if (pos != std::string::npos && pos + 1 < url.size()) {
+        return url.substr(pos + 1);
+    }
+    return ""; // 没有后缀名时返回空字符串
+}
+
+size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    std::ofstream* out = static_cast<std::ofstream*>(userp);
+    size_t totalSize = size * nmemb;
+    out->write(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
+
+int curlDownload(const std::string& url, const std::string& localPath) {
+    CURL* curl = curl_easy_init();
+    if (curl) {
+        std::ofstream file(localPath);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L); // Timeout after 5 seconds for connection
+        CURLcode res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        file.close();
+        if (res != CURLE_OK) {
+            printf("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            return -1;
+        }
+        printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
+    }
+    return 0;
+}
+
+int VideoContent::init(const std::string& tmpDir) {
   AVFormatContext *fmt_ctx = NULL;
   int video_stream_index = -1;
+
+  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  if (remote) {
+      //create local path
+      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      
+      //download to local path
+      if (curlDownload(path, _localPath) < 0) {
+          return -1;
+      }
+  } else {
+    _localPath = path;
+  }
 
   // 初始化 FFmpeg 库
   avformat_network_init();
 
   // 打开输入文件
-  if (avformat_open_input(&fmt_ctx, path.c_str(), NULL, NULL) < 0) {
-    printf("Could not open input file: %s\n", path.c_str());
+  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
+    printf("Could not open input file: %s\n", _localPath.c_str());
     return -1;
   }
 
@@ -484,6 +575,22 @@ int VideoContent::init() {
                  static_cast<double>(frame_rate.num) / frame_rate.den : 0;
 
     return 0;
+}
+
+int AudioContent::init(const std::string& tmpDir) {
+  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  if (remote) {
+      //create local path
+      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      
+      //download to local path
+      if (curlDownload(path, _localPath) < 0) {
+          return -1;
+      }
+  } else {
+    _localPath = path;
+  }
+  return 0;
 }
 
 

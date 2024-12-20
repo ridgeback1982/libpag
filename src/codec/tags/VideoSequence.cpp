@@ -145,6 +145,42 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
 }
 
 //zzy
+void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence* sequence) {
+    // Parse VPS, SPS, PPS from extradata
+    if (extradata_size < 23) {
+        printf("Invalid hvcC size\n");
+        return;
+    }
+
+    // Skip the first 22 bytes of the hvcC header
+    size_t pos = 22;
+
+    uint8_t numOfArrays = extradata[pos++];
+    for (uint8_t i = 0; i < numOfArrays; ++i) {
+        uint8_t nal_unit_type = extradata[pos] & 0x3F; // Get the NAL unit type
+        pos++;
+
+        uint16_t numNalus = (extradata[pos] << 8) | extradata[pos + 1];
+        pos += 2;
+
+        printf("NAL Unit Type:%d, Number of NALUs:%d\n", (int)nal_unit_type, numNalus);
+
+        for (uint16_t j = 0; j < numNalus; ++j) {
+            uint16_t nal_unit_size = (extradata[pos] << 8) | extradata[pos + 1];
+            pos += 2;
+            printf("%d NALU, size:%d\n", j+1, nal_unit_size);
+
+            // Here, extradata + pos points to the NALU data
+            if (nal_unit_type != 39/*SEI*/) {
+                ByteData* header_byte = ConvertToByteDataWithStartCode(extradata + pos, nal_unit_size).release();
+                sequence->headers.push_back(header_byte);
+            }
+            pos += nal_unit_size;
+        }
+    }
+}
+
+//zzy
 VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const int targetFrames) {
   printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d, targetFrames:%d\n", filePath.c_str(), cutFrom, cutTo, targetFrames);
   AVFormatContext *fmt_ctx = NULL;
@@ -252,9 +288,33 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   }
 
   //read sps/pps
+  bool is_hevc = fmt_ctx->streams[video_stream_index]->codecpar->codec_id == AV_CODEC_ID_HEVC;
+  bool is_avc = fmt_ctx->streams[video_stream_index]->codecpar->codec_id == AV_CODEC_ID_H264;
+  //TBD: support other codecs, like hevc
+  //hevc: parse to nal is supported, but pag decoder does not support it yet
+  //vpx: not supported totally
+  if (is_avc == false) {
+    printf("Unsupported codec\n");
+    return nullptr;
+  }
+
   uint8_t* extradata = fmt_ctx->streams[video_stream_index]->codecpar->extradata;
   const int extradata_size = fmt_ctx->streams[video_stream_index]->codecpar->extradata_size;
-  parse_h264_extradata(extradata, extradata_size, sequence);
+  if (is_avc) {
+    parse_h264_extradata(extradata, extradata_size, sequence);
+  } else if (is_hevc) {
+    parse_h265_extradata(extradata, extradata_size, sequence);
+  } else {
+    printf("Unsupported codec\n");
+    return nullptr;
+  }
+
+  //check sps/pps result
+  if (sequence->headers.size() < 2) {
+    printf("No SPS/PPS/VPS found\n");
+    return nullptr;
+  }
+  
 
   while (accuSrcFrames < cutTo - cutFrom) {
     if (av_read_frame(fmt_ctx, pkt) < 0) {
@@ -277,12 +337,18 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
         nal_length = pkt->data[start_bit] << 24 | pkt->data[start_bit + 1] << 16 | pkt->data[start_bit + 2] << 8 | pkt->data[start_bit + 3];
         start_bit += 4;
         const uint8_t* nal = pkt->data + start_bit;
+        int nal_type = 0;
+        if (is_avc) {
+          nal_type = nal[0] & 0x1F; // Get the NAL unit type
+        } else if (is_hevc) {
+          nal_type = (nal[0] & 0x7E) >> 1; // Get the NAL unit type
+        }
         //push to frames
-        if ((nal[0] & 0x1F) == 6/*SEI*/ ||
-          (nal[0] & 0x1F) == 7/*SEI*/   ||
-          (nal[0] & 0x1F) == 8/*SEI*/) {
-          //ignore
+        if (is_avc && (nal_type == 6/*SEI*/ || nal_type == 7/*SPS*/ || nal_type == 8/*PPS*/)) {
+        } else if (is_hevc && (nal_type == 32/*VPS*/ || nal_type == 33/*SPS*/ || nal_type == 34/*PPS*/ || nal_type == 39/*SEI*/)) {
         } else {
+          //if hevc, 19 is I frame, 1 is p frame
+          //if avc, 5 is I frame, 1 is p frame
           auto videoFrame = new VideoFrame();
           videoFrame->isKeyframe = (pkt->flags & AV_PKT_FLAG_KEY) != 0;
           videoFrame->frame = frame_interval > 0 ? (pkt->pts - startPTS) / frame_interval : 0;

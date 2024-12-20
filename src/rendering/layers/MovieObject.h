@@ -50,14 +50,17 @@ namespace movie {
             if (j.contains("cutTo"))
                 j.at("cutTo").get_to(v.cutTo);
         }
-        int init();
+
+        int init(const std::string& tmpDir);
         int width() const { return _width; }
         int height() const { return _height; }
         int fps() const { return _fps; }
+        std::string localPath() const { return _localPath; }
     private:
         int _width = 0;
         int _height = 0;
         int _fps = 0;
+        std::string _localPath;
     };
     void from_json(const json& j, VideoContent& v) {
         VideoContent::from_json(j, v);
@@ -84,6 +87,11 @@ namespace movie {
             if (j.contains("cutTo"))
                 j.at("cutTo").get_to(a.cutTo);
         }
+
+        int init(const std::string& tmpDir);
+        std::string localPath() const { return _localPath; }
+    private:
+        std::string _localPath;
     };
     void from_json(const json& j, AudioContent& a) {
         AudioContent::from_json(j, a);
