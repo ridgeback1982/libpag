@@ -154,6 +154,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     movie::Story story = movie.video.stories[0];
+    printf("JSONComposition::Load, json to movie\n");
 
     std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
     char tempTemplate[] = "tmp_XXXXXX";
@@ -161,7 +162,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     std::string tmpDir = tmpDir1 + "/" + tempFolder;
 #if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
     if (mkdir(tmpDir.c_str(), 0755) == 0) {
-        printf("Temp Directory created\n");
+        printf("Temp Directory created, %s\n", tmpDir.c_str());
     } else {
         printf("Error creating directory\n");
     }
@@ -503,7 +504,7 @@ int curlDownload(const std::string& url, const std::string& localPath) {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L); // Timeout after 5 seconds for connection
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 10000L); // Timeout after 10 seconds for connection
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         file.close();
@@ -511,7 +512,7 @@ int curlDownload(const std::string& url, const std::string& localPath) {
             printf("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             return -1;
         }
-        printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
+        // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
     }
     return 0;
 }
@@ -521,11 +522,13 @@ int VideoContent::init(const std::string& tmpDir) {
   int video_stream_index = -1;
 
   bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
       
       //download to local path
+      printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       if (curlDownload(path, _localPath) < 0) {
           return -1;
       }
@@ -579,11 +582,13 @@ int VideoContent::init(const std::string& tmpDir) {
 
 int AudioContent::init(const std::string& tmpDir) {
   bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  // printf("AudioContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
       
       //download to local path
+      printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       if (curlDownload(path, _localPath) < 0) {
           return -1;
       }

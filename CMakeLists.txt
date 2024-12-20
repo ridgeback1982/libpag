@@ -211,6 +211,7 @@ if (PAG_USE_HARFBUZZ)
 endif ()
 
 #zzy 
+list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/)
 list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/include)
 list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../nlohmann_json/single_include)
 
@@ -297,7 +298,6 @@ elseif (MACOS)
     #zzy
     file(GLOB_RECURSE UTILS_FILES src/utils/macos/*.*)
     list(APPEND PAG_FILES ${UTILS_FILES})
-    list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/)
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavutil.xcframework/macos-arm64_x86_64/libavutil.framework
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavcodec.xcframework/macos-arm64_x86_64/libavcodec.framework 
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
@@ -378,14 +378,20 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     list(APPEND PAG_SHARED_LIBS dl)
 
     #zzy
+    # Find libcurl
+    find_package(CURL REQUIRED)
+    list(APPEND PAG_SHARED_LIBS ${CURL_LIBRARIES})
+    list(APPEND PAG_INCLUDES ${CURL_INCLUDE_DIRS})
+    file(GLOB_RECURSE UTILS_FILES src/utils/linux/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES})
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavcodec.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavfilter.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavformat.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavutil.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswscale.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswresample.so)
+    
     message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
-
     list(APPEND PAG_COMPILE_OPTIONS -fPIC -pthread)
     if (USE_NATIVE_PLATFORM)
         find_library(GLESV2_LIB GLESv2)
