@@ -19,6 +19,7 @@
 //  THE SOFTWARE.
 
 #include "audiosource.h"
+#include <iostream>
 
 extern "C" {
 #include <libavutil/dict.h>
@@ -43,7 +44,7 @@ bool LWAudioDecoder::DecodeNextAVFrame() {
     if (!DecodeFrame) {
         DecodeFrame = av_frame_alloc();
         if (!DecodeFrame) {
-            printf("Couldn't allocate frame\n");
+            fprintf(stderr, "Couldn't allocate frame\n");
             return false;
         }
     }
@@ -73,7 +74,7 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
     av_dict_set_int(&Dict, "use_absolute_path", Options.use_absolute_path, 0);
 
     if (avformat_open_input(&FormatContext, SourceFile, nullptr, &Dict) != 0) {
-        printf("Couldn't open file\n");
+        std::cerr << "Couldn't open file" << std::endl;
         return;
     }
 
@@ -82,7 +83,7 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
     if (avformat_find_stream_info(FormatContext, nullptr) < 0) {
         avformat_close_input(&FormatContext);
         FormatContext = nullptr;
-        printf("Couldn't find stream information\n");
+        std::cerr << "Couldn't find stream information" << std::endl;
         return;
     }
 
@@ -100,13 +101,13 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
     }
 
     if (TrackNumber < 0 || TrackNumber >= static_cast<int>(FormatContext->nb_streams)) {
-        printf("No audio track found\n");
+        std::cerr << "No audio track found" << std::endl;
         return;
     }
         
 
     if (FormatContext->streams[TrackNumber]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
-        printf("Not an audio track\n");
+        std::cerr << "Not an audio track" << std::endl;
         return;
     }
 
@@ -116,18 +117,18 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
 
     const AVCodec *Codec = avcodec_find_decoder(FormatContext->streams[TrackNumber]->codecpar->codec_id);
     if (Codec == nullptr) {
-        printf("Audio codec not found\n");
+        std::cerr << "Audio codec not found" << std::endl;
         return;
     }
 
     CodecContext = avcodec_alloc_context3(Codec);
     if (CodecContext == nullptr) {
-        printf("Could not allocate audio decoding context\n");
+        std::cerr << "Could not allocate audio decoding context" << std::endl;
         return;
     }
 
     if (avcodec_parameters_to_context(CodecContext, FormatContext->streams[TrackNumber]->codecpar) < 0) {
-        printf("Could not copy audio parameters to decoding context\n");
+        std::cerr << "Could not copy audio parameters to decoding context" << std::endl;
         return;
     }
 
@@ -135,7 +136,7 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
     CodecContext->flags |= AV_CODEC_FLAG_DROPCHANGED;
 
     if (Options.drc_scale < 0) {
-        printf("Invalid drc_scale value\n");
+        std::cerr << "Invalid drc_scale value" << std::endl;
         return;
     }
 
@@ -144,7 +145,7 @@ void LWAudioDecoder::OpenFile(const char *SourceFile, int Track, const FFmpegOpt
         av_dict_set(&CodecDict, "drc_scale", std::to_string(Options.drc_scale).c_str(), 0);
 
     if (avcodec_open2(CodecContext, Codec, &CodecDict) < 0) {
-        printf("Could not open audio codec\n");
+        std::cerr << "Could not open audio codec" << std::endl;
         return;
     }
 
@@ -159,7 +160,7 @@ LWAudioDecoder::LWAudioDecoder(const char *SourceFile, int Track, const FFmpegOp
         DecodeSuccess = DecodeNextAVFrame();
         
         if (!DecodeSuccess) {
-            printf("Couldn't decode initial frame\n");
+            std::cerr << "Couldn't decode initial frame" << std::endl;
         }
 
         AP.IsFloat = (DecodeFrame->format == AV_SAMPLE_FMT_FLTP || DecodeFrame->format == AV_SAMPLE_FMT_FLT || DecodeFrame->format == AV_SAMPLE_FMT_DBLP || DecodeFrame->format == AV_SAMPLE_FMT_DBL);
@@ -173,7 +174,7 @@ LWAudioDecoder::LWAudioDecoder(const char *SourceFile, int Track, const FFmpegOp
         AP.StartTime = (DecodeFrame->best_effort_timestamp * FormatContext->streams[TrackNumber]->time_base.num * AP.SampleRate) / FormatContext->streams[TrackNumber]->time_base.den + FormatContext->streams[TrackNumber]->codecpar->initial_padding;
 
         if (AP.BytesPerSample <= 0) {
-            printf("Codec returned zero size audio\n");
+            std::cerr << "Codec returned zero size audio" << std::endl;
         }
 
 }
@@ -477,7 +478,7 @@ int64_t BestAudioSource::GetAudio(uint8_t * const * const Data, int64_t Start, i
         ZeroFillEnd(DataV.data(), Start, Count);
 
     if (Count != 0) {
-        printf("Code error, failed to provide all samples\n");
+        std::cerr << "Code error, failed to provide all samples" << std::endl;
         return 0;
     }
 

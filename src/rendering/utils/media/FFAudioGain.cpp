@@ -1,5 +1,6 @@
 #include "FFAudioGain.h"
 #include "FFError.h"
+#include <iostream>
 
 extern "C" {
     #include <libavformat/avformat.h>
@@ -39,27 +40,27 @@ int FFAudioGain::setupCoreFilter() {
         AVFilterInOut *inputs = NULL, *outputs = NULL;
         ret = avfilter_graph_parse2(_filterGraph, filter_desc, &inputs, &outputs);
         if (ret < 0) {
-            printf("Error parsing filter graph: %d\n", ret);
+            std::cerr << "Error parsing filter graph: " << ret << std::endl;
             return -1;
         }
 
         // Connect the source to the corresponding input
         ret = avfilter_link(_buffersrc_ctx, 0, inputs->filter_ctx, inputs->pad_idx);
         if (ret < 0) {
-            printf("Error linking buffer source for input\n");
+            std::cerr << "Error linking buffer source for input" << std::endl;
             return -1;
         }
 
         // Connect the output
         ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, _buffersink_ctx, 0);
         if (ret < 0) {
-            printf("Error linking buffer sink\n");
+            std::cerr << "Error linking buffer sink" << std::endl;
             return -1;
         }
 
         ret = avfilter_graph_config(_filterGraph, NULL);
         if (ret < 0) {
-            printf("Error configuring filter graph\n");
+            std::cerr << "Error configuring filter graph" << std::endl;
             return -1;
         }
 

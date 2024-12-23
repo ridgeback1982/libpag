@@ -1,4 +1,5 @@
 #include "FFAudioResampler.h"
+#include <iostream>
 
 extern "C" {
     #include <libavformat/avformat.h>
@@ -87,11 +88,11 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
             // uint8_t** audioChunks = new uint8_t*[1];
             // audioChunks[0] = dst_data[0];
             if (av_audio_fifo_realloc((AVAudioFifo*)_audioFifo, av_audio_fifo_size((AVAudioFifo*)_audioFifo) + ret) < 0) {
-              printf("cannot reallocate audio fifo\n");
+              std::cerr << "cannot reallocate audio fifo" << std::endl;
               return 0;
             }
             if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)dst, ret) < 0) {
-              printf("failed to write to audio fifo\n");
+              std::cerr << "failed to write to audio fifo" << std::endl;
               return 0;
             }
             //check if there is some left in swr's internal cache, and must flush it out. Or it will be dropped next convert
@@ -99,11 +100,11 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
                 //flush using null input
                 ret = swr_convert(swr_ctx, dst, dst_nb_samples, (const uint8_t **)nullptr, 0);
                 if (av_audio_fifo_realloc((AVAudioFifo*)_audioFifo, av_audio_fifo_size((AVAudioFifo*)_audioFifo) + ret) < 0) {
-                    printf("cannot reallocate audio fifo\n");
+                    std::cerr << "cannot reallocate audio fifo" << std::endl;
                     return 0;
                 }
                 if (av_audio_fifo_write((AVAudioFifo*)_audioFifo, (void**)dst, ret) < 0) {
-                    printf("failed to write to audio fifo\n");
+                    std::cerr << "failed to write to audio fifo" << std::endl;
                     return 0;
                 }
             }

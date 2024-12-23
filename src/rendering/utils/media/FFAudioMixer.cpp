@@ -1,4 +1,5 @@
 #include "FFAudioMixer.h"
+#include <iostream>
 
 extern "C" {
     #include <libavformat/avformat.h>
@@ -59,7 +60,7 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     AVFilterInOut *inputs = NULL, *outputs = NULL;
     ret = avfilter_graph_parse2(graph, filter_desc, &inputs, &outputs);
     if (ret < 0) {
-        printf("Error parsing filter graph: %d\n", ret);
+        std::cerr << "Error parsing filter graph:" << ret << std::endl;
         return -1;
     }
 
@@ -77,14 +78,14 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
         snprintf(name, sizeof(name), "a%d", i);
         ret = avfilter_graph_create_filter(&source_ctxs[i], abuffersrc, name, args, NULL, graph);
         if (ret < 0) {
-            printf("Error creating buffer source for input %d\n", i);
+            std::cerr << "Error creating buffer source for input " << i << std::endl;
             return -1;
         }
 
         // Connect the source to the corresponding input
         ret = avfilter_link(source_ctxs[i], 0, inputs->filter_ctx, inputs->pad_idx);
         if (ret < 0) {
-            printf("Error linking buffer source for input %d\n", i);
+            std::cerr << "Error linking buffer source for input " << i << std::endl;
             return -1;
         }
 
@@ -95,20 +96,20 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     AVFilterContext* sink_ctx;
     ret = avfilter_graph_create_filter(&sink_ctx, abuffersink, "out", NULL, NULL, graph);
     if (ret < 0) {
-        printf("Error creating buffer sink\n");
+        std::cerr << "Error creating buffer sink" << std::endl;
         return -1;
     }
 
     // Connect the output
     ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, sink_ctx, 0);
     if (ret < 0) {
-        printf("Error linking buffer sink\n");
+        std::cerr << "Error linking buffer sink" << std::endl;
         return -1;
     }
 
     ret = avfilter_graph_config(graph, NULL);
     if (ret < 0) {
-        printf("Error configuring filter graph\n");
+        std::cerr << "Error configuring filter graph" << std::endl;
         return -1;
     }
 
@@ -127,7 +128,7 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
 
   int ret = setupFilterGraph(srcBuffers, filter_graph, &src_ctx, &sink_ctx);
   if (ret < 0) {
-      printf("failed to setup filter graph\n");
+      std::cerr << "failed to setup filter graph" << std::endl;
       return -1;
   }
 

@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <iostream>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
@@ -607,7 +608,7 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
   if (audioGain == nullptr) {
     int outputSamples = readMixedAudioSamples(samples, buffers, bufferSize, targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
-      printf("failed to read mixed audio samples\n");
+      std::cerr << "failed to read mixed audio samples" << std::endl;
       return ErrorCode::UNKNOWN_ERROR;
     }
     _audioTimelineBySamples += outputSamples;
@@ -619,14 +620,14 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
     av_channel_layout_default(&input->ch_layout, targetChannels);
     input->sample_rate = targetSampleRate;
     if (av_frame_get_buffer(input, 0) < 0) {
-      printf("Failed to allocate the input frame\n");
+      std::cerr << "Failed to allocate the input frame" << std::endl;
       av_frame_free(&input);
       return ErrorCode::OUT_OF_MEMORY;
     }
     //hard code mono channel
     int outputSamples = readMixedAudioSamples(samples, input->data, input->linesize[0], targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
-      printf("failed to read mixed audio samples\n");
+      std::cerr << "failed to read mixed audio samples" << std::endl;
       return ErrorCode::UNKNOWN_ERROR;
     }
     _audioTimelineBySamples += outputSamples;

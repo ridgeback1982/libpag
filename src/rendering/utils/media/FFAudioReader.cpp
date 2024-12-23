@@ -1,5 +1,6 @@
 
 #include "FFAudioReader.h"
+#include <iostream>
 
 namespace pag {
 
@@ -75,7 +76,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
         // printf("FFAudioAtempo::process OK(enough available), output samples:%d\n", output->nb_samples);
         processedCount += output->nb_samples;
       } else {
-        printf("FFAudioAtempo::process failed, res:%d\n", res);
+        std::cerr << "FFAudioAtempo::process failed, res:" << res << std::endl;
       } 
     } else {
       do {
@@ -85,7 +86,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
         av_channel_layout_default(&input->ch_layout, _properties.Channels);
         input->sample_rate = _properties.SampleRate;
         if (av_frame_get_buffer(input, 0) < 0) {
-          printf("Failed to allocate the input frame\n");
+          std::cerr << "Failed to allocate the input frame" << std::endl;
           av_frame_free(&input);
           return 0;
         }

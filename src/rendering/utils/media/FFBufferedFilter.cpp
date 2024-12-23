@@ -1,4 +1,5 @@
 #include "FFBufferedFilter.h"
+#include <iostream>
 
 extern "C" {
     #include <libavformat/avformat.h>
@@ -41,7 +42,7 @@ int FFBufferedFilter::setupBufferFilter() {
     if (_buffersrc_ctx == nullptr) {
         const AVFilter *buffersrc = avfilter_get_by_name("abuffer");
         if (!buffersrc) {
-            printf("Required filters not available\n");
+            std::cerr << "Required filters not available" << std::endl;
             return -1;
         }
         char src_args[512];
@@ -51,7 +52,7 @@ int FFBufferedFilter::setupBufferFilter() {
 
         ret = avfilter_graph_create_filter(&_buffersrc_ctx, buffersrc, "in", src_args, NULL, _filterGraph);
         if (ret < 0) {
-            printf("Error creating buffer source for input\n");
+            std::cerr << "Error creating buffer source for input" << std::endl;
             return -1;
         }
     }
@@ -59,19 +60,19 @@ int FFBufferedFilter::setupBufferFilter() {
     if (_buffersink_ctx == nullptr) {
         const AVFilter *buffersink = avfilter_get_by_name("abuffersink");
         if (!buffersink) {
-            printf("Required filters not available\n");
+            std::cerr << "Required filters not available" << std::endl;
             return -1;
         }
         // Configure abuffersink (output sink)
         ret = avfilter_graph_create_filter(&_buffersink_ctx, buffersink, "out", NULL, NULL, _filterGraph);
         if (ret < 0) {
-            printf("Error creating buffer sink for output\n");
+            std::cerr << "Error creating buffer sink for output" << std::endl;
             return -1;
         }
         // Configure buffersink to enforce same planar format(not change)
         enum AVSampleFormat out_sample_fmts[] = { (AVSampleFormat)_format, AV_SAMPLE_FMT_NONE };
         if (av_opt_set_int_list(_buffersink_ctx, "sample_fmts", out_sample_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN) < 0) {
-            printf("Error setting output format on buffer sink\n");
+            std::cerr << "Error setting output format on buffer sink" << std::endl;
             return -1;
         }
     }
@@ -87,30 +88,30 @@ int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
         av_channel_layout_default(&frame->ch_layout, _channels);
         frame->sample_rate = _sampleRate;
         if (av_frame_get_buffer(frame, 0) < 0) {
-          printf("Failed to allocate the input frame\n");
+          std::cerr << "Failed to allocate the input frame" << std::endl;
           av_frame_free(&frame);
           return ErrorCode::OUT_OF_MEMORY;
         }
         if (av_audio_fifo_read((AVAudioFifo*)_fifo, (void**)frame->data, (int)_outputSamples) < 0) {
-            printf("Failed to read from the FIFO\n");
+            std::cerr << "Failed to read from the FIFO" << std::endl;
             return ErrorCode::UNKNOWN_ERROR;
         } 
         *output = frame;
     } else {
         ret = setupBufferFilter();
         if (ret != ErrorCode::SUCCESS) {
-            printf("Error setting up buffer filter\n");
+            std::cerr << "Error setting up buffer filter" << std::endl;
             return ret;
         }
         ret = setupCoreFilter();
         if (ret != ErrorCode::SUCCESS) {
-            printf("Error setting up core filter\n");
+            std::cerr << "Error setting up core filter" << std::endl;
             return ret;
         }
         
         ret = av_buffersrc_add_frame(_buffersrc_ctx, (AVFrame*)input);
         if (ret < 0) {
-            printf("Error adding input frame to buffer source\n");
+            std::cerr << "Error adding input frame to buffer source" << std::endl;
             return -1;
         }
         // Pull filtered frame from the filtergraph
@@ -119,11 +120,11 @@ int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
             // printf("Processed frame with %d samples\n", filtered_frame->nb_samples);
 
             if (av_audio_fifo_realloc(_fifo, av_audio_fifo_size(_fifo) + filtered_frame->nb_samples) < 0) {
-              printf("cannot reallocate audio fifo\n");
+              std::cerr << "cannot reallocate audio fifo" << std::endl;
               return -1;
             }
             if (av_audio_fifo_write(_fifo, (void**)filtered_frame->data, filtered_frame->nb_samples) < 0) {
-              printf("failed to write to audio fifo\n");
+              std::cerr << "failed to write to audio fifo" << std::endl;
               return -1;
             }
             // Release filtered frame for reuse
@@ -138,12 +139,12 @@ int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
             av_channel_layout_default(&frame->ch_layout, _channels);
             frame->sample_rate = _sampleRate;
             if (av_frame_get_buffer(frame, 0) < 0) {
-                printf("Failed to allocate the input frame\n");
+                std::cerr << "Failed to allocate the input frame" << std::endl;
                 av_frame_free(&frame);
                 return -1;
             }
             if (av_audio_fifo_read((AVAudioFifo*)_fifo, (void**)frame->data, (int)_outputSamples) < 0) {
-                printf("Failed to read from the FIFO\n");
+                std::cerr << "Failed to read from the FIFO" << std::endl;
                 return -1;
             } 
             *output = frame;

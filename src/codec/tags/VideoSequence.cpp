@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <iostream>
 #include "VideoSequence.h"
 #include "codec/utils/NALUReader.h"
 //zzy
@@ -94,7 +95,7 @@ std::unique_ptr<ByteData> ConvertToByteDataWithStartCode(const uint8_t* buf, con
 //zzy
 void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence* sequence) {
     if (extradata_size < 7) {
-        printf("Extradata too small\n");
+        std::cerr << "Extradata too small" << std::endl;
         return;
     }
 
@@ -118,7 +119,7 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         offset += 2;
         uint8_t *sps = extradata + offset; // SPS NAL unit starts here
 
-        printf("Found SPS of length %d, sps:%02X\n", sps_length, sps[0]);   //without start code
+        std::cout << "Found SPS of length " << sps_length << ", sps:" << sps[0] << std::endl;   //without start code
         ByteData* sps_byte = ConvertToByteDataWithStartCode(sps, sps_length).release();
         sequence->headers.push_back(sps_byte);
 
@@ -135,7 +136,7 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         offset += 2;
         uint8_t *pps = extradata + offset; // PPS NAL unit starts here
 
-        printf("Found PPS of length %d, pps:%02X\n", pps_length, pps[0]);   //widthout startcode
+        std::cout << "Found PPS of length " << pps_length << ", pps:" << pps[0] << std::endl;    //widthout startcode
         ByteData* pps_byte = ConvertToByteDataWithStartCode(pps, pps_length).release();
         sequence->headers.push_back(pps_byte);
 
@@ -148,7 +149,7 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
 void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence* sequence) {
     // Parse VPS, SPS, PPS from extradata
     if (extradata_size < 23) {
-        printf("Invalid hvcC size\n");
+        std::cerr << "Invalid hvcC size" << std::endl;
         return;
     }
 
@@ -163,12 +164,12 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         uint16_t numNalus = (extradata[pos] << 8) | extradata[pos + 1];
         pos += 2;
 
-        printf("NAL Unit Type:%d, Number of NALUs:%d\n", (int)nal_unit_type, numNalus);
+        std::cout << "NAL Unit Type:" << nal_unit_type << ", Number of NALUs:" << numNalus << std::endl;
 
         for (uint16_t j = 0; j < numNalus; ++j) {
             uint16_t nal_unit_size = (extradata[pos] << 8) | extradata[pos + 1];
             pos += 2;
-            printf("%d NALU, size:%d\n", j+1, nal_unit_size);
+            // printf("%d NALU, size:%d\n", j+1, nal_unit_size);
 
             // Here, extradata + pos points to the NALU data
             if (nal_unit_type != 39/*SEI*/) {
@@ -200,13 +201,13 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 
   // 打开输入文件
   if (avformat_open_input(&fmt_ctx, filePath.c_str(), NULL, NULL) < 0) {
-    printf("Could not open input file: %s\n", filePath.c_str());
+    std::cerr << "Could not open input file:" << filePath << std::endl;
     return nullptr;
   }
 
   // 查找流信息
   if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-    printf("Could not find stream information.\n");
+    std::cerr << "Could not find stream information" << std::endl;
     avformat_close_input(&fmt_ctx);
     return nullptr;
   }
@@ -220,7 +221,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   }
 
   if (video_stream_index == -1) {
-    printf("Could not find a video stream.\n");
+    std::cerr << "Could not find a video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
     return nullptr;
   }
@@ -228,7 +229,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   // 获取解码器
   codec = avcodec_find_decoder(fmt_ctx->streams[video_stream_index]->codecpar->codec_id);
   if (!codec) {
-    printf("Could not find codec for video stream.\n");
+    std::cerr << "Could not find codec for video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
     return nullptr;
   }
@@ -236,13 +237,13 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   // 初始化解码器上下文
   codec_ctx = avcodec_alloc_context3(codec);
   if (!codec_ctx) {
-    printf("Could not allocate codec context.\n");
+    std::cerr << "Could not allocate codec context" << std::endl;
     avformat_close_input(&fmt_ctx);
     return nullptr;
   }
 
   if (avcodec_parameters_to_context(codec_ctx, fmt_ctx->streams[video_stream_index]->codecpar) < 0) {
-    printf("Could not copy codec parameters to codec context.\n");
+    std::cerr << "Could not copy codec parameters to codec context" << std::endl;
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
     return nullptr;
@@ -250,7 +251,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 
   // 打开解码器
   if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
-    printf("Could not open codec.\n");
+    std::cerr << "Could not open codec" << std::endl;
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
     return nullptr;
@@ -272,7 +273,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 //    return nullptr;
 //  }
   if (av_seek_frame(fmt_ctx, -1, seekTarget*AV_TIME_BASE, AVSEEK_FLAG_BACKWARD) < 0) {
-    printf("Seeking failed\n");
+    std::cerr << "Seeking failed" << std::endl;
     return nullptr;
   }
   startPTS = -1;
@@ -281,7 +282,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   // 分配 AVPacket
   pkt = av_packet_alloc();
   if (!pkt) {
-    printf("Could not allocate packet.\n");
+    std::cerr << "Could not allocate packet" << std::endl;
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
     return nullptr;
@@ -294,7 +295,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   //hevc: parse to nal is supported, but pag decoder does not support it yet
   //vpx: not supported totally
   if (is_avc == false) {
-    printf("Unsupported codec\n");
+    std::cerr << "Unsupported codec" << std::endl;
     return nullptr;
   }
 
@@ -305,20 +306,20 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   } else if (is_hevc) {
     parse_h265_extradata(extradata, extradata_size, sequence);
   } else {
-    printf("Unsupported codec\n");
+    std::cerr << "Unsupported codec" << std::endl;
     return nullptr;
   }
 
   //check sps/pps result
   if (sequence->headers.size() < 2) {
-    printf("No SPS/PPS/VPS found\n");
+    std::cerr << "No SPS/PPS/VPS found" << std::endl;
     return nullptr;
   }
   
 
   while (accuSrcFrames < cutTo - cutFrom) {
     if (av_read_frame(fmt_ctx, pkt) < 0) {
-        printf("Failed to read frame, drains\n");
+        std::cerr << "Failed to read frame, drains" << std::endl;
         break;
     }
     if (pkt->stream_index == video_stream_index) {

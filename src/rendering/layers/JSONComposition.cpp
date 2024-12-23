@@ -101,7 +101,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       TimeToFrame(ogCutFrom + ogDuration, video_fps),
       (int)vidComposition->duration);
     if (videoSequence == nullptr) {
-        printf("Error reading video file\n");
+        std::cerr << "Error reading video file" << std::endl;
         return nullptr;
     }
     videoSequence->frameRate = vidComposition->frameRate;   //modify fps of video sequence
@@ -164,7 +164,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     if (mkdir(tmpDir.c_str(), 0755) == 0) {
         printf("Temp Directory created, %s\n", tmpDir.c_str());
     } else {
-        printf("Error creating directory\n");
+        std::cerr << "Error creating directory" << std::endl;
     }
 #else
     #error "Unsupported platform"
@@ -207,7 +207,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
                 jsonComposition->addAudioSource(audioSource);
               }
             } else {
-              printf("Error creating video layer, maybe codec not support\n");
+              std::cerr << "Error creating video layer, maybe codec not support" << std::endl;
             }
         } else if (t->type == "gif") {
             auto track = static_cast<movie::GifTrack*>(t);
@@ -541,13 +541,13 @@ int VideoContent::init(const std::string& tmpDir) {
 
   // 打开输入文件
   if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
-    printf("Could not open input file: %s\n", _localPath.c_str());
+    std::cerr << "Could not open input file:" << _localPath << std::endl;
     return -1;
   }
 
   // 查找流信息
   if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-    printf("Could not find stream information.\n");
+    std::cerr << "Could not find stream information" << std::endl;
     avformat_close_input(&fmt_ctx);
     return -1;
   }
@@ -561,7 +561,7 @@ int VideoContent::init(const std::string& tmpDir) {
   }
 
   if (video_stream_index == -1) {
-    printf("Could not find a video stream.\n");
+    std::cerr << "Could not find a video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
     return -1;
   }
