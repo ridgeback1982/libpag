@@ -24,6 +24,7 @@
 namespace pag {
 std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromName(const std::string& fontFamily,
                                                              const std::string& fontStyle) {
+  LOGI("TypefaceHolder::MakeFromName, fontFamily:%s, style:%s", fontFamily.c_str(), fontStyle.c_str());
   auto holder = new TypefaceHolder();
   holder->fontFamily = fontFamily;
   holder->fontStyle = fontStyle;
@@ -32,6 +33,7 @@ std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromName(const std::string& 
 
 std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromFile(const std::string& fontPath,
                                                              int ttcIndex) {
+  LOGI("TypefaceHolder::MakeFromFile, fontPath:%s, ttcIndex:%d", fontPath.c_str(), ttcIndex);
   auto holder = new TypefaceHolder();
   holder->fontPath = fontPath;
   holder->ttcIndex = ttcIndex;

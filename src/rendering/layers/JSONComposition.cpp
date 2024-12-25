@@ -325,16 +325,21 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   auto textLayer = new TextLayer();
   textLayer->id = UniqueID::Next();
   auto textData = new TextDocument();
-  textData->text = text;
-  textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
   textData->fontSize = 100;     //hardcode, in pixel
-  textData->fillColor = translateColor(content->textColor);   //set by json,  FromRGBA
-  textData->applyStroke = true;   //hard code
-  textData->strokeColor = translateColor(content->stroke);   //set by json
-  textData->strokeWidth = 1;     //set by json
+  textData->text = text;
+  if (!content->fontFamilyName.empty()) {
+    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+  }
+  if (!content->textColor.empty()) {
+    textData->fillColor = translateColor(content->textColor);
+  }
+  if (!content->stroke.empty()) {
+    textData->applyStroke = true;
+    textData->strokeColor = translateColor(content->stroke);
+    textData->strokeWidth = 1;     //hardcode
+  }
   textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
   textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
-  
   textLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
   textLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
   textLayer->transform = Transform2D::MakeDefault().release();
@@ -346,6 +351,9 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   textLayer->transform->scale->value.set(scale_x, scale_y);
   textLayer->timeRemap = new Property<float>(0);      //hard code
 
+  // std::cout << "createTextLayer, fontFamily:" << textData->fontFamily 
+  //     << ", color:" << (int)textData->fillColor.red << "|" << (int)textData->fillColor.green << "|" << (int)textData->fillColor.blue
+  //     << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration << std::endl;
   return textLayer;
 }
 
