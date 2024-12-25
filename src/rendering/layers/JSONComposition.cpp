@@ -48,6 +48,7 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
+#include <regex>
 
 
 #if defined(__linux__)
@@ -63,6 +64,135 @@ extern "C" {
 //1. 关注下各个类的析构函数
 
 //zzy, work alone
+
+namespace movie {
+
+bool starts_with(const std::string& str, const std::string& prefix) {
+    return str.compare(0, prefix.size(), prefix) == 0;
+}
+
+std::string getFileNameFromUrl(const std::string& url) {
+    size_t pos = url.find_last_of('/');
+    if (pos != std::string::npos && pos + 1 < url.size()) {
+        return url.substr(pos + 1);
+    }
+    return ""; // 没有后缀名时返回空字符串
+}
+
+size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    std::ofstream* out = static_cast<std::ofstream*>(userp);
+    size_t totalSize = size * nmemb;
+    out->write(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
+
+int curlDownload(const std::string& url, const std::string& localPath) {
+    CURL* curl = curl_easy_init();
+    if (curl) {
+        std::ofstream file(localPath);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 10000L); // Timeout after 10 seconds for connection
+        CURLcode res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        file.close();
+        if (res != CURLE_OK) {
+            printf("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            return -1;
+        }
+        // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
+    }
+    return 0;
+}
+
+int VideoContent::init(const std::string& tmpDir) {
+  AVFormatContext *fmt_ctx = NULL;
+  int video_stream_index = -1;
+
+  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  // printf("VideoContent::init, remote:%d\n", remote);
+  if (remote) {
+      //create local path
+      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      
+      //download to local path
+      printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      if (curlDownload(path, _localPath) < 0) {
+          return -1;
+      }
+  } else {
+    _localPath = path;
+  }
+
+  // 初始化 FFmpeg 库
+  avformat_network_init();
+
+  // 打开输入文件
+  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
+    std::cerr << "Could not open input file:" << _localPath << std::endl;
+    return -1;
+  }
+
+  // 查找流信息
+  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+    std::cerr << "Could not find stream information" << std::endl;
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+  // 查找视频流
+  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      video_stream_index = i;
+      break;
+    }
+  }
+
+  if (video_stream_index == -1) {
+    std::cerr << "Could not find a video stream" << std::endl;
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+    // Get codec parameters for the video stream
+    AVStream* video_stream = fmt_ctx->streams[video_stream_index];
+    AVCodecParameters* codec_params = video_stream->codecpar;
+    _width = codec_params->width;
+    _height = codec_params->height;
+
+    // Retrieve FPS
+    AVRational frame_rate = video_stream->avg_frame_rate;
+    _fps = (frame_rate.den && frame_rate.num) ? 
+                 static_cast<double>(frame_rate.num) / frame_rate.den : 0;
+
+    return 0;
+}
+
+int AudioContent::init(const std::string& tmpDir) {
+  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  // printf("AudioContent::init, remote:%d\n", remote);
+  if (remote) {
+      //create local path
+      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      
+      //download to local path
+      printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      if (curlDownload(path, _localPath) < 0) {
+          return -1;
+      }
+  } else {
+    _localPath = path;
+  }
+  return 0;
+}
+
+
+
+}  // namespace movie
+
+
 namespace pag {
 
 #define TEST_DURATION 300
@@ -125,6 +255,130 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     vidPreComposeLayer->composition = vidComposition;
 
     return vidPreComposeLayer;
+}
+
+//rgb(216, 27, 67) or rgba(255,255,255,1) or #FFF
+Color translateColor(const std::string& color_string) {
+  Color c = pag::Black;
+  if (movie::starts_with(color_string, "rgba")) {
+    //std::regex regex_pattern(R"rgba\( *(\d{1,3}) *, *(\d{1,3}) *, *(\d{1,3}) *, *\d+(\.\d+)? *\))");
+    std::regex regex_pattern(R"(rgba\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))");
+    std::smatch match;
+    if (std::regex_match(color_string, match, regex_pattern)) {
+        // 提取 RGB 分量
+        int r = std::stoi(match[1].str());
+        int g = std::stoi(match[2].str());
+        int b = std::stoi(match[3].str());
+
+        // 输出结果
+        std::cout << "Red: " << r << ", Green: " << g << ", Blue: " << b << std::endl;
+        c.red = r;
+        c.blue = b;
+        c.green = g;
+    } else {
+        std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
+    }
+  } else if (movie::starts_with(color_string, "rgb")) {
+    std::regex regex_pattern(R"(rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\))");
+    std::smatch match;
+    if (std::regex_match(color_string, match, regex_pattern)) {
+        // 提取 RGB 分量
+        int r = std::stoi(match[1].str());
+        int g = std::stoi(match[2].str());
+        int b = std::stoi(match[3].str());
+
+        // 输出结果
+        std::cout << "Red: " << r << ", Green: " << g << ", Blue: " << b << std::endl;
+        c.red = r;
+        c.blue = b;
+        c.green = g;
+    } else {
+        std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
+    }
+  } else if (movie::starts_with(color_string, "#")) {
+    // 定义正则表达式
+    std::regex regex_pattern("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+    std::smatch match;
+
+    // 检查是否匹配
+    if (std::regex_match(color_string, match, regex_pattern)) {
+        std::string hex = match[1]; // 提取颜色部分
+
+        int r, g, b;
+        if (hex.size() == 3) {
+            // 如果是简写形式，例如 #FFF
+            r = std::stoi(std::string(2, hex[0]), nullptr, 16);
+            g = std::stoi(std::string(2, hex[1]), nullptr, 16);
+            b = std::stoi(std::string(2, hex[2]), nullptr, 16);
+
+            c.red = r;
+            c.blue = b;
+            c.green = g;
+        } else if (hex.size() == 6) {
+            // 如果是标准形式，例如 #FFFFFF
+            r = std::stoi(hex.substr(0, 2), nullptr, 16);
+            g = std::stoi(hex.substr(2, 2), nullptr, 16);
+            b = std::stoi(hex.substr(4, 2), nullptr, 16);
+
+            c.red = r;
+            c.blue = b;
+            c.green = g;
+        } else {
+            std::cerr << "Invalid color code format." << std::endl;
+        }
+
+        // 输出 RGB 值
+        std::cout << "R: " << r << ", G: " << g << ", B: " << b << std::endl;
+    } else {
+        std::cerr << "Invalid color code: " << color_string << std::endl;
+    }
+  }
+  
+  return c;
+}
+
+std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::MovieSpec& spec) {
+    std::vector<TextLayer*> textLayers;
+    movie::TitileContent* content = nullptr;
+    int visual_width = 0;
+    int visual_height = 0;
+    if (track->type == "title") {
+      content = &static_cast<movie::TitleTrack*>(track)->content;
+      visual_width = spec.width * content->location.w;
+      visual_height = spec.height * content->location.h;
+
+      auto textLayer = new TextLayer();
+      textLayer->id = UniqueID::Next();
+      auto textData = new TextDocument();
+      textData->text = content->text;
+    //  textData->fontFamily = "Heiti SC";     //set by json
+    //  textData->fontStyle = "Regular";     //set by json
+      textData->fontSize = 100;     //hardcode, in pixel
+      textData->fillColor = pag::Red;   //set by json,  FromRGBA
+      textData->applyStroke = true;   //hard code
+      textData->strokeColor = pag::Green;   //set by json
+      textData->strokeWidth = 1;     //set by json
+      textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
+      textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+      
+      textLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
+      textLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
+      textLayer->transform = Transform2D::MakeDefault().release();
+
+      textLayer->transform->anchorPoint->value.set(0, -30); //hard code
+      textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
+      float scale_x = (float)visual_width/textData->fontSize;
+      float scale_y = (float)visual_height/textData->fontSize;
+      textLayer->transform->scale->value.set(scale_x, scale_y);
+      textLayer->timeRemap = new Property<float>(0);      //hard code
+      
+      textLayers.push_back(textLayer);
+    } else if (track->type == "subtitle") {
+      content = &static_cast<movie::SubtitleTrack*>(track)->content;
+    }
+
+  
+    return textLayers;
 }
 
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
@@ -236,6 +490,14 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "Title") {
             auto track = static_cast<movie::TitleTrack*>(t);
             printf("title track, text:%s\n", track->content.text.c_str());
+            auto textLayers = createTextLayers(track, movie.video);
+            for (auto layer : textLayers) {
+              vecComposition->layers.push_back(layer);
+              auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagTextLayer->setFrameRate(movie.video.fps); 
+              jsonComposition->addLayer(pagTextLayer);
+            }
         } else if (t->type == "Subtitle") {
             auto track = static_cast<movie::SubtitleTrack*>(t);
             printf("subtitle track, count:%zu\n", track->content.sentences.size());
@@ -475,129 +737,4 @@ JSONComposition::JSONComposition(PreComposeLayer* layer)
 }  // namespace pag
 
 
-namespace movie {
 
-bool starts_with(const std::string& str, const std::string& prefix) {
-    return str.compare(0, prefix.size(), prefix) == 0;
-}
-
-std::string getFileNameFromUrl(const std::string& url) {
-    size_t pos = url.find_last_of('/');
-    if (pos != std::string::npos && pos + 1 < url.size()) {
-        return url.substr(pos + 1);
-    }
-    return ""; // 没有后缀名时返回空字符串
-}
-
-size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    std::ofstream* out = static_cast<std::ofstream*>(userp);
-    size_t totalSize = size * nmemb;
-    out->write(static_cast<char*>(contents), totalSize);
-    return totalSize;
-}
-
-int curlDownload(const std::string& url, const std::string& localPath) {
-    CURL* curl = curl_easy_init();
-    if (curl) {
-        std::ofstream file(localPath);
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 10000L); // Timeout after 10 seconds for connection
-        CURLcode res = curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
-        file.close();
-        if (res != CURLE_OK) {
-            printf("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            return -1;
-        }
-        // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
-    }
-    return 0;
-}
-
-int VideoContent::init(const std::string& tmpDir) {
-  AVFormatContext *fmt_ctx = NULL;
-  int video_stream_index = -1;
-
-  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
-  // printf("VideoContent::init, remote:%d\n", remote);
-  if (remote) {
-      //create local path
-      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
-      
-      //download to local path
-      printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
-      if (curlDownload(path, _localPath) < 0) {
-          return -1;
-      }
-  } else {
-    _localPath = path;
-  }
-
-  // 初始化 FFmpeg 库
-  avformat_network_init();
-
-  // 打开输入文件
-  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
-    std::cerr << "Could not open input file:" << _localPath << std::endl;
-    return -1;
-  }
-
-  // 查找流信息
-  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-    std::cerr << "Could not find stream information" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    return -1;
-  }
-
-  // 查找视频流
-  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
-    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-      video_stream_index = i;
-      break;
-    }
-  }
-
-  if (video_stream_index == -1) {
-    std::cerr << "Could not find a video stream" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    return -1;
-  }
-
-    // Get codec parameters for the video stream
-    AVStream* video_stream = fmt_ctx->streams[video_stream_index];
-    AVCodecParameters* codec_params = video_stream->codecpar;
-    _width = codec_params->width;
-    _height = codec_params->height;
-
-    // Retrieve FPS
-    AVRational frame_rate = video_stream->avg_frame_rate;
-    _fps = (frame_rate.den && frame_rate.num) ? 
-                 static_cast<double>(frame_rate.num) / frame_rate.den : 0;
-
-    return 0;
-}
-
-int AudioContent::init(const std::string& tmpDir) {
-  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
-  // printf("AudioContent::init, remote:%d\n", remote);
-  if (remote) {
-      //create local path
-      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
-      
-      //download to local path
-      printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
-      if (curlDownload(path, _localPath) < 0) {
-          return -1;
-      }
-  } else {
-    _localPath = path;
-  }
-  return 0;
-}
-
-
-
-}  // namespace movie
