@@ -14,5 +14,10 @@ PAG_API std::string getPlatformTemporaryDirectory() {
     }
 }
 
+PAG_API std::string findEnglishFontName(const std::string& chineseFontName) {
+    // TODO: Implement this function for Linux platform.
+    return chineseFontName;
+}
+
 
 }  // namespace pag

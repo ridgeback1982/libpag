@@ -49,6 +49,7 @@ extern "C" {
 #include <cstring>
 #include <unistd.h>
 #include <regex>
+#include <filesystem>
 
 
 #if defined(__linux__)
@@ -259,39 +260,28 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
 //rgb(216, 27, 67) or rgba(255,255,255,1) or #FFF
 Color translateColor(const std::string& color_string) {
-  Color c = pag::Black;
+  Color c = pag::White;
+//  float alpha = 1.0f;
   if (movie::starts_with(color_string, "rgba")) {
-    //std::regex regex_pattern(R"rgba\( *(\d{1,3}) *, *(\d{1,3}) *, *(\d{1,3}) *, *\d+(\.\d+)? *\))");
-    std::regex regex_pattern(R"(rgba\((\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})\))");
+    std::regex regex_pattern(R"(rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d+(\.\d+)?)\s*\))");
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
         // 提取 RGB 分量
-        int r = std::stoi(match[1].str());
-        int g = std::stoi(match[2].str());
-        int b = std::stoi(match[3].str());
-
-        // 输出结果
-        std::cout << "Red: " << r << ", Green: " << g << ", Blue: " << b << std::endl;
-        c.red = r;
-        c.blue = b;
-        c.green = g;
+        c.red = std::stoi(match[1].str());
+        c.green = std::stoi(match[2].str());
+        c.blue = std::stoi(match[3].str());
+//        alpha = std::stof(match[4].str());
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
   } else if (movie::starts_with(color_string, "rgb")) {
-    std::regex regex_pattern(R"(rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\))");
+    std::regex regex_pattern(R"(rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\))");
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
         // 提取 RGB 分量
-        int r = std::stoi(match[1].str());
-        int g = std::stoi(match[2].str());
-        int b = std::stoi(match[3].str());
-
-        // 输出结果
-        std::cout << "Red: " << r << ", Green: " << g << ", Blue: " << b << std::endl;
-        c.red = r;
-        c.blue = b;
-        c.green = g;
+        c.red = std::stoi(match[1].str());
+        c.green = std::stoi(match[2].str());
+        c.blue = std::stoi(match[3].str());
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
@@ -299,85 +289,83 @@ Color translateColor(const std::string& color_string) {
     // 定义正则表达式
     std::regex regex_pattern("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
     std::smatch match;
-
     // 检查是否匹配
     if (std::regex_match(color_string, match, regex_pattern)) {
         std::string hex = match[1]; // 提取颜色部分
-
-        int r, g, b;
         if (hex.size() == 3) {
             // 如果是简写形式，例如 #FFF
-            r = std::stoi(std::string(2, hex[0]), nullptr, 16);
-            g = std::stoi(std::string(2, hex[1]), nullptr, 16);
-            b = std::stoi(std::string(2, hex[2]), nullptr, 16);
-
-            c.red = r;
-            c.blue = b;
-            c.green = g;
+            c.red = std::stoi(std::string(2, hex[0]), nullptr, 16);
+            c.green = std::stoi(std::string(2, hex[1]), nullptr, 16);
+            c.blue = std::stoi(std::string(2, hex[2]), nullptr, 16);
         } else if (hex.size() == 6) {
             // 如果是标准形式，例如 #FFFFFF
-            r = std::stoi(hex.substr(0, 2), nullptr, 16);
-            g = std::stoi(hex.substr(2, 2), nullptr, 16);
-            b = std::stoi(hex.substr(4, 2), nullptr, 16);
-
-            c.red = r;
-            c.blue = b;
-            c.green = g;
+            c.red = std::stoi(hex.substr(0, 2), nullptr, 16);
+            c.green = std::stoi(hex.substr(2, 2), nullptr, 16);
+            c.blue = std::stoi(hex.substr(4, 2), nullptr, 16);
         } else {
             std::cerr << "Invalid color code format." << std::endl;
         }
-
-        // 输出 RGB 值
-        std::cout << "R: " << r << ", G: " << g << ", B: " << b << std::endl;
     } else {
         std::cerr << "Invalid color code: " << color_string << std::endl;
     }
   }
-  
   return c;
+}
+
+std::string getFileNameWithoutExtension(const std::string& filePath) {
+    // 使用 std::filesystem 提取文件名
+    std::filesystem::path path(filePath);
+    return path.stem().string(); // stem() 返回不带扩展名的文件名
+}
+
+TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
+  int visual_width = std::min(spec.width, spec.height) * content->fontSize;
+  int visual_height = visual_width;
+  
+  auto textLayer = new TextLayer();
+  textLayer->id = UniqueID::Next();
+  auto textData = new TextDocument();
+  textData->text = text;
+  textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+  textData->fontSize = 100;     //hardcode, in pixel
+  textData->fillColor = translateColor(content->textColor);   //set by json,  FromRGBA
+  textData->applyStroke = true;   //hard code
+  textData->strokeColor = translateColor(content->stroke);   //set by json
+  textData->strokeWidth = 1;     //set by json
+  textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
+  textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+  
+  textLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
+  textLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
+  textLayer->transform = Transform2D::MakeDefault().release();
+
+  textLayer->transform->anchorPoint->value.set(0, -30); //hard code
+  textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
+  float scale_x = (float)visual_width/textData->fontSize;
+  float scale_y = (float)visual_height/textData->fontSize;
+  textLayer->transform->scale->value.set(scale_x, scale_y);
+  textLayer->timeRemap = new Property<float>(0);      //hard code
+
+  return textLayer;
 }
 
 std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::MovieSpec& spec) {
     std::vector<TextLayer*> textLayers;
     movie::TitileContent* content = nullptr;
-    int visual_width = 0;
-    int visual_height = 0;
     if (track->type == "title") {
       content = &static_cast<movie::TitleTrack*>(track)->content;
-      visual_width = spec.width * content->location.w;
-      visual_height = spec.height * content->location.h;
-
-      auto textLayer = new TextLayer();
-      textLayer->id = UniqueID::Next();
-      auto textData = new TextDocument();
-      textData->text = content->text;
-    //  textData->fontFamily = "Heiti SC";     //set by json
-    //  textData->fontStyle = "Regular";     //set by json
-      textData->fontSize = 100;     //hardcode, in pixel
-      textData->fillColor = pag::Red;   //set by json,  FromRGBA
-      textData->applyStroke = true;   //hard code
-      textData->strokeColor = pag::Green;   //set by json
-      textData->strokeWidth = 1;     //set by json
-      textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
-      textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
-      
-      textLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
-      textLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
-      textLayer->transform = Transform2D::MakeDefault().release();
-
-      textLayer->transform->anchorPoint->value.set(0, -30); //hard code
-      textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
-      float scale_x = (float)visual_width/textData->fontSize;
-      float scale_y = (float)visual_height/textData->fontSize;
-      textLayer->transform->scale->value.set(scale_x, scale_y);
-      textLayer->timeRemap = new Property<float>(0);      //hard code
-      
+      auto textLayer = createTextLayer(content->text, content, track->lifetime, spec);
       textLayers.push_back(textLayer);
     } else if (track->type == "subtitle") {
       content = &static_cast<movie::SubtitleTrack*>(track)->content;
+      for (auto sentence : content->sentences) {
+        movie::LifeTime lifetime;
+        lifetime.begin_time = track->lifetime.begin_time + sentence.begin_time;
+        lifetime.end_time = track->lifetime.begin_time + sentence.end_time;
+        auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
+        textLayers.push_back(textLayer);
+      }
     }
-
-  
     return textLayers;
 }
 
@@ -487,7 +475,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "image") {
             auto track = static_cast<movie::ImageTrack*>(t);
             printf("image track, path:%s\n", track->content.path.c_str());
-        } else if (t->type == "Title") {
+        } else if (t->type == "title") {
             auto track = static_cast<movie::TitleTrack*>(t);
             printf("title track, text:%s\n", track->content.text.c_str());
             auto textLayers = createTextLayers(track, movie.video);
@@ -498,9 +486,17 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               pagTextLayer->setFrameRate(movie.video.fps); 
               jsonComposition->addLayer(pagTextLayer);
             }
-        } else if (t->type == "Subtitle") {
+        } else if (t->type == "subtitle") {
             auto track = static_cast<movie::SubtitleTrack*>(t);
             printf("subtitle track, count:%zu\n", track->content.sentences.size());
+            auto textLayers = createTextLayers(track, movie.video);
+            for (auto layer : textLayers) {
+              vecComposition->layers.push_back(layer);
+              auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagTextLayer->setFrameRate(movie.video.fps); 
+              jsonComposition->addLayer(pagTextLayer);
+            }
         }
     }
 

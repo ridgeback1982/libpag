@@ -114,7 +114,10 @@ static std::shared_ptr<tgfx::Typeface> MakeTypefaceWithName(const std::string& f
                                                             const std::string& fontStyle) {
   auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   if (typeface != nullptr) {
-    if (fontFamily != typeface->fontFamily()) {
+    auto foundFamily = typeface->fontFamily();
+    if (fontFamily != foundFamily) {
+      //zzy, for log
+      LOGE("MakeTypefaceWithName, fontFamily not match, input:%s, found:%s", fontFamily.c_str(), foundFamily.c_str());
       typeface = nullptr;
     }
   }
