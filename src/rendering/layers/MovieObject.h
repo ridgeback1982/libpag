@@ -149,6 +149,16 @@ namespace movie {
             j.at("path").get_to(i.path);
             j.at("location").get_to(i.location);
         }
+
+        int init(const std::string& tmpDir);
+        int width() const { return _width; }
+        int height() const { return _height; }
+        std::string localPath() const { return _localPath; }
+
+    private:
+        int _width = 0;
+        int _height = 0;
+        std::string _localPath;
     };
     void from_json(const json& j, ImageContent& i) {
         ImageContent::from_json(j, i);

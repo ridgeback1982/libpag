@@ -189,7 +189,63 @@ int AudioContent::init(const std::string& tmpDir) {
   return 0;
 }
 
+int ImageContent::init(const std::string& tmpDir) {
+  AVFormatContext *fmt_ctx = NULL;
+  int video_stream_index = -1;
 
+  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  // printf("VideoContent::init, remote:%d\n", remote);
+  if (remote) {
+      //create local path
+      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      
+      //download to local path
+      printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      if (curlDownload(path, _localPath) < 0) {
+          return -1;
+      }
+  } else {
+    _localPath = path;
+  }
+
+  // 初始化 FFmpeg 库
+  avformat_network_init();
+
+  // 打开输入文件
+  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
+    std::cerr << "Could not open input file:" << _localPath << std::endl;
+    return -1;
+  }
+
+  // 查找流信息
+  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+    std::cerr << "Could not find stream information" << std::endl;
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+  // 查找视频流
+  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      video_stream_index = i;
+      break;
+    }
+  }
+
+  if (video_stream_index == -1) {
+    std::cerr << "Could not find a video stream" << std::endl;
+    avformat_close_input(&fmt_ctx);
+    return -1;
+  }
+
+  // Get codec parameters for the video stream
+  AVStream* video_stream = fmt_ctx->streams[video_stream_index];
+  AVCodecParameters* codec_params = video_stream->codecpar;
+  _width = codec_params->width;
+  _height = codec_params->height;
+
+  return 0;
+}
 
 }  // namespace movie
 
@@ -377,6 +433,35 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
+ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
+  movie::ImageContent* content = &static_cast<movie::ImageTrack*>(track)->content;
+  int visual_width = spec.width * content->location.w;   //visual width, not image og width
+  int visual_height = spec.height * content->location.h;
+
+  auto imageWidth = content->width();
+  auto imageHeight = content->height();
+  auto imageLayer = new ImageLayer();
+  imageLayer->id = UniqueID::Next();
+  imageLayer->name = "image_xxx";           //hardcode
+  imageLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
+  imageLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
+  imageLayer->transform = Transform2D::MakeDefault().release();
+  imageLayer->transform->anchorPoint->value.set(imageWidth/2, imageHeight/2);
+  imageLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
+  float scale_x = (float)visual_width/imageWidth;
+  float scale_y = (float)visual_height/imageHeight;
+  imageLayer->transform->scale->value.set(scale_x, scale_y);
+
+  imageLayer->timeRemap = new Property<float>(0);      //hard code
+  imageLayer->imageBytes = new ImageBytes();
+  imageLayer->imageBytes->id = UniqueID::Next();
+  imageLayer->imageBytes->width = imageWidth;
+  imageLayer->imageBytes->height = imageHeight;
+  imageLayer->imageBytes->fileBytes = ByteData::FromPath(content->localPath()).release();
+
+  return imageLayer;
+}
+
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
     auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str()); \
     audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
@@ -482,7 +567,14 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "image") {
             auto track = static_cast<movie::ImageTrack*>(t);
+            track->content.init(tmpDir);
             printf("image track, path:%s\n", track->content.path.c_str());
+            auto layer = CreateImageLayer(track, movie.video);
+            vecComposition->layers.push_back(layer);
+            auto pagImageLayer = std::make_shared<PAGImageLayer>(nullptr, layer);
+            //zzy, must set frame rate in case of null PAGFile
+            pagImageLayer->setFrameRate(movie.video.fps); 
+            jsonComposition->addLayer(pagImageLayer);
         } else if (t->type == "title") {
             auto track = static_cast<movie::TitleTrack*>(t);
             printf("title track, text:%s\n", track->content.text.c_str());
