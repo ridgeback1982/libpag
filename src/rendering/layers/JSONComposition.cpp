@@ -120,9 +120,12 @@ int VideoContent::init(const std::string& tmpDir) {
       
       //download to local path
       printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           return -1;
       }
+      auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+      printf("VideoContent::init, download done, cost:%d s\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
@@ -180,9 +183,12 @@ int AudioContent::init(const std::string& tmpDir) {
       
       //download to local path
       printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           return -1;
       }
+      auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+      printf("AudioContent::init, download done, cost:%d ms\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
@@ -201,9 +207,12 @@ int ImageContent::init(const std::string& tmpDir) {
       
       //download to local path
       printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           return -1;
       }
+      auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+      printf("ImageContent::init, download done, cost:%d ms\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
