@@ -95,6 +95,8 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
         if (count == 0) {
           printf("FFAudioReader::readSamples, audio source drains\n");
           av_frame_free(&input);
+          printf("FFAudioReader::readSamples, audio source drains, free buffer\n");
+          return 0;
         }
         _from += count;
         AVFrame* output = nullptr;

@@ -125,7 +125,7 @@ int VideoContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("VideoContent::init, download done, cost:%d s\n", (int)(tick2-tick1).count()/1000);
+      printf("VideoContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
@@ -188,7 +188,7 @@ int AudioContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("AudioContent::init, download done, cost:%d ms\n", (int)(tick2-tick1).count()/1000);
+      printf("AudioContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
@@ -212,7 +212,7 @@ int ImageContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("ImageContent::init, download done, cost:%d ms\n", (int)(tick2-tick1).count()/1000);
+      printf("ImageContent::init, download done, cost: %d s\n", (int)(tick2-tick1).count()/1000);
   } else {
     _localPath = path;
   }
