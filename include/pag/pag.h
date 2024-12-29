@@ -841,6 +841,7 @@ public:
 
   void setSpeed(float speed);
   void setVolumeForMix(int volume);
+  void setLoop(bool loop);
 
   int volumeForMix() const { return _mixVolume; }
   
@@ -854,7 +855,6 @@ private:
   void releaseSourceBuffer();
   Frame _startFrame = 0;
   Frame _duration = 0;
-  // int _maxVolume = -1;
   int _mixVolume = -1;
   uint8_t** _sourceBuffer = nullptr;
   int _sourceBufferSize = 0;

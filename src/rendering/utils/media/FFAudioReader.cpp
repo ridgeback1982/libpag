@@ -8,9 +8,11 @@ FFAudioReader::FFAudioReader(const std::string& path) {
   _source.reset(new BestAudioSource(path.c_str(), -1));
   _properties = _source->GetAudioProperties();
   _from = 0;
+  _movingFrom = 0;
   _to = -1;
   // _volumeDetector.reset(new FFVolumeDetector(path));   //no need for volume detection
   _speed = 1.0f;
+  _loop = false;
 }
 
 FFAudioReader::~FFAudioReader() {}
@@ -37,6 +39,7 @@ int FFAudioReader::getBytesPerSample() {
 
 void FFAudioReader::setCutFrom(int64_t timeMicroSec) {
   _from = timeMicroSec * _properties.SampleRate / 1000000;
+  _movingFrom = _from;
 }
 
 void FFAudioReader::setCutTo(int64_t timeMicroSec) {
@@ -91,14 +94,17 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
           return 0;
         }
 
-        int count = (int)_source->GetAudio(input->data, _from, sampleCount);
+        int count = (int)_source->GetAudio(input->data, _movingFrom, sampleCount);
         if (count == 0) {
           printf("FFAudioReader::readSamples, audio source drains\n");
+          if (_loop) {
+            _movingFrom = _from;
+            printf("FFAudioReader::readSamples, will loop\n");
+          }
           av_frame_free(&input);
-          printf("FFAudioReader::readSamples, audio source drains, free buffer\n");
           return 0;
         }
-        _from += count;
+        _movingFrom += count;
         AVFrame* output = nullptr;
         res = _atempo->process(input, &output);
         if (res == ErrorCode::SUCCESS) {
@@ -129,8 +135,15 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
       } while (res == ErrorCode::AGAIN);
     }
   } else {
-    int count = (int)_source->GetAudio(data, _from, sampleCount);
-    _from += count;
+    int count = (int)_source->GetAudio(data, _movingFrom, sampleCount);
+    if (count == 0) {
+        printf("FFAudioReader::readSamples, audio source drains\n");
+        if (_loop) {
+          _movingFrom = _from;
+          printf("FFAudioReader::readSamples, will loop\n");
+        }
+      }
+    _movingFrom += count;
     processedCount += count;
   }
 

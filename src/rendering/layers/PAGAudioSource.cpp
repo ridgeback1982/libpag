@@ -51,6 +51,12 @@ void PAGAudioSource::setVolumeForMix(int volume) {
     _mixVolume = volume;
 }
 
+void PAGAudioSource::setLoop(bool loop) {
+    if (_ffAudioReader) {
+        _ffAudioReader->setLoop(loop);
+    }
+}
+
 void PAGAudioSource::setCutFrom(int64_t timeMicroSec) {
     if (_ffAudioReader) {
         _ffAudioReader->setCutFrom(timeMicroSec);

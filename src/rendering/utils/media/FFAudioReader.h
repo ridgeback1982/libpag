@@ -25,6 +25,7 @@ public:
   int readSamples(uint8_t** data, int channels, int sampleCount);
   int getMaxVolume();
   void setSpeed(float speed) { _speed = speed; }
+  void setLoop(bool loop) { _loop = loop; }
 
   static void test(const std::string inputPath, const std::string outputPath);
 
@@ -38,9 +39,10 @@ private:
   std::unique_ptr<FFAudioAtempo> _atempo;
   AudioProperties _properties;
   int64_t _from;
+  int64_t _movingFrom;
   int64_t _to;
   float _speed;
-
+  bool _loop;
 };
 
 }  // namespace pag
