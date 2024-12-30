@@ -827,6 +827,8 @@ class PAG_API PAGImageLayer : public PAGLayer {
 };
 
 //zzy
+#define MAX_VOLUME (20)
+#define MIN_VOLUME (-60)
 class FFAudioReader;
 class FFAudioResampler;
 class PAG_API PAGAudioSource {

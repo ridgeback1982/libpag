@@ -21,7 +21,7 @@ public:
     virtual ~FFBufferedFilter();
 
     void setOuputSamples(int samples) { _outputSamples = samples; }
-    int process(const AVFrame* input, AVFrame** output);
+    int process(AVFrame* input, AVFrame** output);
     int availableSamples() const;
     int setupBufferFilter();
 

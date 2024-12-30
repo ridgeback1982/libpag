@@ -58,7 +58,6 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
       _atempo->setSpeed(_speed);
     }
     _atempo->setOuputSamples(sampleCount);
-    AVFrame* input = nullptr;
     if (_atempo->availableSamples() >= sampleCount) {
       AVFrame* output = nullptr;
       res = _atempo->process(nullptr, &output);
@@ -81,9 +80,10 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
       } else {
         std::cerr << "FFAudioAtempo::process failed, res:" << res << std::endl;
       } 
+      av_frame_free(&output);
     } else {
       do {
-        input = av_frame_alloc();
+        AVFrame* input = av_frame_alloc();
         input->nb_samples = sampleCount;
         input->format = _properties.Format;
         av_channel_layout_default(&input->ch_layout, _properties.Channels);

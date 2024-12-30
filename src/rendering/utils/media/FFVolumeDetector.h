@@ -10,9 +10,6 @@
 //zzy
 namespace pag {
 
-#define MAX_VOLUME (20)
-#define MIN_VOLUME (-60)
-
 class PAG_API FFVolumeDetector {
 public:
     FFVolumeDetector(const std::string& filePath);

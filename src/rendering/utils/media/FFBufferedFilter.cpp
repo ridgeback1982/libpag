@@ -79,7 +79,7 @@ int FFBufferedFilter::setupBufferFilter() {
     return ret;
 }
 
-int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
+int FFBufferedFilter::process(AVFrame* input, AVFrame** output) {
     int ret = ErrorCode::SUCCESS;
     if (availableSamples() >= _outputSamples) {
         auto frame = av_frame_alloc();
@@ -109,11 +109,12 @@ int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
             return ret;
         }
         
-        ret = av_buffersrc_add_frame(_buffersrc_ctx, (AVFrame*)input);
+        ret = av_buffersrc_add_frame_flags(_buffersrc_ctx, input, AV_BUFFERSRC_FLAG_KEEP_REF);
         if (ret < 0) {
             std::cerr << "Error adding input frame to buffer source" << std::endl;
             return -1;
         }
+
         // Pull filtered frame from the filtergraph
         AVFrame *filtered_frame = av_frame_alloc();
         while ((ret = av_buffersink_get_frame(_buffersink_ctx, filtered_frame)) >= 0) {
@@ -130,6 +131,8 @@ int FFBufferedFilter::process(const AVFrame* input, AVFrame** output) {
             // Release filtered frame for reuse
             av_frame_unref(filtered_frame);
         }
+        av_frame_free(&filtered_frame);
+        av_frame_unref(input);
 
         if (availableSamples() >= _outputSamples) {
             // printf("FFBufferedFilter::process, get enough samples:%d|%d\n", availableSamples(), _outputSamples);

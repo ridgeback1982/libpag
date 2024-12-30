@@ -43,6 +43,7 @@ extern "C" {
 }
 #include "MovieObject.h"
 #include "file_util.h"
+#include <set>
 #include <cmath>
 #include <iostream>
 #include <cstdlib>
@@ -50,6 +51,7 @@ extern "C" {
 #include <unistd.h>
 #include <regex>
 #include <filesystem>
+
 
 
 #if defined(__linux__)
@@ -122,6 +124,7 @@ int VideoContent::init(const std::string& tmpDir) {
       printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
+          avformat_free_context(fmt_ctx);
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -136,6 +139,7 @@ int VideoContent::init(const std::string& tmpDir) {
   // 打开输入文件
   if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
     std::cerr << "Could not open input file:" << _localPath << std::endl;
+    avformat_free_context(fmt_ctx);
     return -1;
   }
 
@@ -143,6 +147,7 @@ int VideoContent::init(const std::string& tmpDir) {
   if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
     std::cerr << "Could not find stream information" << std::endl;
     avformat_close_input(&fmt_ctx);
+    avformat_free_context(fmt_ctx);
     return -1;
   }
 
@@ -157,6 +162,7 @@ int VideoContent::init(const std::string& tmpDir) {
   if (video_stream_index == -1) {
     std::cerr << "Could not find a video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
+    avformat_free_context(fmt_ctx);
     return -1;
   }
 
@@ -171,6 +177,8 @@ int VideoContent::init(const std::string& tmpDir) {
     _fps = (frame_rate.den && frame_rate.num) ? 
                  static_cast<double>(frame_rate.num) / frame_rate.den : 0;
 
+    avformat_close_input(&fmt_ctx);
+    avformat_free_context(fmt_ctx);
     return 0;
 }
 
@@ -209,6 +217,7 @@ int ImageContent::init(const std::string& tmpDir) {
       printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
+          avformat_free_context(fmt_ctx);
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -230,6 +239,7 @@ int ImageContent::init(const std::string& tmpDir) {
   if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
     std::cerr << "Could not find stream information" << std::endl;
     avformat_close_input(&fmt_ctx);
+    avformat_free_context(fmt_ctx);
     return -1;
   }
 
@@ -244,6 +254,7 @@ int ImageContent::init(const std::string& tmpDir) {
   if (video_stream_index == -1) {
     std::cerr << "Could not find a video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
+    avformat_free_context(fmt_ctx);
     return -1;
   }
 
@@ -253,6 +264,8 @@ int ImageContent::init(const std::string& tmpDir) {
   _width = codec_params->width;
   _height = codec_params->height;
 
+  avformat_close_input(&fmt_ctx);
+  avformat_free_context(fmt_ctx);
   return 0;
 }
 
@@ -274,6 +287,35 @@ int TimeToFrame(int time, float fps) {
 
 int LifetimeToFrameDuration(const movie::LifeTime& lifetime, float fps) {
     return TimeToFrame(lifetime.end_time, fps) - TimeToFrame(lifetime.begin_time, fps);
+}
+
+
+typedef std::set<std::pair<float, float>> FloatPairSet;
+FloatPairSet strokeWidthSet = {
+  //{fontsize, strokeWidth}
+    {0.03,      0},
+    {0.05,      4},
+    {0.07,      5},
+    {0.1,       6}
+};
+
+float findValueFromFloatPairSet(const FloatPairSet &fps, float key) {
+    for (auto it = fps.begin(); it!= fps.end(); ++it) {
+        if (key < it->first) {
+            if (it == fps.begin()) {
+                return it->second;
+            } else {
+                auto prev = it;
+                --prev;
+                float slope = (it->second - prev->second) / (it->first - prev->first);
+                return prev->second + slope * (key - prev->first);
+            }
+        } else {
+            continue;
+        }
+    }
+    //return last value
+    return fps.rbegin()->second;
 }
 
 PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec) {
@@ -401,7 +443,7 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   if (!content->stroke.empty()) {
     textData->applyStroke = true;
     textData->strokeColor = translateColor(content->stroke);
-    textData->strokeWidth = 1;     //hardcode
+    textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
   }
   textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
   textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
@@ -416,9 +458,10 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   textLayer->transform->scale->value.set(scale_x, scale_y);
   textLayer->timeRemap = new Property<float>(0);      //hard code
 
-  // std::cout << "createTextLayer, fontFamily:" << textData->fontFamily 
-  //     << ", color:" << (int)textData->fillColor.red << "|" << (int)textData->fillColor.green << "|" << (int)textData->fillColor.blue
-  //     << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration << std::endl;
+//  std::cout << "createTextLayer, fontFamily:" << textData->fontFamily 
+//      << ", color:" << (int)textData->fillColor.red << "|" << (int)textData->fillColor.green << "|" << (int)textData->fillColor.blue
+//      << ", stroke:" << (int)textData->strokeColor.red << "|" << (int)textData->strokeColor.green << "|" << (int)textData->strokeColor.blue << ", width:" << textData->strokeWidth
+//      << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration << std::endl;
   return textLayer;
 }
 
@@ -528,6 +571,19 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     
+    //add water mark
+    auto waterMark = new movie::TitleTrack();
+    waterMark->type = "title";
+    waterMark->lifetime.begin_time = 0;
+    waterMark->lifetime.end_time = story.duration;
+    waterMark->zorder = 1000;
+    waterMark->content.text = ".";
+    waterMark->content.location.center_x = 0.0f;
+    waterMark->content.location.center_y = 0.95f;
+    waterMark->content.fontSize = 0.1f;
+    waterMark->content.textColor = "#777777";
+    story.tracks.push_back(waterMark);
+
     //sort tracks by zorder
     std::sort(story.tracks.begin(), story.tracks.end(), [](const auto& a, const auto& b) {
         return a->zorder < b->zorder;
@@ -614,6 +670,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     if (!vecComposition->staticTimeRangeUpdated) {
       vecComposition->updateStaticTimeRanges();
       vecComposition->staticTimeRangeUpdated = true;
+    }
+    
+    //zzy, must not do this in destructor of story, because the destructor is called by nlohmann::json ahead of time
+    for (auto& track : story.tracks) {
+        delete track;
     }
 
     return jsonComposition;

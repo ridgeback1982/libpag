@@ -538,12 +538,15 @@ int PAGComposition::getAudioFrameNumber(int targetSampleRate) const {
 int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
   int output = 0;
   int frame = getAudioFrameNumber(targetSampleRate);
-
+    
   //collect all visible audio sources
   std::vector<AudioPreMixData>srcBuffers2;
   for (size_t index=0; index<audios.size(); index++) {
     auto audio = audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
+      if (audio->volumeForMix() == MIN_VOLUME) {
+        continue;
+      }
       uint8_t** srcBuffers = new uint8_t*[targetChannels];
       for(int i=0; i<targetChannels; i++) {
         srcBuffers[i] = new uint8_t[bufferSize];
@@ -553,38 +556,50 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
         }
       }
        
-      if (audio->readAudioBySamples(samples, srcBuffers, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
-        //skip it, no more data
-        continue;
-      }
+       if (audio->readAudioBySamples(samples, srcBuffers, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
+         //skip it, no more data
+         continue;
+       }
       srcBuffers2.push_back({audio->volumeForMix(), targetChannels, srcBuffers});
     }
   }
 
   //do mix here
-  if (srcBuffers2.size() > 0) {
-    if (audioMixer) {
-      if (audioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
-        output = 0;
-        goto end;
-      }
-      output = (int)samples;
-    } else {
-      output = 0;
-      goto end;
-    }
-  } 
-  // else if (srcBuffers2.size() == 1) {
-  //   memcpy(buffer, srcBuffers2[0].buffer.get(), bufferSize);
-  //   res = samples;
-  // } 
-  else {
-    //no audio, but it is valid, so set buffer to silence
-    output = (int)samples;
-    for (int i = 0; i < targetChannels; i++) {
-      memset(buffers[i], 0, bufferSize);
-    }
-  }
+   if (srcBuffers2.size() > 0) {
+     if (audioMixer) {
+       if (audioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
+         output = 0;
+         goto end;
+       }
+       output = (int)samples;
+     } else {
+       output = 0;
+       goto end;
+     }
+   } 
+   //  else if (srcBuffers2.size() == 1) {
+   //   if (srcBuffers2[0].channels == 1) {
+   //     for (int i = 0; i < targetChannels; i++) {
+   //       memcpy(buffers[i], srcBuffers2[0].buffers[0], bufferSize);
+   //     }
+   //   } else {
+   //     if (targetChannels == 1) {
+   //       memcpy(buffers[0], srcBuffers2[0].buffers[0], bufferSize);
+   //     } else {
+   //       for(int i = 0; i < srcBuffers2[0].channels; i++) {
+   //         memcpy(buffers[i], srcBuffers2[0].buffers[i], bufferSize);
+   //       }
+   //     }
+   //   }
+   //   output = (int)samples;
+   //  }
+   else {
+     //no audio, but it is valid, so set buffer to silence
+     output = (int)samples;
+     for (int i = 0; i < targetChannels; i++) {
+       memset(buffers[i], 0, bufferSize);
+     }
+   }
 
   for (auto srcBuffer : srcBuffers2) {
     if (srcBuffer.buffers) {

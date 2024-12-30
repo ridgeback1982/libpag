@@ -69,6 +69,7 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
 
     AVFilterContext** source_ctxs = (AVFilterContext**)malloc(sizeof(AVFilterContext*) * srcBuffers.size());
+    AVFilterInOut* tmp_inputs = inputs;
     for (int i = 0; i < (int)srcBuffers.size(); i++) {
         char args[512];
         snprintf(args, sizeof(args),
@@ -79,17 +80,21 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
         ret = avfilter_graph_create_filter(&source_ctxs[i], abuffersrc, name, args, NULL, graph);
         if (ret < 0) {
             std::cerr << "Error creating buffer source for input " << i << std::endl;
+            avfilter_inout_free(&inputs);
+            avfilter_inout_free(&outputs);
             return -1;
         }
 
         // Connect the source to the corresponding input
-        ret = avfilter_link(source_ctxs[i], 0, inputs->filter_ctx, inputs->pad_idx);
+        ret = avfilter_link(source_ctxs[i], 0, tmp_inputs->filter_ctx, tmp_inputs->pad_idx);
         if (ret < 0) {
             std::cerr << "Error linking buffer source for input " << i << std::endl;
+            avfilter_inout_free(&inputs);
+            avfilter_inout_free(&outputs);
             return -1;
         }
 
-        inputs = inputs->next;  // Advance to the next input
+        tmp_inputs = tmp_inputs->next;  // Advance to the next input
     }
 
     // Create buffer sink
@@ -97,6 +102,8 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     ret = avfilter_graph_create_filter(&sink_ctx, abuffersink, "out", NULL, NULL, graph);
     if (ret < 0) {
         std::cerr << "Error creating buffer sink" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
         return -1;
     }
 
@@ -104,17 +111,23 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
     ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, sink_ctx, 0);
     if (ret < 0) {
         std::cerr << "Error linking buffer sink" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
         return -1;
     }
 
     ret = avfilter_graph_config(graph, NULL);
     if (ret < 0) {
         std::cerr << "Error configuring filter graph" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
         return -1;
     }
 
     *sources = source_ctxs;
     *sink = sink_ctx;
+    avfilter_inout_free(&inputs);
+    avfilter_inout_free(&outputs);
     return 0;
 }
 
@@ -178,6 +191,7 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
     //printf("Mixed frame with %d samples\n", filt_frame->nb_samples);
     av_frame_unref(filt_frame);
   }
+  av_frame_free(&filt_frame);
     
 //  if (ret == AVERROR(EAGAIN)) {
 //    printf("EAGAIN \n");
@@ -186,9 +200,19 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
 
   //finish
   for (auto frame : frames) {
+    av_frame_unref(frame); 
     av_frame_free(&frame);
   }
   av_frame_free(&filt_frame);
+  if (src_ctx) {
+    for (int i = 0; i < srcCount; ++i) {
+      avfilter_free(src_ctx[i]);
+    }
+    free(src_ctx);    //it is created in setupFilterGraph
+  }
+  if (sink_ctx) {
+    avfilter_free(sink_ctx);
+  }
   avfilter_graph_free(&filter_graph);
   return 0;
 }
