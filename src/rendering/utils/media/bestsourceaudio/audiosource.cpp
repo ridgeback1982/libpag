@@ -354,7 +354,11 @@ void BestAudioSource::ZeroFillEnd(uint8_t *Data[], int64_t Start, int64_t &Count
     if (HasExactNumAudioSamples && (Start + Count > AP.NumSamples)) {
         if (Start > AP.NumSamples) {
             int64_t Length = Count;
-            fprintf(stderr, "Start is bigger than NumSamples(%s), %lld|%lld, will fill zero data\n", Source.c_str(), Start, AP.NumSamples);
+            //zzy, log control
+            if (_debugStart != Start) {
+                fprintf(stderr, "Start is bigger than NumSamples(%s), %lld|%lld, will fill zero data\n", Source.c_str(), Start, AP.NumSamples);
+                _debugStart = Start;
+            }
             for (int i = 0; i < AP.Channels; i++)
                 memset(Data[i], 0, Length * AP.BytesPerSample);
             Count -= Length;
@@ -365,6 +369,11 @@ void BestAudioSource::ZeroFillEnd(uint8_t *Data[], int64_t Start, int64_t &Count
                 memset(Data[i] + ByteOffset, 0, Length * AP.BytesPerSample);
             Count -= Length;
         }
+    }
+
+    //zzy, log control
+    if (_debugStart > Start) {
+        _debugStart = 0;    //reset
     }
 }
 

@@ -119,6 +119,7 @@ private:
     size_t MaxSize;
     size_t CacheSize = 0;
     int64_t PreRoll = 200000;
+    int64_t _debugStart = 0;    //zzy, control frequency of audio buffer drain log
 
     void ZeroFillStart(uint8_t *Data[], int64_t &Start, int64_t &Count);
     void ZeroFillEnd(uint8_t *Data[], int64_t Start, int64_t &Count);
