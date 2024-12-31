@@ -26,7 +26,7 @@ public:
     void setGain(int gain) { _gain = gain; }
 
 private:
-    int _gain = 17;
+    int _gain = 5;
     bool _setUp = false;
 //    AVFilterContext *_gain_ctx = NULL;
 };
