@@ -996,6 +996,7 @@ class PAG_API PAGComposition : public PAGLayer {
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
   //zzy
+  void setVideoFrameRate(float frameRate) { _frameRate = frameRate; }
   void setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer);
   void setAudioGain(std::shared_ptr<FFAudioGain> audioGain);
   void addAudioSource(std::shared_ptr<PAGAudioSource> audioSource);
@@ -1080,6 +1081,7 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class AudioClip;
 
   friend class PAGDecoder;
+
 };
 
 //zzy, JSONComposition definition

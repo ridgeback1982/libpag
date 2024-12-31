@@ -348,10 +348,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
     auto vidPreComposeLayer = new PreComposeLayer();
     vidPreComposeLayer->id = UniqueID::Next();
-    vidPreComposeLayer->startTime = TimeToFrame(track->lifetime.begin_time, vidComposition->frameRate);
+    vidPreComposeLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
     //zzy, must set compositionStartTime same as startTime, or it will be zero, and cause video start play from some middle point
     vidPreComposeLayer->compositionStartTime = vidPreComposeLayer->startTime;
-    vidPreComposeLayer->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
+    vidPreComposeLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
     vidPreComposeLayer->transform = Transform2D::MakeDefault().release();
     //set transform
     vidPreComposeLayer->transform->anchorPoint->value.set(video_width/2, video_height/2);
@@ -538,6 +538,34 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
   return nullptr;
 }
 
+void prepareAllTracks(movie::Story& story) {
+  //add water mark
+  auto waterMark = new movie::TitleTrack();
+  waterMark->type = "title";
+  waterMark->lifetime.begin_time = 0;
+  waterMark->lifetime.end_time = story.duration;
+  waterMark->zorder = 1000;
+  waterMark->content.text = ".";
+  waterMark->content.location.center_x = 0.0f;
+  waterMark->content.location.center_y = 0.95f;
+  waterMark->content.fontSize = 0.1f;
+  waterMark->content.textColor = "#777777";
+  story.tracks.push_back(waterMark);
+
+  //check duration of all tracks
+  for (auto& t : story.tracks) {
+    t->lifetime.end_time = std::min(t->lifetime.end_time, story.duration);
+  }
+
+  //remove tracks with zero duration
+  story.tracks.erase(std::remove_if(story.tracks.begin(), story.tracks.end(), [](movie::Track* t) { return t->lifetime.end_time <= t->lifetime.begin_time; }), story.tracks.end());
+
+  //sort tracks by zorder
+  std::sort(story.tracks.begin(), story.tracks.end(), [](const auto& a, const auto& b) {
+      return a->zorder < b->zorder;
+  });
+}
+
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str) {
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
@@ -571,23 +599,8 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     
-    //add water mark
-    auto waterMark = new movie::TitleTrack();
-    waterMark->type = "title";
-    waterMark->lifetime.begin_time = 0;
-    waterMark->lifetime.end_time = story.duration;
-    waterMark->zorder = 1000;
-    waterMark->content.text = ".";
-    waterMark->content.location.center_x = 0.0f;
-    waterMark->content.location.center_y = 0.95f;
-    waterMark->content.fontSize = 0.1f;
-    waterMark->content.textColor = "#777777";
-    story.tracks.push_back(waterMark);
-
-    //sort tracks by zorder
-    std::sort(story.tracks.begin(), story.tracks.end(), [](const auto& a, const auto& b) {
-        return a->zorder < b->zorder;
-    });
+    //prepare all tracks for rendering
+    prepareAllTracks(story);
     
     //add track to PAGLayer one by one
     for (auto& t : story.tracks) {
@@ -599,7 +612,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto vidPreComposeLayer = createVideoLayer(track, movie.video);
             if (vidPreComposeLayer != nullptr) {
               vecComposition->layers.push_back(vidPreComposeLayer);
+              //zzy, must set "containingComposition" for fps sampler
+              vidPreComposeLayer->containingComposition = vecComposition;
               auto pagVideoLayer = std::make_shared<PAGComposition>(nullptr, vidPreComposeLayer);
+              //zzy, must set frame rate in case of null PAGFile, but it is different from "setFrameRate"
+              pagVideoLayer->setVideoFrameRate(movie.video.fps);
               jsonComposition->addLayer(pagVideoLayer);
 
               //add audio source
