@@ -566,25 +566,34 @@ void prepareAllTracks(movie::Story& story) {
   });
 }
 
-std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str) {
+std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir) {
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     movie::Story story = movie.video.stories[0];
     printf("JSONComposition::Load, json to movie\n");
 
-    std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
-    char tempTemplate[] = "tmp_XXXXXX";
-    std::string tempFolder(mkdtemp(tempTemplate));
-    std::string tmpDir = tmpDir1 + "/" + tempFolder;
-#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
-    if (mkdir(tmpDir.c_str(), 0755) == 0) {
-        printf("Temp Directory created, %s\n", tmpDir.c_str());
+    std::string tmpDir;
+    if (tmp_dir.empty()) {
+      std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
+      printf("JSONComposition::Load, platform tmp dir:%s\n", tmpDir1.c_str());
+      char tempTemplate[] = "tmp_XXXXXX";
+      std::string tempFolder(mkdtemp(tempTemplate));
+      tmpDir = tmpDir1 + "/" + tempFolder;
+      printf("JSONComposition::Load, tmp dir:%s\n", tmpDir.c_str());
+  #if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
+      if (mkdir(tmpDir.c_str(), 0755) == 0) {
+          printf("Temp Directory created: %s\n", tmpDir.c_str());
+      } else {
+          std::cerr << "Error creating directory" << std::endl;
+      }
+  #else
+      #error "Unsupported platform"
+  #endif
     } else {
-        std::cerr << "Error creating directory" << std::endl;
+      tmpDir = tmp_dir;
+      printf("customer tmp dir: %s\n", tmpDir.c_str());
     }
-#else
-    #error "Unsupported platform"
-#endif
+    
 
     auto vecComposition = new VectorComposition();
     vecComposition->id = UniqueID::Next();
