@@ -359,11 +359,9 @@ namespace movie {
     public:
         std::string type = "movie";
         MovieSpec video;
-        Output output;
         static void from_json(const json& j, Movie& m) {
             j.at("type").get_to(m.type);
             j.at("video").get_to(m.video);
-            j.at("output").get_to(m.output);
         }
     };
     void from_json(const json& j, Movie& m) {

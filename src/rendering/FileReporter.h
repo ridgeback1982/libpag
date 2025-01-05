@@ -21,6 +21,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 #include "pag/pag.h"
 
 namespace pag {
@@ -47,9 +48,13 @@ class FileReporter {
   int64_t renderMaxTime = 0;
   int64_t renderFirstFrameTime = 0;
 
-  int64_t flushTotalTime = 0;
-  int64_t flushMaxTime = 0;
-  int64_t flushFirstFrameTime = 0;
+  // int64_t flushTotalTime = 0;
+  // int64_t flushMaxTime = 0;
+  // int64_t flushFirstFrameTime = 0;
+
+  //zzy, debug
+  int64_t jobTotalTime = 0;
+  int64_t jobMaxTime = 0;
 
   int64_t imageDecodingMaxTime = 0;
 

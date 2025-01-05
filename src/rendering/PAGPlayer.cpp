@@ -312,6 +312,16 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
                    renderCache->softwareDecodingTime;
   renderCache->presentingTime -= knownTime;
   renderCache->totalTime = clock.measure("", "presenting");
+
+  //zzy, debug
+  // static int logCount = 0;
+  // if (logCount++ % 200 == 0) {
+  //   std::cout << "PAGPlayer::flush, total time:" << renderCache->totalTime/1000 << "ms, prepare time:" << renderCache->renderingTime/1000 << "ms, draw time:" << renderCache->presentingTime/1000
+  //     << "ms, imageDecodingTime:" << renderCache->imageDecodingTime/1000 << "ms, textureUploadingTime:" << renderCache->textureUploadingTime/1000
+  //     << "ms, programCompilingTime:" << renderCache->programCompilingTime/1000 << "ms, hardwareDecodingTime:" << renderCache->hardwareDecodingTime/1000
+  //     << "ms, softwareDecodingTime:" << renderCache->softwareDecodingTime/1000 << std::endl;
+  // }
+  
   //  auto composition = stage->getRootComposition();
   //  if (composition) {
   //    renderCache->printPerformance(composition->currentFrameInternal());
