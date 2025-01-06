@@ -19,6 +19,7 @@
 #include "VideoDecoderFactory.h"
 #include <atomic>
 #include "SoftAVCDecoder.h"
+#include "FFAVCDecoder.h"
 #include "SoftwareDecoderWrapper.h"
 #include "base/utils/USE.h"
 #include "pag/pag.h"
@@ -82,9 +83,15 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
 #ifdef PAG_USE_LIBAVC
-    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
+    // videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
+    // if (videoDecoder != nullptr) {
+    //   LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+    // }
+
+    //zzy, use FFAvcDecoder instead
+    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFAVCDecoder>(), format);
     if (videoDecoder != nullptr) {
-      LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+      LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");
     }
 #else
     USE(format);
