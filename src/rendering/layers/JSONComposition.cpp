@@ -477,7 +477,10 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
       for (auto sentence : content->sentences) {
         movie::LifeTime lifetime;
         lifetime.begin_time = track->lifetime.begin_time + sentence.begin_time;
-        lifetime.end_time = track->lifetime.begin_time + sentence.end_time;
+        if (lifetime.begin_time >= track->lifetime.end_time) {
+          break;
+        }
+        lifetime.end_time = std::min(track->lifetime.begin_time + sentence.end_time, track->lifetime.end_time);
         auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
         textLayers.push_back(textLayer);
       }
@@ -539,6 +542,7 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
 }
 
 void prepareAllTracks(movie::Story& story) {
+  printf("prepareAllTracks, duration:%d\n", story.duration);
   //add water mark
   auto waterMark = new movie::TitleTrack();
   waterMark->type = "title";
@@ -593,7 +597,6 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
       tmpDir = tmp_dir;
       printf("customer tmp dir: %s\n", tmpDir.c_str());
     }
-    
 
     auto vecComposition = new VectorComposition();
     vecComposition->id = UniqueID::Next();

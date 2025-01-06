@@ -119,7 +119,7 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         offset += 2;
         uint8_t *sps = extradata + offset; // SPS NAL unit starts here
 
-        std::cout << "Found SPS of length " << sps_length << ", sps:" << sps[0] << std::endl;   //without start code
+        // std::cout << "Found SPS of length " << sps_length << ", sps:" << sps[0] << std::endl;   //without start code
         ByteData* sps_byte = ConvertToByteDataWithStartCode(sps, sps_length).release();
         sequence->headers.push_back(sps_byte);
 
@@ -136,7 +136,7 @@ void parse_h264_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         offset += 2;
         uint8_t *pps = extradata + offset; // PPS NAL unit starts here
 
-        std::cout << "Found PPS of length " << pps_length << ", pps:" << pps[0] << std::endl;    //widthout startcode
+        // std::cout << "Found PPS of length " << pps_length << ", pps:" << pps[0] << std::endl;    //widthout startcode
         ByteData* pps_byte = ConvertToByteDataWithStartCode(pps, pps_length).release();
         sequence->headers.push_back(pps_byte);
 
