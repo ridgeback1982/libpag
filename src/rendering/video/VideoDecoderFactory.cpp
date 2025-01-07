@@ -83,14 +83,12 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
 #ifdef PAG_USE_LIBAVC
-    fprintf("Using SoftAVCDecoder");
     videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
     if (videoDecoder != nullptr) {
       LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
     }
 #elif PAG_USE_FFAVC2
     //zzy, use FFAvcDecoder instead
-    fprintf("Using FFAVCDecoder");
     videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFAVCDecoder>(), format);
     if (videoDecoder != nullptr) {
       LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");

@@ -1,9 +1,11 @@
 
 #include "FFAVCDecoder.h"
+#include "base/utils/TimeUtil.h"
+#include "platform/Platform.h"
+#include "tgfx/utils/Clock.h"
 #include <cstdlib>
 
 #ifdef PAG_USE_FFAVC2
-
 
 namespace pag {
 
@@ -108,6 +110,7 @@ DecoderResult FFAVCDecoder::onSendBytes(void* bytes, size_t length, [[maybe_unus
         if (parseNalType((uint8_t*)bytes, (int)length) == 5) {
             _firstKeyFrame = (uint8_t*)malloc(_extraDataLength + length);
             if (!_firstKeyFrame) {
+                fprintf(stderr, "FFAVCDecoder::onSendBytes, first frame is not KEY frame\n");
                 return DecoderResult::Error;
             }
             memcpy(_firstKeyFrame, _extraData, _extraDataLength);
@@ -125,12 +128,21 @@ DecoderResult FFAVCDecoder::onSendBytes(void* bytes, size_t length, [[maybe_unus
     packet->size = input_length;
 
     int ret = 0;
+    // tgfx::Clock clock = {};
     if ((ret = avcodec_send_packet(_codec_ctx, packet)) < 0) {
         if (ret != AVERROR_EOF) {
             fprintf(stderr, "Error sending packet to decoder(onSendBytes), %d\n", ret);
+            res = DecoderResult::Error;
+        } else {
+            //return Success if AVERROR_EOF(caused by onFlush)
+            res = DecoderResult::Success;
         }
-        res = DecoderResult::Error;
     }
+    // auto sendTime = clock.elapsedTime();
+    // static int logcount = 0;
+    // if (logcount++ % 50 == 0) {
+    //     printf("FFAVCDecoder::onSendBytes, cost:%d\n", sendTime/1000);
+    // }
 
     av_packet_free(&packet);
     return res;

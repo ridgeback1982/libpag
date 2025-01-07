@@ -99,6 +99,7 @@ message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_FRAMEWORK: ${PAG_BUILD_FRAMEWORK}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
+message("PAG_USE_FFAVC2: ${PAG_USE_FFAVC2}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -174,6 +175,10 @@ if (PAG_USE_LIBAVC)
     list(APPEND PAG_DEFINES PAG_USE_LIBAVC)
     list(APPEND PAG_STATIC_VENDORS libavc)
     list(APPEND PAG_INCLUDES third_party/libavc/common third_party/libavc/decoder)
+endif ()
+
+if (PAG_USE_FFAVC2)
+    list(APPEND PAG_DEFINES PAG_USE_FFAVC2)
 endif ()
 
 if (PAG_USE_QT)

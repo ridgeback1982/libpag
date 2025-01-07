@@ -195,6 +195,7 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
     }
     tgfx::Clock clock = {};
     auto decoder = factory->createDecoder(demuxer->getFormat());
+    printf("VideoReader::makeVideoDecoder, decoder:%p \n", decoder.get());
     if (decoder != nullptr) {
       if (decoder->isHardwareBacked()) {
         hardDecodingInitialTime = clock.elapsedTime();
