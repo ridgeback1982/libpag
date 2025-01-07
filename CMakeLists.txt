@@ -80,7 +80,7 @@ else ()
     set(USE_NATIVE_PLATFORM ON)
 endif ()
 
-if (PAG_USE_FFAVC)
+if (PAG_USE_FFAVC OR PAG_USE_FFAVC2)
     set(PAG_USE_LIBAVC OFF)
 endif ()
 

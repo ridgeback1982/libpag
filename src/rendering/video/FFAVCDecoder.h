@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef PAG_USE_LIBAVC
+#ifdef PAG_USE_FFAVC2
 
 #include "base/utils/Log.h"
 #include "pag/decoder.h"
@@ -44,11 +44,16 @@ public:
 
 private:
   AVCodecContext* _codec_ctx = nullptr;
-
+  uint8_t* _extraData = nullptr;
+  int _extraDataLength = 0;
+  uint8_t* _firstKeyFrame = nullptr;
   uint8_t* _yuv = nullptr;
   int      _yuvLength = 0;   
   int   _width = 0;
   int   _height = 0;
+  bool _decoded = false;
+  bool _inputDrain = false;
+  
 };
 
 

@@ -37,6 +37,7 @@ void NativePlatform::setNALUType(NALUType type) const {
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+
   return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
           VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }

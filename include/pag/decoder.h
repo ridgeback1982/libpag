@@ -66,7 +66,10 @@ enum class DecoderResult {
   /**
    * The calling fails.
    */
-  Error = -2
+  Error = -2,
+    
+  //zzy, according toDecodingResult
+  EndOfStream = -3
 };
 
 /**

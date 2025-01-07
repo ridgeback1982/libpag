@@ -2,7 +2,7 @@
 #include "FFAVCDecoder.h"
 #include <cstdlib>
 
-#ifdef PAG_USE_LIBAVC
+#ifdef PAG_USE_FFAVC2
 
 
 namespace pag {
@@ -10,11 +10,21 @@ namespace pag {
 FFAVCDecoder::~FFAVCDecoder() {
   avcodec_free_context(&_codec_ctx);
   if (_yuv) {
-    free(_yuv);
+      free(_yuv);
+      _yuv = nullptr;
+  }
+  if (_extraData) {
+      free(_extraData);
+      _extraData = nullptr;
+  }
+  if (_firstKeyFrame) {
+      free(_firstKeyFrame);
+      _firstKeyFrame = nullptr;
   }
 }
 
 bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::string mime, int width, int height) {
+    printf("FFAVCDecoder::onConfigure, mime:%s, width:%d, height:%d \n", mime.c_str(), width, height);
     const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
     if (!codec) {
         fprintf(stderr, "H.264 decoder not found\n");
@@ -30,6 +40,7 @@ bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::stri
     // Open codec
     if (avcodec_open2(_codec_ctx, codec, NULL) < 0) {
         fprintf(stderr, "Failed to open codec\n");
+        avcodec_free_context(&_codec_ctx);
         return false;
     }
 
@@ -37,26 +48,24 @@ bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::stri
     for (auto& header : headers) {
         bufferLength += header.length;
     }
-    size_t pos = 0;
-    uint8_t *avbuffer = (uint8_t*)av_malloc(bufferLength);
-    for (auto& header : headers) {
-        memcpy(avbuffer + pos, header.data, header.length);
-        pos += header.length;
+    if (_extraData) {
+        free(_extraData);
     }
-    AVPacket *packet = av_packet_alloc();
-    packet->data = avbuffer;
-    packet->size = bufferLength;
-
-    if (avcodec_send_packet(_codec_ctx, packet) < 0) {
-        fprintf(stderr, "Error sending packet to decoder\n");
-        av_packet_free(&packet);
+    _extraDataLength = (int)bufferLength;
+    _extraData = (uint8_t*)malloc(_extraDataLength);
+    if (!_extraData) {
+        avcodec_free_context(&_codec_ctx);
         return false;
+    }
+    size_t pos = 0;
+    for (auto& header : headers) {
+        memcpy(_extraData + pos, header.data, header.length);
+        pos += header.length;
     }
 
     _yuvLength = width*height + width*height/2;
     _yuv = (uint8_t*)malloc(_yuvLength);
     if (_yuv == nullptr) {
-        av_packet_free(&packet);
         return false;
     }
     memset(_yuv, 0, _yuvLength);
@@ -64,18 +73,62 @@ bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::stri
     _width = width;
     _height = height;
 
-    av_packet_free(&packet);
     return true;
 }
 
-DecoderResult FFAVCDecoder::onSendBytes(void* bytes, size_t length, int64_t time)  {
-    DecoderResult res = DecoderResult::Success;
-    AVPacket *packet = av_packet_alloc();
-    packet->data = (uint8_t*)bytes;
-    packet->size = length;
+int parseNalType(uint8_t* bitstream, int length) {
+    int pos = 0;
+    uint8_t nalType = 0;
+    while (pos < length) {
+        // Look for start code prefix: 0x000001 or 0x00000001
+        if (pos + 3 < length &&
+            bitstream[pos] == 0x00 && bitstream[pos + 1] == 0x00 && (bitstream[pos + 2] == 0x01 ||
+             (bitstream[pos + 2] == 0x00 && pos + 4 < length && bitstream[pos + 3] == 0x01))) {
 
-    if (avcodec_send_packet(_codec_ctx, packet) < 0) {
-        fprintf(stderr, "Error sending packet to decoder\n");
+            // Adjust position to the NAL header
+            pos += (bitstream[pos + 2] == 0x01) ? 3 : 4;
+
+            if (pos < length) {
+                uint8_t nalHeader = bitstream[pos];
+                nalType = nalHeader & 0x1F; // Extract last 5 bits for NAL type
+//                std::cout << "Found NAL Unit: Type = " << static_cast<int>(nalType) << std::endl;
+                break;
+            }
+        }
+        pos++;
+    }
+    return nalType;
+}
+
+DecoderResult FFAVCDecoder::onSendBytes(void* bytes, size_t length, [[maybe_unused]]int64_t time)  {
+    DecoderResult res = DecoderResult::Success;
+    uint8_t* input = (uint8_t*)bytes;
+    int input_length = (int)length;
+    if (!_firstKeyFrame) {
+        if (parseNalType((uint8_t*)bytes, (int)length) == 5) {
+            _firstKeyFrame = (uint8_t*)malloc(_extraDataLength + length);
+            if (!_firstKeyFrame) {
+                return DecoderResult::Error;
+            }
+            memcpy(_firstKeyFrame, _extraData, _extraDataLength);
+            memcpy(_firstKeyFrame + _extraDataLength, bytes, length);
+            input = _firstKeyFrame;
+            input_length = _extraDataLength + (int)length;
+        } else {
+            //has to return Success. If return Error, decode will fail; if return TryAgainLater, the same nal will be input again
+            return res;
+        }
+    }
+    
+    AVPacket *packet = av_packet_alloc();
+    packet->data = input;
+    packet->size = input_length;
+
+    int ret = 0;
+    if ((ret = avcodec_send_packet(_codec_ctx, packet)) < 0) {
+        if (ret != AVERROR_EOF) {
+            fprintf(stderr, "Error sending packet to decoder(onSendBytes), %d\n", ret);
+        }
         res = DecoderResult::Error;
     }
 
@@ -85,10 +138,12 @@ DecoderResult FFAVCDecoder::onSendBytes(void* bytes, size_t length, int64_t time
 
 DecoderResult FFAVCDecoder::onEndOfStream() {
     DecoderResult res = DecoderResult::Success;
-    if (avcodec_send_packet(_codec_ctx, nullptr) < 0) {
-        fprintf(stderr, "Error sending packet to decoder\n");
+    int ret = 0;
+    if ((ret = avcodec_send_packet(_codec_ctx, nullptr)) < 0) {
+        fprintf(stderr, "Error sending packet to decoder(onEndOfStream), %d\n", ret);
         res = DecoderResult::Error;
     }
+    _inputDrain = true;
     return res;
 }
 
@@ -97,7 +152,6 @@ DecoderResult FFAVCDecoder::onDecodeFrame() {
     AVFrame *frame = av_frame_alloc();
     int ret = avcodec_receive_frame(_codec_ctx, frame);
     if (ret == 0) {
-        printf("Decoded frame: %d x %d\n", frame->width, frame->height);
         uint8_t* ySrc = frame->data[0];
         uint8_t* yDst = _yuv;
         for (int i=0; i<frame->height; i++) {
@@ -119,8 +173,14 @@ DecoderResult FFAVCDecoder::onDecodeFrame() {
             vSrc += frame->linesize[2];
             vDst += _width/2;
         }
+//        if (_decoded) {
+//            printf("Decoded frame: %d x %d, overlap\n", frame->width, frame->height);
+//        } else {
+//            printf("Decoded frame: %d x %d, normal\n", frame->width, frame->height);
+//        }
+        _decoded = true;
     } else if (ret == AVERROR(EAGAIN)) {
-        res = DecoderResult::TryAgainLater;
+        res = _inputDrain ? DecoderResult::EndOfStream : DecoderResult::TryAgainLater;
     } else {
         res = DecoderResult::Error;
     }
@@ -130,24 +190,42 @@ DecoderResult FFAVCDecoder::onDecodeFrame() {
 }
 
 std::unique_ptr<YUVBuffer> FFAVCDecoder::onRenderFrame() {
-    auto output = std::make_unique<YUVBuffer>();
-    output->data[0] = _yuv;
-    output->data[1] = _yuv + _width*_height;
-    output->data[2] = _yuv + _width*_height + _width*_height/4;
-    output->lineSize[0] = _width;
-    output->lineSize[1] = _width/2;
-    output->lineSize[2] = _width/2;
-    return output;
+    if (_decoded) {
+        auto output = std::make_unique<YUVBuffer>();
+        output->data[0] = _yuv;
+        output->data[1] = _yuv + _width*_height;
+        output->data[2] = _yuv + _width*_height + _width*_height/4;
+        output->lineSize[0] = _width;
+        output->lineSize[1] = _width/2;
+        output->lineSize[2] = _width/2;
+        
+        _decoded = false;
+        return output;
+    } else {
+        return nullptr;
+    }
 }
 
 void FFAVCDecoder::onFlush() {
-    // Reset the decoder (flush and reinitialize)
-    avcodec_send_packet(_codec_ctx, NULL);  // Send NULL packet to flush
-    AVFrame *frame = av_frame_alloc();
-    while (avcodec_receive_frame(_codec_ctx, frame) == 0) {
-        // Process any remaining frames after flushing
+    // Just consume all frames(no need to reset decoder)
+    if (_codec_ctx) {
+//        printf("FFAVCDecoder::onFlush\n");
+        //zzy, do not send packet with NULL, because it indicates stream EOF, and decoder will not output anything after that
+//        avcodec_send_packet(_codec_ctx, NULL);  // Send NULL packet to flush
+        AVFrame *frame = av_frame_alloc();
+        while (avcodec_receive_frame(_codec_ctx, frame) == 0) {
+            // Process any remaining frames after flushing
+        }
+        av_frame_free(&frame);
+
+        if (_firstKeyFrame) {
+            free(_firstKeyFrame);
+            _firstKeyFrame = nullptr;
+        }
+        
+        _inputDrain = false;
+        _decoded = false;
     }
-    av_frame_free(&frame);
 }
 
 }

@@ -345,7 +345,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
           nal_type = (nal[0] & 0x7E) >> 1; // Get the NAL unit type
         }
         //push to frames
-        if (is_avc && (nal_type == 6/*SEI*/ || nal_type == 7/*SPS*/ || nal_type == 8/*PPS*/)) {
+        if (is_avc && (nal_type == 6/*SEI*/ || nal_type == 7/*SPS*/ || nal_type == 8/*PPS*/ || nal_type == 9/*AUD*/)) {
         } else if (is_hevc && (nal_type == 32/*VPS*/ || nal_type == 33/*SPS*/ || nal_type == 34/*PPS*/ || nal_type == 39/*SEI*/)) {
         } else {
           //if hevc, 19 is I frame, 1 is p frame
