@@ -57,6 +57,10 @@ void PAGAudioSource::setLoop(bool loop) {
     }
 }
 
+void PAGAudioSource::setType(AudioSourceType type) {
+    _audioSourceType = type;
+}
+
 void PAGAudioSource::setCutFrom(int64_t timeMicroSec) {
     if (_ffAudioReader) {
         _ffAudioReader->setCutFrom(timeMicroSec);

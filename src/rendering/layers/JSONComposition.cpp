@@ -525,6 +525,10 @@ ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
     audioSource->setCutFrom(1000*(int64_t)(typedTrack->content.cutFrom * typedTrack->content.speed)); \
     audioSource->setVolumeForMix(typedTrack->content.mixVolume); \
     audioSource->setLoop(typedTrack->content.loop); \
+    if (typedTrack->type == "voice") \
+      audioSource->setType(AudioSourceType::Voice); \
+    else \
+      audioSource->setType(AudioSourceType::Bgm); \
     return audioSource; 
 
 std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie::Track* track, const movie::MovieSpec& spec) {

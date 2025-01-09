@@ -831,6 +831,10 @@ class PAG_API PAGImageLayer : public PAGLayer {
 #define MIN_VOLUME (-60)
 class FFAudioReader;
 class FFAudioResampler;
+typedef enum AudioType {
+    Voice = 0,
+    Bgm
+}AudioSourceType;
 class PAG_API PAGAudioSource {
 public:
   PAGAudioSource(const std::string& path);
@@ -850,6 +854,8 @@ public:
   void setCutFrom(int64_t timeMicroSec);
   void setCutTo(int64_t timeMicroSec);
 
+  void setType(AudioSourceType type);
+
   //return samples
   int readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
 
@@ -863,6 +869,7 @@ private:
   int _wantedSourceSamples = 0;
   std::unique_ptr<FFAudioReader> _ffAudioReader;
   std::unique_ptr<FFAudioResampler> _ffAudioResampler;
+  AudioSourceType _audioSourceType;
 };
 
 class PreComposeLayer;

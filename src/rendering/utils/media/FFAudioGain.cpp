@@ -33,7 +33,7 @@ int FFAudioGain::setupCoreFilter() {
 //            "loudnorm=I=-23:TP=-1.5:LRA=11,acompressor=threshold=-20dB:ratio=8:attack=5:release=100:makeup=%ddB",
 //            _gain);
         snprintf(filter_desc, sizeof(filter_desc),
-            "acompressor=threshold=-15dB:ratio=2:attack=20:release=500:makeup=%ddB",
+            "acompressor=threshold=-13dB:ratio=2:attack=20:release=500:makeup=%ddB",
             _gain);
 
         // Parse and configure the filter graph
