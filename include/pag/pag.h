@@ -831,6 +831,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
 #define MIN_VOLUME (-60)
 class FFAudioReader;
 class FFAudioResampler;
+class WRTCAudioGain;
 typedef enum AudioType {
     Voice = 0,
     Bgm
@@ -849,7 +850,7 @@ public:
   void setVolumeForMix(int volume);
   void setLoop(bool loop);
 
-  int volumeForMix() const { return _mixVolume; }
+  int volumeForMix() const;
   
   void setCutFrom(int64_t timeMicroSec);
   void setCutTo(int64_t timeMicroSec);
@@ -870,6 +871,9 @@ private:
   std::unique_ptr<FFAudioReader> _ffAudioReader;
   std::unique_ptr<FFAudioResampler> _ffAudioResampler;
   AudioSourceType _audioSourceType;
+
+  bool _useWRTCAudioGainForVoice = true;    //control variable;
+  std::unique_ptr<WRTCAudioGain> _wAudioGain;
 };
 
 class PreComposeLayer;
@@ -1020,9 +1024,9 @@ class PAG_API PAGComposition : public PAGLayer {
   float _frameRate = 60;
   std::vector<std::shared_ptr<PAGLayer>> layers;
   //zzy
-  std::vector<std::shared_ptr<PAGAudioSource>> audios;
-  std::shared_ptr<FFAudioMixer> audioMixer;
-  std::shared_ptr<FFAudioGain> audioGain;
+  std::vector<std::shared_ptr<PAGAudioSource>> _audios;
+  std::shared_ptr<FFAudioMixer> _ffAudioMixer;
+  std::shared_ptr<FFAudioGain> _ffAudioGain;
   int64_t _audioTimelineBySamples = 0;
 
   PAGComposition(int width, int height);

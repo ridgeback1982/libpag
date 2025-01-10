@@ -1,3 +1,5 @@
+#include <fstream>
+#include <iostream>
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
@@ -5,6 +7,7 @@
 #include "rendering/utils/ScopedLock.h"
 #include "rendering/utils/media/FFAudioReader.h"
 #include "rendering/utils/media/FFAudioResampler.h"
+#include "rendering/utils/media/WRTCAudioGain.h"
 
 //ffmpeg
 extern "C" {
@@ -22,6 +25,7 @@ namespace pag {
 
 PAGAudioSource::PAGAudioSource(const std::string& path) {
   _ffAudioReader = std::make_unique<FFAudioReader>(path);
+  _wAudioGain = std::make_unique<WRTCAudioGain>();
 }
 
 PAGAudioSource::~PAGAudioSource() {
@@ -71,6 +75,10 @@ void PAGAudioSource::setCutTo(int64_t timeMicroSec) {
     if (_ffAudioReader) {
         _ffAudioReader->setCutTo(timeMicroSec);
     }
+}
+
+int PAGAudioSource::volumeForMix() const {
+     return _mixVolume; 
 }
 
 int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
@@ -131,6 +139,16 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
               memcpy(buffers[i], _sourceBuffer[i], _ffAudioReader->getBytesPerSample() * src_samples);
             }
           }
+        }
+    }
+
+    //extra gain audio if needed(for voice)
+    if (_audioSourceType == AudioSourceType::Voice && _useWRTCAudioGainForVoice) {
+        if (_wAudioGain) {
+            if (_wAudioGain->processInplace(samples, buffers, bufferSize, targetSampleRate, targetFormat, targetChannels) < 0) {
+                std::cerr << "processInplace failed" << std::endl;
+                dst_filled_samples = 0;
+            }
         }
     }
     

@@ -518,16 +518,16 @@ std::vector<std::shared_ptr<PAGLayer>> PAGComposition::getLayersUnderPoint(float
 
 //zzy
 void PAGComposition::setAudioMixer(std::shared_ptr<FFAudioMixer> audioMixer) {
-  this->audioMixer = audioMixer;
+  this->_ffAudioMixer = audioMixer;
 }
 
 void PAGComposition::setAudioGain(std::shared_ptr<FFAudioGain> audioGain) {
-  this->audioGain = audioGain;
+  this->_ffAudioGain = audioGain;
 }
 
 //zzy
 void PAGComposition::addAudioSource(std::shared_ptr<PAGAudioSource> audioSource) {
-  audios.push_back(audioSource);
+  _audios.push_back(audioSource);
 }
 
 //zzy
@@ -541,8 +541,8 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
     
   //collect all visible audio sources
   std::vector<AudioPreMixData>srcBuffers2;
-  for (size_t index=0; index<audios.size(); index++) {
-    auto audio = audios[index];
+  for (size_t index=0; index<_audios.size(); index++) {
+    auto audio = _audios[index];
     if (frame >= audio->startFrame() && frame < audio->endFrame()) {
       if (audio->volumeForMix() == MIN_VOLUME) {
         continue;
@@ -566,8 +566,8 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
 
   //do mix here
   if (srcBuffers2.size() > 0) {
-    if (audioMixer) {
-      if (audioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
+    if (_ffAudioMixer) {
+      if (_ffAudioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
         output = 0;
         goto end;
       }
@@ -620,7 +620,7 @@ end:
 
 int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
   int ret = ErrorCode::SUCCESS;
-  if (audioGain == nullptr) {
+  if (_ffAudioGain == nullptr) {
     int outputSamples = readMixedAudioSamples(samples, buffers, bufferSize, targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
       std::cerr << "failed to read mixed audio samples" << std::endl;
@@ -628,7 +628,7 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
     }
     _audioTimelineBySamples += outputSamples;
   } else {
-    audioGain->setOuputSamples((int)samples);
+    //get input frame
     auto input = av_frame_alloc();
     input->nb_samples = (int)samples;
     input->format = static_cast<AVSampleFormat>(targetFormat);
@@ -639,15 +639,15 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
       av_frame_free(&input);
       return ErrorCode::OUT_OF_MEMORY;
     }
-    //hard code mono channel
     int outputSamples = readMixedAudioSamples(samples, input->data, input->linesize[0], targetSampleRate, targetFormat, targetChannels);
     if (outputSamples == 0) {
       std::cerr << "failed to read mixed audio samples" << std::endl;
       return ErrorCode::UNKNOWN_ERROR;
     }
-    _audioTimelineBySamples += outputSamples;
+    //gain process
     AVFrame* output = nullptr;
-    ret = audioGain->process(input, &output);
+    _ffAudioGain->setOuputSamples((int)samples);
+    ret = _ffAudioGain->process(input, &output);
     if (ret == ErrorCode::SUCCESS) {
       int bytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(targetFormat));
       if (output->ch_layout.nb_channels == 1) {
@@ -663,6 +663,8 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
           }
         }
       }
+
+      _audioTimelineBySamples += outputSamples;
     } else {
       //printf("failed to get gained audio samples, %d\n", ret);
     }
