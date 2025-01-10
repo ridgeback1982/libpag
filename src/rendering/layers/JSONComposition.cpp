@@ -518,17 +518,13 @@ ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
 }
 
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
-    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str()); \
+    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str(), typedTrack->type == "voice" ? AudioSourceType::Voice : AudioSourceType::Bgm); \
     audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
     audioSource->setDuration(LifetimeToFrameDuration(typedTrack->lifetime, spec.fps)); \
     audioSource->setSpeed(typedTrack->content.speed); \
     audioSource->setCutFrom(1000*(int64_t)(typedTrack->content.cutFrom * typedTrack->content.speed)); \
     audioSource->setVolumeForMix(typedTrack->content.mixVolume); \
     audioSource->setLoop(typedTrack->content.loop); \
-    if (typedTrack->type == "voice") \
-      audioSource->setType(AudioSourceType::Voice); \
-    else \
-      audioSource->setType(AudioSourceType::Bgm); \
     return audioSource; 
 
 std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie::Track* track, const movie::MovieSpec& spec) {
@@ -914,12 +910,12 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   jsonComposition->addLayer(pagTextLayer);
 
   //add audio source
-  auto audioSource = std::make_shared<PAGAudioSource>(tokens[2]);
+  auto audioSource = std::make_shared<PAGAudioSource>(tokens[2], AudioSourceType::Voice);
   audioSource->setStartFrame(0);
   audioSource->setDuration(TEST_DURATION);
   jsonComposition->addAudioSource(audioSource);
 
-  auto musicSource = std::make_shared<PAGAudioSource>(tokens[0]);
+  auto musicSource = std::make_shared<PAGAudioSource>(tokens[0], AudioSourceType::Bgm);
   musicSource->setStartFrame(0);
   musicSource->setDuration(TEST_DURATION);
   jsonComposition->addAudioSource(musicSource);

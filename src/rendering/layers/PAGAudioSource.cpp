@@ -23,7 +23,7 @@ extern "C" {
 //zzy, do some enhance later here
 namespace pag {
 
-PAGAudioSource::PAGAudioSource(const std::string& path) {
+PAGAudioSource::PAGAudioSource(const std::string& path, AudioSourceType type) : _audioSourceType(type) {
   _ffAudioReader = std::make_unique<FFAudioReader>(path);
   _wAudioGain = std::make_unique<WRTCAudioGain>();
 }
@@ -51,18 +51,18 @@ void PAGAudioSource::setSpeed(float speed) {
 }
 
 void PAGAudioSource::setVolumeForMix(int volume) {
-    printf("PAGAudioSource::setVolumeForMix, volume:%d\n", volume);
-    _mixVolume = volume;
+    if (_audioSourceType == AudioSourceType::Voice) {
+        _mixVolume = std::min(volume, 10);      //10dB is a test value
+    } else {
+        _mixVolume = volume;
+    }
+    printf("PAGAudioSource::setVolumeForMix, volume:%d, type:%d\n", _mixVolume, _audioSourceType);
 }
 
 void PAGAudioSource::setLoop(bool loop) {
     if (_ffAudioReader) {
         _ffAudioReader->setLoop(loop);
     }
-}
-
-void PAGAudioSource::setType(AudioSourceType type) {
-    _audioSourceType = type;
 }
 
 void PAGAudioSource::setCutFrom(int64_t timeMicroSec) {

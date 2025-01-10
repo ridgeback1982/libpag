@@ -64,6 +64,7 @@ int WRTCAudioGain::agcProcess(int16_t *buffer, uint32_t sampleRate, int samplesC
             _agcInst = nullptr;
             return -1;
         }
+        printf("WRTCAudioGain, init done\n");
     }
     int samples = std::min(160, (int)(sampleRate / 100));
     if (samples == 0) return -1;

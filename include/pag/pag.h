@@ -838,7 +838,7 @@ typedef enum AudioType {
 }AudioSourceType;
 class PAG_API PAGAudioSource {
 public:
-  PAGAudioSource(const std::string& path);
+  PAGAudioSource(const std::string& path, AudioSourceType type);
   ~PAGAudioSource();
 
   void setStartFrame(Frame startFrame) { _startFrame = startFrame; }
@@ -854,8 +854,6 @@ public:
   
   void setCutFrom(int64_t timeMicroSec);
   void setCutTo(int64_t timeMicroSec);
-
-  void setType(AudioSourceType type);
 
   //return samples
   int readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannles);
