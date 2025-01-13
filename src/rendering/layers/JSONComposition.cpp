@@ -51,6 +51,9 @@ extern "C" {
 #include <unistd.h>
 #include <regex>
 #include <filesystem>
+#include <string>
+#include <locale>
+#include <codecvt>
 
 
 
@@ -281,6 +284,10 @@ namespace pag {
 #define TEST_IMAGE_WIDTH 512
 #define TEST_IMAGE_HEIGHT 512
 
+// 定义一些常量
+#define MAX_CHARS_PER_LINE 16
+#define FIT_CHARS_PER_LINE 12
+
 int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
 }
@@ -292,11 +299,17 @@ int LifetimeToFrameDuration(const movie::LifeTime& lifetime, float fps) {
 
 typedef std::set<std::pair<float, float>> FloatPairSet;
 FloatPairSet strokeWidthSet = {
-  //{fontsize, strokeWidth}
-    {0.03,      0},
-    {0.05,      4},
-    {0.07,      5},
-    {0.1,       6}
+    //{fontsize, strokeWidth}
+    //中心描边
+    // {0.03,      0},
+    // {0.05,      4},
+    // {0.07,      5},
+    // {0.1,       6}
+    //外描边
+    {0.03,      0},       
+    {0.05,      5*3},
+    {0.07,      6*3},
+    {0.1,       7*3}
 };
 
 float findValueFromFloatPairSet(const FloatPairSet &fps, float key) {
@@ -433,6 +446,7 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   textLayer->id = UniqueID::Next();
   auto textData = new TextDocument();
   textData->fontSize = 100;     //hardcode, in pixel
+  // textData->fontStyle = "bold"; //hardcode, SHOULD NOT BE USED if the font family does not support the style
   textData->text = text;
   if (!content->fontFamilyName.empty()) {
     textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
@@ -444,6 +458,7 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
     textData->applyStroke = true;
     textData->strokeColor = translateColor(content->stroke);
     textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
+    textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
   }
   textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
   textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
@@ -465,6 +480,31 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   return textLayer;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+bool isChineseChar(char32_t c) {
+    return (c >= 0x4E00 && c <= 0x9FFF); // 中文字符范围
+}
+
+bool isEnglishChar(char32_t c) {
+    return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')); // 英文字母范围
+}
+
+void countChars(const std::u32string& unicodeStr, size_t& chineseCount, size_t& englishCount) {
+    chineseCount = 0;
+    englishCount = 0;
+
+    // 遍历 Unicode 字符串
+    for (char32_t c : unicodeStr) {
+        if (isChineseChar(c)) {
+            ++chineseCount;
+        } else if (isEnglishChar(c)) {
+            ++englishCount;
+        }
+    }
+}
+
 std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::MovieSpec& spec) {
     std::vector<TextLayer*> textLayers;
     movie::TitileContent* content = nullptr;
@@ -481,12 +521,39 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
           break;
         }
         lifetime.end_time = std::min(track->lifetime.begin_time + sentence.end_time, track->lifetime.end_time);
-        auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
-        textLayers.push_back(textLayer);
+        
+        // 将 UTF-8 字符串转换为 Unicode 字符串（char32_t）
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+        std::u32string unicodeStr = converter.from_bytes(sentence.text);
+        size_t chineseCount = 0, englishCount = 0;
+        countChars(unicodeStr, chineseCount, englishCount);
+        int charCount = (int)(chineseCount + englishCount);
+        if (charCount > MAX_CHARS_PER_LINE) {
+          int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
+          int charPerLine = (int)std::floor((float)charCount / lineCount);
+          int durPerLine = (int)std::floor((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
+          std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
+          for (int i=0; i<lineCount; i++) {
+            movie::LifeTime lineLifetime;
+            lineLifetime.begin_time = lifetime.begin_time + i * durPerLine;
+            lineLifetime.end_time = std::min(lineLifetime.begin_time + durPerLine, lifetime.end_time);
+
+            std::u32string subUnicodeText = (i == lineCount - 1) ? unicodeStr.substr(i*charPerLine) : unicodeStr.substr(i*charPerLine, charPerLine);
+            std::string utf8SubText = converter.to_bytes(subUnicodeText);
+
+            auto textLayer = createTextLayer(utf8SubText, content, lineLifetime, spec);
+            textLayers.push_back(textLayer);
+          }
+        } else {
+          auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
+          textLayers.push_back(textLayer);  
+        }
       }
     }
     return textLayers;
 }
+
+#pragma clang diagnostic pop
 
 ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
   movie::ImageContent* content = &static_cast<movie::ImageTrack*>(track)->content;

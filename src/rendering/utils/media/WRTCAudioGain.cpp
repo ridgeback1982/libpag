@@ -43,7 +43,7 @@ int WRTCAudioGain::agcProcess(int16_t *buffer, uint32_t sampleRate, int samplesC
     if (samplesCount == 0) return -1;
     if (_agcInst == nullptr) {
         WebRtcAgcConfig agcConfig;
-        agcConfig.compressionGaindB = 9; // default 9 dB
+        agcConfig.compressionGaindB = 15; // default 9 dB
         agcConfig.limiterEnable = 1; // default kAgcTrue (on)
         agcConfig.targetLevelDbfs = 3; // default 3 (-3 dBOv)
         int minLevel = 0;

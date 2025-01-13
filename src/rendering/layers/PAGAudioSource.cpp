@@ -52,7 +52,7 @@ void PAGAudioSource::setSpeed(float speed) {
 
 void PAGAudioSource::setVolumeForMix(int volume) {
     if (_audioSourceType == AudioSourceType::Voice) {
-        _mixVolume = std::min(volume, 10);      //10dB is a test value
+        _mixVolume = std::min(volume, 12);      //10dB is normal loud level, 15 is 破音 level
     } else {
         _mixVolume = volume;
     }
