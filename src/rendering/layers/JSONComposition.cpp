@@ -637,11 +637,14 @@ void prepareAllTracks(movie::Story& story) {
   });
 }
 
-std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir) {
+std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     movie::Story story = movie.video.stories[0];
     printf("JSONComposition::Load, json to movie\n");
+    if (progressCB) {
+      progressCB(0);
+    }
 
     std::string tmpDir;
     if (tmp_dir.empty()) {
@@ -682,6 +685,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     prepareAllTracks(story);
     
     //add track to PAGLayer one by one
+    int tCount = 0;
     for (auto& t : story.tracks) {
         if (t->type == "video") {
             //create video PAGComposition and add to JSONComposition
@@ -760,6 +764,9 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               jsonComposition->addLayer(pagTextLayer);
             }
         }
+        if (progressCB) {
+          progressCB(tCount++ * 100 / story.tracks.size());
+        }
     }
 
     //update static time range, I am not sure if it is necessary
@@ -771,6 +778,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     //zzy, must not do this in destructor of story, because the destructor is called by nlohmann::json ahead of time
     for (auto& track : story.tracks) {
         delete track;
+    }
+
+    if (progressCB) {
+      progressCB(100);
     }
 
     return jsonComposition;

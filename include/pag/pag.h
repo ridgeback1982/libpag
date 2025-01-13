@@ -1097,7 +1097,7 @@ class PAG_API PAGComposition : public PAGLayer {
 class PAG_API JSONComposition : public PAGComposition {
 public:
   static std::shared_ptr<JSONComposition> LoadTest(const std::string& json);
-  static std::shared_ptr<JSONComposition> Load(const std::string& json, std::string tmp_dir="");
+  static std::shared_ptr<JSONComposition> Load(const std::string& json, std::string tmp_dir="", const std::function<void(int)>& progressCB = nullptr);
 
 protected:
   JSONComposition(PreComposeLayer* layer);
