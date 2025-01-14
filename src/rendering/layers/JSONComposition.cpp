@@ -640,7 +640,15 @@ void prepareAllTracks(movie::Story& story) {
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
+    if (movie.video.stories.size() != 1) {
+      std::cerr << "Error: only support one story" << std::endl;
+      return nullptr;
+    }
     movie::Story story = movie.video.stories[0];
+    if (story.duration == 0) {
+      std::cerr << "Error: story duration is zero" << std::endl;
+      return nullptr;
+    }
     printf("JSONComposition::Load, json to movie\n");
     if (progressCB) {
       progressCB(0);
@@ -680,6 +688,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     auto preComposeLayer = PreComposeLayer::Wrap(vecComposition).release();
     auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
+    jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story.duration : 0;   //set by json
     
     //prepare all tracks for rendering
     prepareAllTracks(story);
@@ -1005,6 +1014,10 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
 JSONComposition::JSONComposition(PreComposeLayer* layer)
   : PAGComposition(nullptr, layer) {
 
+}
+
+int JSONComposition::videoEncodeBitrateKPBS() const {
+  return _videoEncodeBitrateKPBS;
 }
 
 

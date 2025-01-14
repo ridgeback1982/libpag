@@ -45,9 +45,9 @@ namespace movie {
                 j.at("loop").get_to(v.loop);
             if (j.contains("speed"))
                 j.at("speed").get_to(v.speed);
-            if (j.contains("cutFrom"))
+            if (j.contains("cutFrom") && j.at("cutFrom").is_number())
                 j.at("cutFrom").get_to(v.cutFrom);
-            if (j.contains("cutTo"))
+            if (j.contains("cutTo") && j.at("cutTo").is_number())
                 j.at("cutTo").get_to(v.cutTo);
         }
 
@@ -331,12 +331,15 @@ namespace movie {
         int width = 0;
         int height = 0;
         int fps = 0;
+        int fileSizeLimit = 0;
         std::vector<Story> stories;
 
         static void from_json(const json& j, MovieSpec& m) {
             j.at("width").get_to(m.width);
             j.at("height").get_to(m.height);
             j.at("fps").get_to(m.fps);
+            if (j.contains("fileSizeLimit") && j.at("fileSizeLimit").is_number())
+                j.at("fileSizeLimit").get_to(m.fileSizeLimit);
             j.at("stories").get_to(m.stories);
         }
     };

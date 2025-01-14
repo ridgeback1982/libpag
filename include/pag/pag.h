@@ -1099,8 +1099,10 @@ public:
   static std::shared_ptr<JSONComposition> LoadTest(const std::string& json);
   static std::shared_ptr<JSONComposition> Load(const std::string& json, std::string tmp_dir="", const std::function<void(int)>& progressCB = nullptr);
 
+  int videoEncodeBitrateKPBS() const;
 protected:
   JSONComposition(PreComposeLayer* layer);
+  int _videoEncodeBitrateKPBS = 0;
 };
 
 class PAG_API PAGFile : public PAGComposition {
