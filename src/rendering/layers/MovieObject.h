@@ -74,6 +74,7 @@ namespace movie {
         float speed = 1.0f;
         int cutFrom = 0;
         int cutTo = 0;
+        bool enhance = false;
         static void from_json(const json& j, AudioContent& a) {
             j.at("path").get_to(a.path);
             if (j.contains("mixVolume"))
@@ -82,10 +83,12 @@ namespace movie {
                 j.at("loop").get_to(a.loop);
             if (j.contains("speed"))
                 j.at("speed").get_to(a.speed);
-            if (j.contains("cutFrom"))
+            if (j.contains("cutFrom") && j.at("cutFrom").is_number())
                 j.at("cutFrom").get_to(a.cutFrom);
-            if (j.contains("cutTo"))
+            if (j.contains("cutTo") && j.at("cutTo").is_number())
                 j.at("cutTo").get_to(a.cutTo);
+            if (j.contains("enhance"))
+                j.at("enhance").get_to(a.enhance);
         }
 
         int init(const std::string& tmpDir);

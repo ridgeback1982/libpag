@@ -16,6 +16,10 @@ extern "C" {
 //zzy
 namespace pag {
 
+enum FFGainMode {
+    Compress,       //normal gain
+    Suppress,       //for music "enhance"
+};
 
 class PAG_API FFAudioGain : public FFBufferedFilter {
 public:
@@ -23,12 +27,14 @@ public:
     virtual ~FFAudioGain();
     int setupCoreFilter() override;
 
-    void setGain(int gain) { _gain = gain; }
+    void setMode(FFGainMode mode) {
+        _mode = mode;
+    }
 
 private:
+    FFGainMode _mode = Compress;    //default
     int _gain = 5;
     bool _setUp = false;
-//    AVFilterContext *_gain_ctx = NULL;
 };
 
 

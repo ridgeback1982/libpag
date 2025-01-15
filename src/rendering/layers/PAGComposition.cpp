@@ -551,7 +551,7 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
       for(int i=0; i<targetChannels; i++) {
         srcBuffers[i] = new uint8_t[bufferSize];
         if (srcBuffers[i] == nullptr) {
-          output = 0;
+          output = -1;
           goto end;
         }
       }
@@ -559,6 +559,8 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
       if (audio->readAudioBySamples(samples, srcBuffers, bufferSize, targetSampleRate, targetFormat, targetChannels) == 0) {
         //skip it, no more data
         continue;
+//        output = 0;
+//        goto end;
       }
       srcBuffers2.push_back({audio->volumeForMix(), targetChannels, srcBuffers});
     }
@@ -568,12 +570,14 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
   if (srcBuffers2.size() > 0) {
     if (_ffAudioMixer) {
       if (_ffAudioMixer->mixAudio(srcBuffers2, buffers, bufferSize, targetChannels) < 0) {
-        output = 0;
+        std::cout << "PAGComposition::readMixedAudioSamples, failed to mix audio" << std::endl;
+        output = -1;
         goto end;
       }
       output = (int)samples;
     } else {
-      output = 0;
+      std::cout << "PAGComposition::readMixedAudioSamples, audio mixer is not set" << std::endl;
+      output = -1;
       goto end;
     }
   } 
@@ -622,9 +626,12 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
   int ret = ErrorCode::SUCCESS;
   if (_ffAudioGain == nullptr) {
     int outputSamples = readMixedAudioSamples(samples, buffers, bufferSize, targetSampleRate, targetFormat, targetChannels);
-    if (outputSamples == 0) {
+    if (outputSamples < 0) {
       std::cerr << "failed to read mixed audio samples" << std::endl;
       return ErrorCode::UNKNOWN_ERROR;
+    } else if (outputSamples == 0) {
+      //audio buffer is not ready yet
+      return ErrorCode::AGAIN;
     }
     _audioTimelineBySamples += outputSamples;
   } else {
@@ -655,12 +662,8 @@ int PAGComposition::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
           memcpy(buffers[i], output->data[0], bytesPerSample * output->nb_samples);
         }
       } else {
-        if (targetChannels == 1) {
-          memcpy(buffers[0], output->data[0], bytesPerSample * output->nb_samples);
-        } else {
-          for(int i = 0; i < targetChannels; i++) {
-            memcpy(buffers[i], output->data[i], bytesPerSample * output->nb_samples);
-          }
+        for(int i = 0; i < targetChannels; i++) {
+          memcpy(buffers[i], output->data[i], bytesPerSample * output->nb_samples);
         }
       }
 

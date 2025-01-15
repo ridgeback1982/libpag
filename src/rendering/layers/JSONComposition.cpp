@@ -585,19 +585,22 @@ ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
 }
 
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
-    auto audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str(), typedTrack->type == "voice" ? AudioSourceType::Voice : AudioSourceType::Bgm); \
+    audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str(), typedTrack->type == "voice" ? AudioSourceType::Voice : AudioSourceType::Bgm); \
     audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
     audioSource->setDuration(LifetimeToFrameDuration(typedTrack->lifetime, spec.fps)); \
     audioSource->setSpeed(typedTrack->content.speed); \
     audioSource->setCutFrom(1000*(int64_t)(typedTrack->content.cutFrom * typedTrack->content.speed)); \
     audioSource->setVolumeForMix(typedTrack->content.mixVolume); \
-    audioSource->setLoop(typedTrack->content.loop); \
-    return audioSource; 
+    audioSource->setLoop(typedTrack->content.loop);
 
 std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie::Track* track, const movie::MovieSpec& spec) {
+  std::shared_ptr<PAGAudioSource> audioSource;
   if (type == "music") {
     auto typedTrack = static_cast<movie::MusicTrack*>(track);
     CREATE_AUDIO_SOURCE(typedTrack, spec);
+    if (typedTrack->content.enhance) {
+      audioSource->setSuppress(true);   //"enhance" 响度统一
+    }
   } else if (type == "voice") {
     auto typedTrack = static_cast<movie::VoiceTrack*>(track);
     CREATE_AUDIO_SOURCE(typedTrack, spec);
@@ -605,7 +608,7 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
     auto typedTrack = static_cast<movie::VideoTrack*>(track);
     CREATE_AUDIO_SOURCE(typedTrack, spec);
   }
-  return nullptr;
+  return audioSource;
 }
 
 void prepareAllTracks(movie::Story& story) {

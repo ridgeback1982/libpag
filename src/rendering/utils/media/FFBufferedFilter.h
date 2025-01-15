@@ -34,8 +34,10 @@ protected:
     AVAudioFifo* _fifo = nullptr;
     int _outputSamples = 0;
     AVFilterGraph* _filterGraph = nullptr;
-    AVFilterContext *_buffersrc_ctx = NULL;
-    AVFilterContext *_buffersink_ctx = NULL;
+    AVFilterContext* _filter_ctx = nullptr;
+    AVFilterContext* _buffersrc_ctx = NULL;
+    AVFilterContext* _buffersink_ctx = NULL;
+    int _bufferedSamples = 0;
 };
 
 

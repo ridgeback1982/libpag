@@ -201,7 +201,7 @@ int WRTCAudioGain::convert_S16_to_Float(const uint8_t **s16_data, uint8_t **floa
 
 int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_unused]]int bufferSize, int sampleRate, int format, int channels) {
     int ret = 0;
-    if ((channels == 1 && format == AV_SAMPLE_FMT_FLT) ||
+    if ((channels == 1 && format == AV_SAMPLE_FMT_FLTP) ||
         (channels == 2 && format == AV_SAMPLE_FMT_FLTP)) {
         if (_s16BufferedSamples < samples) {
             if (_s16Buffer) {

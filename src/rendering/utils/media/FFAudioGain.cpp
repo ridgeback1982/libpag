@@ -28,13 +28,20 @@ int FFAudioGain::setupCoreFilter() {
     int ret = 0;
     if (_setUp == false) {
         char filter_desc[1024] = "";
-        //zzy, I don't know why, loudnorm's output sample is distorted
+        if (_mode == FFGainMode::Compress) {
 //        snprintf(filter_desc, sizeof(filter_desc),
 //            "loudnorm=I=-23:TP=-1.5:LRA=11,acompressor=threshold=-20dB:ratio=8:attack=5:release=100:makeup=%ddB",
 //            _gain);
-        snprintf(filter_desc, sizeof(filter_desc),
-            "acompressor=threshold=-13dB:ratio=2:attack=20:release=500:makeup=%ddB",
-            _gain);
+            snprintf(filter_desc, sizeof(filter_desc),
+                "acompressor=threshold=-13dB:ratio=2:attack=20:release=500:makeup=%ddB",
+                _gain);
+        } else if (_mode == FFGainMode::Suppress) {
+            snprintf(filter_desc, sizeof(filter_desc),
+                "loudnorm=linear=true:i=-13.0:lra=7.0:tp=-2.0");
+        } else {
+            std::cerr << "Unknown mode: " << _mode << std::endl;
+            return -1;
+        }
 
         // Parse and configure the filter graph
         AVFilterInOut *inputs = NULL, *outputs = NULL;

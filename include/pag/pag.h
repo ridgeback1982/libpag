@@ -832,6 +832,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
 class FFAudioReader;
 class FFAudioResampler;
 class WRTCAudioGain;
+class FFAudioGain;
 typedef enum AudioType {
     Voice = 0,
     Bgm
@@ -850,6 +851,7 @@ public:
   void setVolumeForMix(int volume);
   void setLoop(bool loop);
 
+  void setSuppress(bool suppress);    //for music "enhance" 响度统一
   int volumeForMix() const;
   
   void setCutFrom(int64_t timeMicroSec);
@@ -872,6 +874,8 @@ private:
 
   bool _useWRTCAudioGainForVoice = true;    //control variable;
   std::unique_ptr<WRTCAudioGain> _wAudioGain;
+  bool _suppress = false;
+  std::unique_ptr<FFAudioGain> _ffAudioGain;
 };
 
 class PreComposeLayer;
