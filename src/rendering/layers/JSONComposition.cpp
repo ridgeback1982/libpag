@@ -620,9 +620,9 @@ void prepareAllTracks(movie::Story& story) {
   waterMark->lifetime.end_time = story.duration;
   waterMark->zorder = 1000;
   waterMark->content.text = ".";
-  waterMark->content.location.center_x = 0.0f;
-  waterMark->content.location.center_y = 0.95f;
-  waterMark->content.fontSize = 0.1f;
+  waterMark->content.location.center_x = 0.1f;
+  waterMark->content.location.center_y = 0.9f;
+  waterMark->content.fontSize = 0.05f;
   waterMark->content.textColor = "#777777";
   story.tracks.push_back(waterMark);
 
