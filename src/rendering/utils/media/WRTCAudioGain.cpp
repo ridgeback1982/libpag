@@ -43,7 +43,7 @@ int WRTCAudioGain::agcProcess(int16_t *buffer, uint32_t sampleRate, int samplesC
     if (samplesCount == 0) return -1;
     if (_agcInst == nullptr) {
         WebRtcAgcConfig agcConfig;
-        agcConfig.compressionGaindB = 15; // default 9 dB
+        agcConfig.compressionGaindB = 9; // default 9 dB
         agcConfig.limiterEnable = 1; // default kAgcTrue (on)
         agcConfig.targetLevelDbfs = 3; // default 3 (-3 dBOv)
         int minLevel = 0;
@@ -64,7 +64,7 @@ int WRTCAudioGain::agcProcess(int16_t *buffer, uint32_t sampleRate, int samplesC
             _agcInst = nullptr;
             return -1;
         }
-        printf("WRTCAudioGain, init done\n");
+        printf("WRTCAudioGain, init done, compress gain:%d, targetLevel:%d\n", agcConfig.compressionGaindB, agcConfig.targetLevelDbfs);
     }
     int samples = std::min(160, (int)(sampleRate / 100));
     if (samples == 0) return -1;
