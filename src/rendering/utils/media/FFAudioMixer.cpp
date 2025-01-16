@@ -106,6 +106,30 @@ int FFAudioMixer::setupFilterGraph(const std::vector<AudioPreMixData> &srcBuffer
         avfilter_inout_free(&outputs);
         return -1;
     }
+    // Configure buffersink to enforce same planar format(not change)
+    enum AVSampleFormat out_sample_fmts[] = { (AVSampleFormat)_format, AV_SAMPLE_FMT_NONE };
+    if (av_opt_set_int_list(sink_ctx, "sample_fmts", out_sample_fmts, AV_SAMPLE_FMT_NONE, AV_OPT_SEARCH_CHILDREN) < 0) {
+        std::cerr << "Error setting output format on buffer sink" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
+        return -1;
+    }
+    const int64_t out_channel_layouts[] = { (int64_t)(_channelCount == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO), -1 };
+    if (av_opt_set_int_list(sink_ctx, "channel_layouts", out_channel_layouts, -1,
+        AV_OPT_SEARCH_CHILDREN) < 0) {
+        std::cerr << "Error setting output format on buffer sink" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
+        return -1;
+    }
+    const int out_sample_rates[] = { _sampleRate , -1 };
+    if (av_opt_set_int_list(sink_ctx, "sample_rates", out_sample_rates, -1,
+        AV_OPT_SEARCH_CHILDREN) < 0) {
+        std::cerr << "Error setting output format on buffer sink" << std::endl;
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
+        return -1;
+    }
 
     // Connect the output
     ret = avfilter_link(outputs->filter_ctx, outputs->pad_idx, sink_ctx, 0);
@@ -179,13 +203,16 @@ int FFAudioMixer::mixAudio(const std::vector<AudioPreMixData> &srcBuffers, uint8
         memcpy(dstBuffers[i], filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
       }
     } else {
-      if (channels == 1) {
-        memcpy(dstBuffers[0], filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
-      } else {
-        for(int i = 0; i < filt_frame->ch_layout.nb_channels; i++) {
+//      if (channels == 1) {
+//        memcpy(dstBuffers[0], filt_frame->data[0], std::min(filt_frame->linesize[0], bufferSize));
+//      } else {
+//        for(int i = 0; i < filt_frame->ch_layout.nb_channels; i++) {
+//          memcpy(dstBuffers[i], filt_frame->data[i], std::min(filt_frame->linesize[0], bufferSize));
+//        }
+//      }
+        for(int i = 0; i < channels; i++) {
           memcpy(dstBuffers[i], filt_frame->data[i], std::min(filt_frame->linesize[0], bufferSize));
         }
-      }
     }
     
     //printf("Mixed frame with %d samples\n", filt_frame->nb_samples);

@@ -68,13 +68,16 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
             memcpy(data[i], output->data[0], _properties.BytesPerSample * sampleCount);
           }
         } else {
-          if (channels == 1) {
-            memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
-          } else {
-            for(int i = 0; i < output->ch_layout.nb_channels; i++) {
+//          if (channels == 1) {
+//            memcpy(data[0], output->data[0], _properties.BytesPerSample * sampleCount);
+//          } else {
+//            for(int i = 0; i < output->ch_layout.nb_channels; i++) {
+//              memcpy(data[i], output->data[i], _properties.BytesPerSample * sampleCount);
+//            }
+//          }
+            for(int i = 0; i < channels; i++) {
               memcpy(data[i], output->data[i], _properties.BytesPerSample * sampleCount);
             }
-          }
         }
         // printf("FFAudioAtempo::process OK(enough available), output samples:%d\n", output->nb_samples);
         processedCount += output->nb_samples;
@@ -114,7 +117,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
               memcpy(data[i], output->data[0], _properties.BytesPerSample * sampleCount);
             }
           } else {
-              for(int i = 0; i < output->ch_layout.nb_channels; i++) {
+              for(int i = 0; i < channels; i++) {
                 memcpy(data[i], output->data[i], _properties.BytesPerSample * sampleCount);
               }
           }

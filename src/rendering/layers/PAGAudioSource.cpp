@@ -126,7 +126,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
             auto srcSampleRate = _ffAudioReader->getSampleRate();
             auto srcFormat = (AVSampleFormat)_ffAudioReader->getFormat();
             auto srcChannels = _ffAudioReader->getChannels();
-            
+        
             if (srcSampleRate != targetSampleRate ||
                 srcFormat != targetFormat ||
                 srcChannels != targetChannels) {
@@ -193,7 +193,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
                         return 0;
                     }
                     for (int i = 0; i < targetChannels; i++) {
-                        memcpy(input->data[i], buffers[i], _ffAudioReader->getBytesPerSample() * dst_filled_samples);
+                        memcpy(input->data[i], buffers[i], av_get_bytes_per_sample(static_cast<AVSampleFormat>(targetFormat)) * dst_filled_samples);
                     }
                 } else {
                     //no more data, so flush the filter

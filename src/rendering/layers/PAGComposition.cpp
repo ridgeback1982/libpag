@@ -587,12 +587,8 @@ int PAGComposition::readMixedAudioSamples(int64_t samples, uint8_t** buffers, in
   //       memcpy(buffers[i], srcBuffers2[0].buffers[0], bufferSize);
   //     }
   //   } else {
-  //     if (targetChannels == 1) {
-  //       memcpy(buffers[0], srcBuffers2[0].buffers[0], bufferSize);
-  //     } else {
-  //       for(int i = 0; i < srcBuffers2[0].channels; i++) {
-  //         memcpy(buffers[i], srcBuffers2[0].buffers[i], bufferSize);
-  //       }
+  //     for(int i = 0; i < targetChannels; i++) {
+  //       memcpy(buffers[i], srcBuffers2[0].buffers[i], bufferSize);
   //     }
   //   }
   //   output = (int)samples;

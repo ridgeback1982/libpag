@@ -133,13 +133,16 @@ int FFAudioResampler::process(uint8_t** dst, int dstLength,
             memcpy(dst[i], src[0], bytesPerSample * srcSamples);
           }
         } else {
-          if (_dstChannels == 1) {
-            memcpy(dst[0], src[0], bytesPerSample * srcSamples);
-          } else {
+//          if (_dstChannels == 1) {
+//            memcpy(dst[0], src[0], bytesPerSample * srcSamples);
+//          } else {
+//            for(int i = 0; i < _dstChannels; i++) {
+//              memcpy(dst[i], src[i], bytesPerSample * srcSamples);
+//            }
+//          }
             for(int i = 0; i < _dstChannels; i++) {
               memcpy(dst[i], src[i], bytesPerSample * srcSamples);
             }
-          }
         }
         ret = srcSamples;
     }

@@ -201,8 +201,8 @@ int WRTCAudioGain::convert_S16_to_Float(const uint8_t **s16_data, uint8_t **floa
 
 int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_unused]]int bufferSize, int sampleRate, int format, int channels) {
     int ret = 0;
-    //AAC
     if (format == AV_SAMPLE_FMT_FLTP) {
+        //AAC
         if (_s16BufferedSamples < samples) {
             if (_s16Buffer) {
                  // Free the allocated memory
@@ -252,9 +252,8 @@ int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_un
         if (ret < 0) {
             return -1;
         }
-
-
     } else if (format == AV_SAMPLE_FMT_S16P) {
+        //MP3
         for (int i=0; i<channels; i++) {
             //agc in place
             //  kAgcModeAdaptiveAnalog  模拟音量调节
