@@ -56,6 +56,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
     if (_atempo == nullptr) {
       _atempo = std::make_unique<FFAudioAtempo>(_properties.SampleRate, _properties.Channels, _properties.Format);
       _atempo->setSpeed(_speed);
+      std::cout << "Create audio atempo for speed:" << _speed << std::endl;
     }
     _atempo->setOuputSamples(sampleCount);
     if (_atempo->availableSamples() >= sampleCount) {

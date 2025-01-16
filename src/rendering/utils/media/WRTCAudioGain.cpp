@@ -129,8 +129,8 @@ int WRTCAudioGain::convert_Float_to_S16(const uint8_t **float_data, uint8_t **s1
     av_channel_layout_default(&out_ch_layout, channels);
     av_opt_set_chlayout(swr_ctx, "in_channel_layout", &in_ch_layout, 0);
     av_opt_set_chlayout(swr_ctx, "out_channel_layout", &out_ch_layout, 0);
-    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", channels == 1 ? AV_SAMPLE_FMT_FLT : AV_SAMPLE_FMT_FLTP, 0);
-    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", channels == 1 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S16P, 0);
+    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", AV_SAMPLE_FMT_FLTP, 0);
+    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", AV_SAMPLE_FMT_S16P, 0);
     av_opt_set_int(swr_ctx, "in_sample_rate", sample_rate, 0);
     av_opt_set_int(swr_ctx, "out_sample_rate", sample_rate, 0);
 
@@ -171,8 +171,8 @@ int WRTCAudioGain::convert_S16_to_Float(const uint8_t **s16_data, uint8_t **floa
     av_channel_layout_default(&out_ch_layout, channels);
     av_opt_set_chlayout(swr_ctx, "in_channel_layout", &in_ch_layout, 0);
     av_opt_set_chlayout(swr_ctx, "out_channel_layout", &out_ch_layout, 0);
-    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", channels == 1 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S16P, 0);
-    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", channels == 1 ? AV_SAMPLE_FMT_FLT : AV_SAMPLE_FMT_FLTP, 0);
+    av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", AV_SAMPLE_FMT_S16P, 0);
+    av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", AV_SAMPLE_FMT_FLTP, 0);
     av_opt_set_int(swr_ctx, "in_sample_rate", sample_rate, 0);
     av_opt_set_int(swr_ctx, "out_sample_rate", sample_rate, 0);
 
@@ -201,8 +201,8 @@ int WRTCAudioGain::convert_S16_to_Float(const uint8_t **s16_data, uint8_t **floa
 
 int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_unused]]int bufferSize, int sampleRate, int format, int channels) {
     int ret = 0;
-    if ((channels == 1 && format == AV_SAMPLE_FMT_FLTP) ||
-        (channels == 2 && format == AV_SAMPLE_FMT_FLTP)) {
+    //AAC
+    if (format == AV_SAMPLE_FMT_FLTP) {
         if (_s16BufferedSamples < samples) {
             if (_s16Buffer) {
                  // Free the allocated memory
@@ -214,7 +214,7 @@ int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_un
                 NULL,            // Linesize (not needed for interleaved)
                 channels,           // Number of channels
                 (int)samples,     // Number of samples
-                channels == 1 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S16P,      // Sample format
+                AV_SAMPLE_FMT_S16P,      // Sample format
                 0               // Alignment
             );
             if (ret < 0) {
@@ -254,6 +254,25 @@ int WRTCAudioGain::processInplace(int64_t samples, uint8_t** buffers, [[maybe_un
         }
 
 
+    } else if (format == AV_SAMPLE_FMT_S16P) {
+        for (int i=0; i<channels; i++) {
+            //agc in place
+            //  kAgcModeAdaptiveAnalog  模拟音量调节
+            //  kAgcModeAdaptiveDigital 自适应增益
+            //  kAgcModeFixedDigital 固定增益
+            ret = agcProcess((int16_t*)buffers[i], sampleRate, (int)samples, kAgcModeAdaptiveDigital);
+            if (ret < 0) {
+                return -1;
+            }
+            
+//            //zzy, test
+//            if (i == 0) {
+//                if (_dumpFile) {
+//                    fwrite(buffers[i], sizeof(int16_t), samples, _dumpFile);
+//                    //printf("dump %d samples, %d returned \n", (int)samples, ws);
+//                }
+//            }
+        }
     } else {
         std::cerr << "WRTCAudioGain::processInplace, input format not supported, format:" << format << ", channels:" << channels << std::endl;
         return -1;

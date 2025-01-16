@@ -90,10 +90,6 @@ int PAGAudioSource::volumeForMix() const {
 int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int bufferSize, int targetSampleRate, int targetFormat, int targetChannels) {
     if (targetSampleRate == 0 || targetChannels == 0)
         return 0;
-    if (_ffAudioResampler == nullptr) {
-        //do not change the format of the dst audio
-        _ffAudioResampler = std::make_unique<FFAudioResampler>(targetSampleRate, targetChannels, targetFormat);
-    }
     int samplerate = (int)_ffAudioReader->getSampleRate();
     int channels = _ffAudioReader->getChannels();
     int wanted_samples = (int)av_rescale_rnd(samples, samplerate, targetSampleRate, AV_ROUND_UP);
@@ -134,6 +130,15 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
             if (srcSampleRate != targetSampleRate ||
                 srcFormat != targetFormat ||
                 srcChannels != targetChannels) {
+                if (_ffAudioResampler == nullptr) {
+                    //do not change the format of the dst audio
+                    _ffAudioResampler = std::make_unique<FFAudioResampler>(targetSampleRate, targetChannels, targetFormat);
+                    std::cout << "Create audio resampler for type:" << _audioSourceType 
+                        << ", detail(sr:" << srcSampleRate << "|" << targetSampleRate 
+                        << ", f:" << srcFormat << "|" << targetFormat
+                        << ", ch:" << srcChannels << "|" << targetChannels
+                        << ")" << std::endl;
+                }
                 dst_filled_samples = _ffAudioResampler->process(buffers, bufferSize, (const uint8_t**)_sourceBuffer, _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
             } else {
                 dst_filled_samples = src_samples;
