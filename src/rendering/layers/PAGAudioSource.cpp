@@ -141,7 +141,6 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
                 }
                 dst_filled_samples = _ffAudioResampler->process(buffers, bufferSize, (const uint8_t**)_sourceBuffer, _sourceBufferSize, _wantedSourceSamples, (int)srcSampleRate, srcChannels, srcFormat);
             } else {
-                dst_filled_samples = src_samples;
                 if (channels == 1) {
                     for (int i = 0; i < targetChannels; i++) {
                         memcpy(buffers[i], _sourceBuffer[0], _ffAudioReader->getBytesPerSample() * src_samples);
@@ -151,6 +150,7 @@ int PAGAudioSource::readAudioBySamples(int64_t samples, uint8_t** buffers, int b
                         memcpy(buffers[i], _sourceBuffer[i], _ffAudioReader->getBytesPerSample() * src_samples);
                     }
                 }
+                dst_filled_samples = src_samples;
             }
         }
         if (dst_filled_samples < 0) {

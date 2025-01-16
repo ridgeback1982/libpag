@@ -23,21 +23,20 @@ public:
     void setOuputSamples(int samples) { _outputSamples = samples; }
     int process(AVFrame* input, AVFrame** output);
     int availableSamples() const;
-    int setupBufferFilter();
+    int setupBufferFilter(AVFrame* input);
 
     virtual int setupCoreFilter() = 0;
 
 protected:
-    int _sampleRate = 0;
-    int _channels = 0;
-    int _format = 0;
+    int _dstSampleRate = 0;
+    int _dstChannels = 0;
+    int _dstFormat = 0;
     AVAudioFifo* _fifo = nullptr;
     int _outputSamples = 0;
     AVFilterGraph* _filterGraph = nullptr;
     AVFilterContext* _filter_ctx = nullptr;
     AVFilterContext* _buffersrc_ctx = NULL;
     AVFilterContext* _buffersink_ctx = NULL;
-    int _bufferedSamples = 0;
 };
 
 
