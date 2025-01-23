@@ -641,13 +641,14 @@ std::vector<TextLayer*> createArticleTextLayers(movie::ArticleTrack* articleTrac
     textData->leading = leadingInP;
     textData->tracking = std::max(std::min((int)std::ceil(trackingInP * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
     //apply box
-    //box text will affect the real anchor point, so we need to hard code it to the top-center of a paragraph(x=w/2, y=0)
+    //box text will affect the real anchor point, so we can hard code it to the top-center of a paragraph(x=w/2, y=0)
     textData->boxText = true;     //hard code
     textData->boxTextSize = pag::Point::Zero();
+    //set the boxTextSize exactly same as the paragraph size, so that the real anchor point is the top-center
     textData->boxTextSize.x = boxWidth;
-    textData->boxTextSize.y = heightInP;  //std::ceil(heightInP * 1.1);
-    textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);
-    textData->firstBaseLine = fontSize;
+    textData->boxTextSize.y = heightInP;
+    textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
+    textData->firstBaseLine = fontSize;   //set firstBaseLine the same as font size
 
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
