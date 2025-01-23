@@ -201,7 +201,7 @@ namespace movie {
         float verticalSpacing = 0.0f;       //0.0 - 5.0, times of fontSize
         float horizontalSpacing = 0.0f;     //0.0 - 1.0, times of fontSize
         float paragraphSpacing = 0.0f;      //0.0 - 5.0, times of fontSize
-        float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280)
+        float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280), 0 is bottom, 1 is top
         float speed = 0.2f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
         bool indented = true;               //indented(缩进) or not
         float fontSize = 0.05f;
@@ -225,7 +225,7 @@ namespace movie {
             if (j.contains("speed"))
                 j.at("speed").get_to(a.speed);
             if (j.contains("indented"))
-                j.at("indented").get_to(a.speed);
+                j.at("indented").get_to(a.indented);
             if (j.contains("fontSize"))
                 j.at("fontSize").get_to(a.fontSize);
             if (j.contains("fontFamilyName"))

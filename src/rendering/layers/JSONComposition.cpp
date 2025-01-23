@@ -458,11 +458,14 @@ void countChars(const std::u32string& unicodeStr, size_t& chineseCount, size_t& 
     }
 }
 
-std::vector<std::string> splitStringByNewline(const std::string& input) {
+std::vector<std::string> splitStringByNewline(const std::string& input, bool addIndent = false) {
     std::vector<std::string> result;
     std::stringstream ss(input);
     std::string line;
     while (std::getline(ss, line, '\n')) {
+        if (addIndent) {
+            line = "    " + line;   //4 spaces is an indent
+        }
         result.push_back(line);
     }
     return result;
@@ -593,12 +596,12 @@ int getBoxTextHeight(const std::string& text, int fontSize/*单位是像素*/, i
   return lineCount * leading;
 }
 
-std::vector<TextLayer*> createArticleTextLayers([[maybe_unused]]movie::ArticleTrack* articleTrack, [[maybe_unused]]const movie::MovieSpec& spec) {
+std::vector<TextLayer*> createArticleTextLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
   std::vector<TextLayer*> textLayers;
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
   int height = spec.height;
-  auto paragraphs = splitStringByNewline(content->text);
+  auto paragraphs = splitStringByNewline(content->text, articleTrack->content.indented);
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int fontSize = std::ceil(std::min(width, height) * content->fontSize);
@@ -609,6 +612,7 @@ std::vector<TextLayer*> createArticleTextLayers([[maybe_unused]]movie::ArticleTr
   boxWidth = ((boxWidth >> 1) << 1);
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
+  int startPositionFrame = std::ceil((content->startPosition * height) / movePerFrame);
   
   int frame = 0;
   for (auto& p : paragraphs) {
@@ -647,7 +651,7 @@ std::vector<TextLayer*> createArticleTextLayers([[maybe_unused]]movie::ArticleTr
 
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
-    textLayer->startTime = frame;
+    textLayer->startTime = frame - startPositionFrame;
     textLayer->duration = std::ceil((heightInP + spaceInP + height) / movePerFrame);
     textLayer->transform = Transform2D::MakeDefault().release();
     textLayer->transform->anchorPoint->value.set(0, 0); //hard code
