@@ -117,8 +117,8 @@ namespace movie {
 
     class TitileContent {
     public:
-        std::vector<Sentence> sentences;
-        std::string text;
+        std::vector<Sentence> sentences;    //case of subtitle
+        std::string text;                   //case of title
         Location location;
         float fontSize = 0.0f;
         std::string fontFamilyName;
@@ -167,13 +167,87 @@ namespace movie {
         ImageContent::from_json(j, i);
     }
 
+    class VerticalScope {
+    public:
+        float top = 0.2;
+        float bottom = 0.8;
+        static void from_json(const json& j, VerticalScope& v) {
+            j.at("top").get_to(v.top);
+            j.at("bottom").get_to(v.bottom);
+        }
+    };
+    static void from_json(const json& j, VerticalScope& v) {
+        VerticalScope::from_json(j, v);
+    }
+
+    class HorizontalScope {
+    public:
+        float left = 0.3;
+        float right = 0.7;
+        static void from_json(const json& j, HorizontalScope& h) {
+            j.at("left").get_to(h.left);
+            j.at("right").get_to(h.right);
+        }
+    };
+    static void from_json(const json& j, HorizontalScope& h) {
+        HorizontalScope::from_json(j, h);
+    }
+
+    class ArticleContent {
+    public:
+        std::string text;
+        VerticalScope verticalVisibleScope;         //垂直方向可见区域
+        HorizontalScope horizontalVisibleScope;     //水平方向可见区域
+        float verticalSpacing = 0.0f;       //0.0 - 5.0, times of fontSize
+        float horizontalSpacing = 0.0f;     //0.0 - 1.0, times of fontSize
+        float paragraphSpacing = 0.0f;      //0.0 - 5.0, times of fontSize
+        float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280)
+        float speed = 0.2f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
+        bool indented = true;               //indented(缩进) or not
+        float fontSize = 0.05f;
+        std::string fontFamilyName;
+        std::string textColor;
+        std::string stroke;
+        static void from_json(const json& j, ArticleContent& a) {
+            j.at("text").get_to(a.text);
+            if (j.contains("verticalVisibleScope"))
+                j.at("verticalVisibleScope").get_to(a.verticalVisibleScope);
+            if (j.contains("horizontalVisibleScope"))
+                j.at("horizontalVisibleScope").get_to(a.horizontalVisibleScope);
+            if (j.contains("verticalSpacing"))
+                j.at("verticalSpacing").get_to(a.verticalSpacing);
+            if (j.contains("horizontalSpacing"))
+                j.at("horizontalSpacing").get_to(a.horizontalSpacing);
+            if (j.contains("paragraphSpacing"))
+                j.at("paragraphSpacing").get_to(a.paragraphSpacing);
+            if (j.contains("startPosition"))
+                j.at("startPosition").get_to(a.startPosition);
+            if (j.contains("speed"))
+                j.at("speed").get_to(a.speed);
+            if (j.contains("indented"))
+                j.at("indented").get_to(a.speed);
+            if (j.contains("fontSize"))
+                j.at("fontSize").get_to(a.fontSize);
+            if (j.contains("fontFamilyName"))
+                j.at("fontFamilyName").get_to(a.fontFamilyName);
+            if (j.contains("textColor"))
+                j.at("textColor").get_to(a.textColor);
+            if (j.contains("stroke"))
+                j.at("stroke").get_to(a.stroke);
+        }
+    };
+    void from_json(const json& j, ArticleContent& a) {
+        ArticleContent::from_json(j, a);
+    }
+
     class LifeTime {
     public:
         int begin_time = 0;
         int end_time = 0;
         static void from_json(const json& j, LifeTime& l) {
             j.at("begin_time").get_to(l.begin_time);
-            j.at("end_time").get_to(l.end_time);
+            if (j.contains("end_time"))
+                j.at("end_time").get_to(l.end_time);
         }
     };
     void from_json(const json& j, LifeTime& l) {
@@ -280,6 +354,18 @@ namespace movie {
         SubtitleTrack::from_json(j, s);
     }
 
+    class ArticleTrack : public Track {
+    public:
+        ArticleContent content;
+        static void from_json(const json& j, ArticleTrack& a) {
+            Track::from_json(j, a);
+            j.at("content").get_to(a.content);
+        }
+    };
+    void from_json(const json& j, ArticleTrack& a) {
+        ArticleTrack::from_json(j, a);
+    }
+
     ///////////////////////////////////////
     class Story {
     public:
@@ -315,6 +401,10 @@ namespace movie {
                 } else if (jtrack.at("type").get<std::string>() == "subtitle") {
                     auto t = new SubtitleTrack();
                     SubtitleTrack::from_json(jtrack, *t);
+                    s.tracks.push_back(t);
+                } else if (jtrack.at("type").get<std::string>() == "article") {
+                    auto t = new ArticleTrack();
+                    ArticleTrack::from_json(jtrack, *t);
                     s.tracks.push_back(t);
                 } else {
 

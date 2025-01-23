@@ -54,6 +54,7 @@ extern "C" {
 #include <string>
 #include <locale>
 #include <codecvt>
+#include <algorithm>
 
 
 
@@ -67,9 +68,9 @@ extern "C" {
 
 
 //NOTE:
-//1. 关注下各个类的析构函数
-
 //zzy, work alone
+
+#define DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX (1.0)      //ratio of font size, NOTE: 单边的
 
 namespace movie {
 
@@ -306,10 +307,10 @@ FloatPairSet strokeWidthSet = {
     // {0.07,      5},
     // {0.1,       6}
     //外描边
-    {0.03,      0},       
-    {0.05,      5*3},
-    {0.07,      6*3},
-    {0.1,       7*3}
+    {0.03,      0},
+    {0.05,      3*2},
+    {0.07,      4*2},
+    {0.1,       5*2}
 };
 
 float findValueFromFloatPairSet(const FloatPairSet &fps, float key) {
@@ -432,54 +433,6 @@ Color translateColor(const std::string& color_string) {
   return c;
 }
 
-std::string getFileNameWithoutExtension(const std::string& filePath) {
-    // 使用 std::filesystem 提取文件名
-    std::filesystem::path path(filePath);
-    return path.stem().string(); // stem() 返回不带扩展名的文件名
-}
-
-TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
-  int visual_width = std::min(spec.width, spec.height) * content->fontSize;
-  int visual_height = visual_width;
-  
-  auto textLayer = new TextLayer();
-  textLayer->id = UniqueID::Next();
-  auto textData = new TextDocument();
-  textData->fontSize = 100;     //hardcode, in pixel
-  // textData->fontStyle = "bold"; //hardcode, SHOULD NOT BE USED if the font family does not support the style
-  textData->text = text;
-  if (!content->fontFamilyName.empty()) {
-    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
-  }
-  if (!content->textColor.empty()) {
-    textData->fillColor = translateColor(content->textColor);
-  }
-  if (!content->stroke.empty()) {
-    textData->applyStroke = true;
-    textData->strokeColor = translateColor(content->stroke);
-    textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
-    textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
-  }
-  textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
-  textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
-  textLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
-  textLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
-  textLayer->transform = Transform2D::MakeDefault().release();
-
-  textLayer->transform->anchorPoint->value.set(0, -30); //hard code
-  textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
-  float scale_x = (float)visual_width/textData->fontSize;
-  float scale_y = (float)visual_height/textData->fontSize;
-  textLayer->transform->scale->value.set(scale_x, scale_y);
-  textLayer->timeRemap = new Property<float>(0);      //hard code
-
-//  std::cout << "createTextLayer, fontFamily:" << textData->fontFamily 
-//      << ", color:" << (int)textData->fillColor.red << "|" << (int)textData->fillColor.green << "|" << (int)textData->fillColor.blue
-//      << ", stroke:" << (int)textData->strokeColor.red << "|" << (int)textData->strokeColor.green << "|" << (int)textData->strokeColor.blue << ", width:" << textData->strokeWidth
-//      << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration << std::endl;
-  return textLayer;
-}
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -503,6 +456,69 @@ void countChars(const std::u32string& unicodeStr, size_t& chineseCount, size_t& 
             ++englishCount;
         }
     }
+}
+
+std::vector<std::string> splitStringByNewline(const std::string& input) {
+    std::vector<std::string> result;
+    std::stringstream ss(input);
+    std::string line;
+    while (std::getline(ss, line, '\n')) {
+        result.push_back(line);
+    }
+    return result;
+}
+
+std::string getFileNameWithoutExtension(const std::string& filePath) {
+    // 使用 std::filesystem 提取文件名
+    std::filesystem::path path(filePath);
+    return path.stem().string(); // stem() 返回不带扩展名的文件名
+}
+
+bool isLineBreak(char32_t unicode) {
+    return unicode == U'\n' ||   // Line Feed
+           unicode == U'\r' ||   // Carriage Return
+           unicode == U'\u2028' || // Line Separator
+           unicode == U'\u2029';  // Paragraph Separator
+}
+
+TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
+  int visual_width = std::min(spec.width, spec.height) * content->fontSize;
+  int visual_height = visual_width;
+  
+  auto textLayer = new TextLayer();
+  textLayer->id = UniqueID::Next();
+  textLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
+  textLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
+  textLayer->transform = Transform2D::MakeDefault().release();
+  textLayer->transform->anchorPoint->value.set(0, -30); //hard code
+  textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
+  textLayer->timeRemap = new Property<float>(0);      //hard code
+
+  auto textData = new TextDocument();
+  textData->fontSize = std::max(visual_width, visual_height);     //in pixel
+  // textData->fontStyle = "bold"; //hardcode, SHOULD NOT BE USED if the font family does not support the style
+  textData->text = text;
+  if (!content->fontFamilyName.empty()) {
+    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+  }
+  if (!content->textColor.empty()) {
+    textData->fillColor = translateColor(content->textColor);
+  }
+  if (!content->stroke.empty()) {
+    textData->applyStroke = true;
+    textData->strokeColor = translateColor(content->stroke);
+    textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
+    textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
+    textData->tracking = textData->strokeWidth * 1000 * 0.7 / textData->fontSize;   //横向间距，如果使用了外描边
+  }
+  textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
+
+  textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+//  std::cout << "createTextLayer, fontFamily:" << textData->fontFamily 
+//      << ", color:" << (int)textData->fillColor.red << "|" << (int)textData->fillColor.green << "|" << (int)textData->fillColor.blue
+//      << ", stroke:" << (int)textData->strokeColor.red << "|" << (int)textData->strokeColor.green << "|" << (int)textData->strokeColor.blue << ", width:" << textData->strokeWidth
+//      << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration << std::endl;
+  return textLayer;
 }
 
 std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::MovieSpec& spec) {
@@ -553,9 +569,122 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
+int getBoxTextHeight(const std::string& text, int fontSize/*单位是像素*/, int leading/*纵向*//*单位是像素*/, 
+                     int tracking/*横向*//*单位是像素*/, int boxWidth/*单位是像素*/) {
+  //算法核心是计算每行的高度以及行数
+  int lineCount = 1;
+  int currentLineLength = 0;
+
+  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+  std::u32string unicodeStr = converter.from_bytes(text);
+
+  for (char32_t c : unicodeStr) {
+    if (isLineBreak(c)) {
+      ++lineCount;
+      currentLineLength = 0;
+    } else {
+      currentLineLength += fontSize + tracking;
+    }
+    if (currentLineLength > boxWidth) {
+      ++lineCount;
+      currentLineLength = fontSize + tracking;
+    }
+  } 
+  return lineCount * leading;
+}
+
+std::vector<TextLayer*> createArticleTextLayers([[maybe_unused]]movie::ArticleTrack* articleTrack, [[maybe_unused]]const movie::MovieSpec& spec) {
+  std::vector<TextLayer*> textLayers;
+  movie::ArticleContent* content = &articleTrack->content;
+  int width = spec.width;
+  int height = spec.height;
+  auto paragraphs = splitStringByNewline(content->text);
+  //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
+  //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
+  int fontSize = std::ceil(std::min(width, height) * content->fontSize);
+  int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;
+  int trackingInP = std::ceil(content->horizontalSpacing * fontSize);
+  int boxWidth = std::ceil(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
+  boxWidth -= std::ceil(DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX * fontSize) * 2;
+  boxWidth = ((boxWidth >> 1) << 1);
+  float speedInP = height * content->speed;
+  float movePerFrame = speedInP / spec.fps;
+  
+  int frame = 0;
+  for (auto& p : paragraphs) {
+    //paragraph height in pixels
+    auto heightInP = getBoxTextHeight(p, fontSize, leadingInP/*纵向*/, trackingInP/*横向*/, boxWidth);
+    //vertial space in pixels
+    int spaceInP = std::ceil(content->paragraphSpacing * fontSize);
+    
+    auto textData = new TextDocument();
+    textData->fontSize = fontSize;
+    textData->text = p;
+    if (!content->fontFamilyName.empty()) {
+      textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+    }
+    if (!content->textColor.empty()) {
+      textData->fillColor = translateColor(content->textColor);
+    }
+    if (!content->stroke.empty()) {
+      textData->applyStroke = true;
+      textData->strokeColor = translateColor(content->stroke);
+      textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
+      textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
+      textData->tracking = textData->strokeWidth * 1000 * 0.7 / textData->fontSize;   //横向间距，如果使用了外描边
+    }
+    textData->justification = pag::ParagraphJustification::LeftJustify;   //hard code
+    textData->leading = leadingInP;
+    textData->tracking = std::max(std::min((int)std::ceil(trackingInP * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
+    //apply box
+    //box text will affect the real anchor point, so we need to hard code it to the top-center of a paragraph(x=w/2, y=0)
+    textData->boxText = true;     //hard code
+    textData->boxTextSize = pag::Point::Zero();
+    textData->boxTextSize.x = boxWidth;
+    textData->boxTextSize.y = heightInP;  //std::ceil(heightInP * 1.1);
+    textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);
+    textData->firstBaseLine = fontSize;
+
+    auto textLayer = new TextLayer();
+    textLayer->id = UniqueID::Next();
+    textLayer->startTime = frame;
+    textLayer->duration = std::ceil((heightInP + spaceInP + height) / movePerFrame);
+    textLayer->transform = Transform2D::MakeDefault().release();
+    textLayer->transform->anchorPoint->value.set(0, 0); //hard code
+    textLayer->transform->position->value.set(width/2, height/2);    //hard code
+    textLayer->timeRemap = new Property<float>(0);      //hard code
+    textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+
+     auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+     keyFrame->startTime = textLayer->startTime;
+     keyFrame->endTime = textLayer->startTime + textLayer->duration;
+     float startx = width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) * 0.5;
+     float starty = height + 0;
+     keyFrame->startValue = pag::Point::Make(startx, starty);   //set by json
+     float endx = startx;
+     float endy = -heightInP - spaceInP;
+     keyFrame->endValue = pag::Point::Make(endx, endy);   //set by json
+     keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+     std::vector<Keyframe<pag::Point>*> keyframes = {};
+     keyframes.push_back(keyFrame);
+     //release former scale property
+     if (textLayer->transform->position) {
+       delete textLayer->transform->position;
+     }
+     textLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
+    
+    textLayers.push_back(textLayer);
+
+    frame += std::ceil((heightInP + spaceInP) / movePerFrame);
+  }
+  
+
+  return textLayers;
+}
+
 #pragma clang diagnostic pop
 
-ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
+ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
   movie::ImageContent* content = &static_cast<movie::ImageTrack*>(track)->content;
   int visual_width = spec.width * content->location.w;   //visual width, not image og width
   int visual_height = spec.height * content->location.h;
@@ -580,6 +709,24 @@ ImageLayer* CreateImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
   imageLayer->imageBytes->width = imageWidth;
   imageLayer->imageBytes->height = imageHeight;
   imageLayer->imageBytes->fileBytes = ByteData::FromPath(content->localPath()).release();
+
+  //test code
+  // {
+  //     //hard code animation: scale
+  //     auto keyFrame1 = new SingleEaseKeyframe<pag::Point>();
+  //     keyFrame1->startTime = -200;
+  //     keyFrame1->endTime = imageLayer->duration;
+  //     keyFrame1->startValue = pag::Point::Make(spec.width*content->location.center_x, 2400.0);   //set by json
+  //     keyFrame1->endValue = pag::Point::Make(spec.width*content->location.center_x, 0.0f);   //set by json
+  //     keyFrame1->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+  //     std::vector<Keyframe<pag::Point>*> keyframes = {};
+  //     keyframes.push_back(keyFrame1);
+  //     //release former scale property
+  //     if (imageLayer->transform->position) {
+  //       delete imageLayer->transform->position;
+  //     }
+  //     imageLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
+  //   }
 
   return imageLayer;
 }
@@ -611,31 +758,74 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
   return audioSource;
 }
 
-void prepareAllTracks(movie::Story& story) {
-  printf("prepareAllTracks, duration:%d\n", story.duration);
+int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height) {
+  auto paragraphs = splitStringByNewline(articleTrack->content.text);
+  //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
+  //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
+  int articleHeight = 0;
+  int fontSize = std::ceil(std::min(width, height) * articleTrack->content.fontSize);
+  int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
+  int tracking = std::ceil(articleTrack->content.horizontalSpacing * fontSize);
+  int boxWidth = std::ceil(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
+  boxWidth -= std::ceil(DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX * fontSize) * 2;
+  boxWidth = ((boxWidth >> 1) << 1);
+  for (auto& p : paragraphs) {
+    //paragraph height in pixels
+    auto heightInP = getBoxTextHeight(p, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth);
+    //vertial space in pixels
+    int spaceInP = std::ceil(articleTrack->content.paragraphSpacing * fontSize);
+    articleHeight += heightInP + spaceInP;
+  }
+  float speedInP = height * articleTrack->content.speed;
+  int duration = std::ceil((float)articleHeight * 1000 / speedInP);
+
+  return duration;
+}
+
+void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps) {
+  printf("prepareAllTracks, duration:%d\n", story->duration);
+
+  //check if article track exists
+  int articleDuration = 0;
+  for (auto& track : story->tracks) {
+    if (track->type == "article") {
+      movie::ArticleTrack* articleTrack = static_cast<movie::ArticleTrack*>(track);
+      articleDuration = getArticleDuration(articleTrack, width, height);
+      printf("article duration:%d\n", articleDuration);
+      break;
+    }
+  }
+  //modify lifetime and duration
+  if (articleDuration > 0) {
+    for (auto& track : story->tracks) {
+      track->lifetime.end_time = articleDuration;
+    }
+    story->duration = articleDuration;
+  }
+
   //add water mark
   auto waterMark = new movie::TitleTrack();
   waterMark->type = "title";
   waterMark->lifetime.begin_time = 0;
-  waterMark->lifetime.end_time = story.duration;
+  waterMark->lifetime.end_time = story->duration;
   waterMark->zorder = 1000;
   waterMark->content.text = ".";
   waterMark->content.location.center_x = 0.1f;
   waterMark->content.location.center_y = 0.9f;
   waterMark->content.fontSize = 0.05f;
   waterMark->content.textColor = "#777777";
-  story.tracks.push_back(waterMark);
+  story->tracks.push_back(waterMark);
 
   //check duration of all tracks
-  for (auto& t : story.tracks) {
-    t->lifetime.end_time = std::min(t->lifetime.end_time, story.duration);
+  for (auto& t : story->tracks) {
+    t->lifetime.end_time = std::min(t->lifetime.end_time, story->duration);
   }
 
   //remove tracks with zero duration
-  story.tracks.erase(std::remove_if(story.tracks.begin(), story.tracks.end(), [](movie::Track* t) { return t->lifetime.end_time <= t->lifetime.begin_time; }), story.tracks.end());
+  story->tracks.erase(std::remove_if(story->tracks.begin(), story->tracks.end(), [](movie::Track* t) { return t->lifetime.end_time <= t->lifetime.begin_time; }), story->tracks.end());
 
   //sort tracks by zorder
-  std::sort(story.tracks.begin(), story.tracks.end(), [](const auto& a, const auto& b) {
+  std::sort(story->tracks.begin(), story->tracks.end(), [](const auto& a, const auto& b) {
       return a->zorder < b->zorder;
   });
 }
@@ -647,8 +837,13 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
       std::cerr << "Error: only support one story" << std::endl;
       return nullptr;
     }
-    movie::Story story = movie.video.stories[0];
-    if (story.duration == 0) {
+    movie::Story* story = &movie.video.stories[0];
+
+    //prepare all tracks for rendering(including article tracks and water mark)
+    prepareAllTracks(story, movie.video.width, movie.video.height, movie.video.fps);
+
+    //last check
+    if (story->duration == 0) {
       std::cerr << "Error: story duration is zero" << std::endl;
       return nullptr;
     }
@@ -683,7 +878,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     vecComposition->id = UniqueID::Next();
     vecComposition->width = movie.video.width;
     vecComposition->height = movie.video.height;
-    vecComposition->duration = TimeToFrame(story.duration, movie.video.fps);   //set by json
+    vecComposition->duration = TimeToFrame(story->duration, movie.video.fps);   //set by json
     vecComposition->frameRate = movie.video.fps;           //set by json
     vecComposition->backgroundColor = {0, 0, 0};     //hard code
 
@@ -691,14 +886,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     auto preComposeLayer = PreComposeLayer::Wrap(vecComposition).release();
     auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
-    jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story.duration : 0;   //set by json
-    
-    //prepare all tracks for rendering
-    prepareAllTracks(story);
+    jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story->duration : 0;   //set by json
     
     //add track to PAGLayer one by one
     int tCount = 0;
-    for (auto& t : story.tracks) {
+    for (auto& t : story->tracks) {
         if (t->type == "video") {
             //create video PAGComposition and add to JSONComposition
             auto track = static_cast<movie::VideoTrack*>(t);
@@ -747,7 +939,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto track = static_cast<movie::ImageTrack*>(t);
             track->content.init(tmpDir);
             printf("image track, path:%s\n", track->content.path.c_str());
-            auto layer = CreateImageLayer(track, movie.video);
+            auto layer = createImageLayer(track, movie.video);
             vecComposition->layers.push_back(layer);
             auto pagImageLayer = std::make_shared<PAGImageLayer>(nullptr, layer);
             //zzy, must set frame rate in case of null PAGFile
@@ -775,9 +967,20 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               pagTextLayer->setFrameRate(movie.video.fps); 
               jsonComposition->addLayer(pagTextLayer);
             }
+        } else if (t->type == "article") {
+            auto track = static_cast<movie::ArticleTrack*>(t);
+            printf("article track, count:%zu\n", track->content.text.size());
+            auto textLayers = createArticleTextLayers(track, movie.video);
+            for (auto layer : textLayers) {
+              vecComposition->layers.push_back(layer);
+              auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagTextLayer->setFrameRate(movie.video.fps); 
+              jsonComposition->addLayer(pagTextLayer);
+            }
         }
         if (progressCB) {
-          progressCB(tCount++ * 100 / story.tracks.size());
+          progressCB(tCount++ * 100 / story->tracks.size());
         }
     }
 
@@ -788,7 +991,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     }
     
     //zzy, must not do this in destructor of story, because the destructor is called by nlohmann::json ahead of time
-    for (auto& track : story.tracks) {
+    for (auto& track : story->tracks) {
         delete track;
     }
 
