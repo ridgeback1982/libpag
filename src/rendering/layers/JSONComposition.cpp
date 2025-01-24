@@ -596,8 +596,8 @@ int getBoxTextHeight(const std::string& text, int fontSize/*单位是像素*/, i
   return lineCount * leading;
 }
 
-std::vector<TextLayer*> createArticleTextLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
-  std::vector<TextLayer*> textLayers;
+std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
+  std::vector<Layer*> layers;
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
   int height = spec.height;
@@ -613,14 +613,84 @@ std::vector<TextLayer*> createArticleTextLayers(movie::ArticleTrack* articleTrac
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
   int startPositionFrame = std::ceil((content->startPosition * height) / movePerFrame);
+  int visibleWidth = std::ceil(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
+  int visibleHeight = std::ceil(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
+  int visibleMiddleX = std::ceil(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
+  int visibleMiddleY = std::ceil(height * (content->verticalVisibleScope.top + content->verticalVisibleScope.bottom) / 2);
   
+
+  //step 1: create bgc layer(background color)
+  if (!content->backgroundColor.empty()) {
+    auto bgColor = translateColor(content->backgroundColor);
+    auto solidLayer = new SolidLayer();
+    solidLayer->id = UniqueID::Next();
+    solidLayer->startTime = 0;      //hard code
+    solidLayer->duration = TimeToFrame(spec.stories[0].duration, spec.fps);
+    solidLayer->transform = Transform2D::MakeDefault().release();
+    solidLayer->transform->anchorPoint->value.set(width/2, height/2);
+    solidLayer->transform->position->value.set(visibleMiddleX, visibleMiddleY);
+    solidLayer->timeRemap = new Property<float>(0);      //hard code
+    solidLayer->name = "纯色背景";
+    //暂时忽略蒙板masks，来年再做
+
+    solidLayer->solidColor = bgColor;
+    solidLayer->width = width;
+    solidLayer->height = height;
+      
+    layers.push_back(solidLayer);
+  }
+
+  //step 2: create shape layer for "遮罩"
+  auto shapeLayer = new ShapeLayer();
+  shapeLayer->id = UniqueID::Next();
+  shapeLayer->startTime = 0;      //hard code
+  //workround: 这里设置一个很大的duration，否则整个图像会在中间黑掉，原因不明
+  shapeLayer->duration = INT64_MAX; //TimeToFrame(spec.stories[0].duration, spec.fps);
+  shapeLayer->transform = Transform2D::MakeDefault().release();
+  shapeLayer->transform->anchorPoint->value.set(0, 0);                //hard code
+  shapeLayer->transform->position->value.set(visibleMiddleX, visibleMiddleY);
+  shapeLayer->timeRemap = new Property<float>(0);                     //hard code
+  shapeLayer->name = "文字遮罩";
+  shapeLayer->isActive = false;      //de-active by default
+
+  auto shapeElement = new ShapeGroupElement();
+  shapeElement->transform = new ShapeTransform();
+  shapeElement->transform->anchorPoint = new Property<Point>(pag::Point::Make(0, 0));      //hard code
+  shapeElement->transform->position = new Property<Point>(pag::Point::Make(0, 0));         //hard code
+  shapeElement->transform->scale = new Property<Point>(pag::Point::Make(1, 1));            //hard code
+  shapeElement->transform->skew = new Property<float>(0);             //hard code
+  shapeElement->transform->skewAxis = new Property<float>(0);         //hard code
+  shapeElement->transform->rotation = new Property<float>(0);         //hard code
+  shapeElement->transform->opacity = new Property<Opacity>(255);      //hard code
+
+  auto rectElement = new RectangleElement();
+  rectElement->size = new Property<Point>(pag::Point::Make(visibleWidth, visibleHeight));
+  rectElement->position = new Property<Point>(pag::Point::Make(0, 0));                     //hard code
+  rectElement->roundness = new Property<float>(0);                    //hard code
+  shapeElement->elements.push_back(rectElement);
+  auto strokeElement = new StrokeElement();
+  strokeElement->color = new Property<pag::Color>(pag::White);
+  strokeElement->opacity = new Property<Opacity>(255);
+  strokeElement->strokeWidth = new Property<float>(0);
+  strokeElement->miterLimit = new Property<float>(4);
+  shapeElement->elements.push_back(strokeElement);
+  auto fillElement = new FillElement();
+  fillElement->color = new Property<pag::Color>(pag::White);
+  fillElement->opacity = new Property<Opacity>(255);
+  shapeElement->elements.push_back(fillElement);
+  
+  shapeLayer->contents.push_back(shapeElement);
+  //no need to push shapeLayer to layers, because it is invisible
+  //layers.push_back(shapeLayer);
+
+  //step 2: create text layers
   int frame = 0;
   for (auto& p : paragraphs) {
     //paragraph height in pixels
     auto heightInP = getBoxTextHeight(p, fontSize, leadingInP/*纵向*/, trackingInP/*横向*/, boxWidth);
     //vertial space in pixels
     int spaceInP = std::ceil(content->paragraphSpacing * fontSize);
-    
+
     auto textData = new TextDocument();
     textData->fontSize = fontSize;
     textData->text = p;
@@ -659,32 +729,35 @@ std::vector<TextLayer*> createArticleTextLayers(movie::ArticleTrack* articleTrac
     textLayer->transform->position->value.set(width/2, height/2);    //hard code
     textLayer->timeRemap = new Property<float>(0);      //hard code
     textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+    //set shaper layer to text layer as matte(遮罩)
+    textLayer->trackMatteType = TrackMatteType::Alpha;
+    textLayer->trackMatteLayer = shapeLayer;
 
-     auto keyFrame = new SingleEaseKeyframe<pag::Point>();
-     keyFrame->startTime = textLayer->startTime;
-     keyFrame->endTime = textLayer->startTime + textLayer->duration;
-     float startx = width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) * 0.5;
-     float starty = height + 0;
-     keyFrame->startValue = pag::Point::Make(startx, starty);   //set by json
-     float endx = startx;
-     float endy = -heightInP - spaceInP;
-     keyFrame->endValue = pag::Point::Make(endx, endy);   //set by json
-     keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
-     std::vector<Keyframe<pag::Point>*> keyframes = {};
-     keyframes.push_back(keyFrame);
-     //release former scale property
-     if (textLayer->transform->position) {
-       delete textLayer->transform->position;
-     }
-     textLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
+    auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+    keyFrame->startTime = textLayer->startTime;
+    keyFrame->endTime = textLayer->startTime + textLayer->duration;
+    float startx = width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) * 0.5;
+    float starty = height + 0;
+    keyFrame->startValue = pag::Point::Make(startx, starty);   //set by json
+    float endx = startx;
+    float endy = -heightInP - spaceInP;
+    keyFrame->endValue = pag::Point::Make(endx, endy);   //set by json
+    keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+    std::vector<Keyframe<pag::Point>*> keyframes = {};
+    keyframes.push_back(keyFrame);
+    //release former scale property
+    if (textLayer->transform->position) {
+      delete textLayer->transform->position;
+    }
+    textLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
     
-    textLayers.push_back(textLayer);
+
+    layers.push_back(textLayer);
 
     frame += std::ceil((heightInP + spaceInP) / movePerFrame);
   }
-  
 
-  return textLayers;
+  return layers;
 }
 
 #pragma clang diagnostic pop
@@ -975,13 +1048,30 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "article") {
             auto track = static_cast<movie::ArticleTrack*>(t);
             printf("article track, count:%zu\n", track->content.text.size());
-            auto textLayers = createArticleTextLayers(track, movie.video);
-            for (auto layer : textLayers) {
+            auto layers = createArticleRelatedLayers(track, movie.video);
+            for (auto layer : layers) {
               vecComposition->layers.push_back(layer);
-              auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, layer);
-              //zzy, must set frame rate in case of null PAGFile
-              pagTextLayer->setFrameRate(movie.video.fps); 
-              jsonComposition->addLayer(pagTextLayer);
+              if (layer->type() == LayerType::Text) {
+                auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, (TextLayer*)layer);
+                //zzy, must set frame rate in case of null PAGFile
+                pagTextLayer->setFrameRate(movie.video.fps);
+                if (layer->trackMatteLayer) {
+                  pagTextLayer->_trackMatteLayer = std::make_shared<PAGSolidLayer>(nullptr, (SolidLayer*)layer->trackMatteLayer);
+                  pagTextLayer->_trackMatteLayer->weakThis = pagTextLayer->_trackMatteLayer;
+                  pagTextLayer->_trackMatteLayer->trackMatteOwner = pagTextLayer.get();
+                }
+                jsonComposition->addLayer(pagTextLayer);
+              } else if (layer->type() == LayerType::Solid) {
+                auto pagSolidLayer = std::make_shared<PAGSolidLayer>(nullptr, (SolidLayer*)layer);
+                //zzy, must set frame rate in case of null PAGFile
+                pagSolidLayer->setFrameRate(movie.video.fps); 
+                jsonComposition->addLayer(pagSolidLayer);
+              } else if (layer->type() == LayerType::Shape) {
+                auto pagShapeLayer = std::make_shared<PAGShapeLayer>(nullptr, (ShapeLayer*)layer);
+                //zzy, must set frame rate in case of null PAGFile
+                pagShapeLayer->setFrameRate(movie.video.fps);
+                jsonComposition->addLayer(pagShapeLayer);
+              }
             }
         }
         if (progressCB) {
