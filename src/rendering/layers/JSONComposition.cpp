@@ -644,8 +644,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   auto shapeLayer = new ShapeLayer();
   shapeLayer->id = UniqueID::Next();
   shapeLayer->startTime = 0;      //hard code
-  //workround: 这里设置一个很大的duration，否则整个图像会在中间黑掉，原因不明
-  shapeLayer->duration = INT64_MAX; //TimeToFrame(spec.stories[0].duration, spec.fps);
+  shapeLayer->duration = TimeToFrame(spec.stories[0].duration, spec.fps);
   shapeLayer->transform = Transform2D::MakeDefault().release();
   shapeLayer->transform->anchorPoint->value.set(0, 0);                //hard code
   shapeLayer->transform->position->value.set(visibleMiddleX, visibleMiddleY);
@@ -1056,9 +1055,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
                 //zzy, must set frame rate in case of null PAGFile
                 pagTextLayer->setFrameRate(movie.video.fps);
                 if (layer->trackMatteLayer) {
-                  pagTextLayer->_trackMatteLayer = std::make_shared<PAGSolidLayer>(nullptr, (SolidLayer*)layer->trackMatteLayer);
+                  //shape layer as track matte
+                  pagTextLayer->_trackMatteLayer = std::make_shared<PAGShapeLayer>(nullptr, (ShapeLayer*)layer->trackMatteLayer);
                   pagTextLayer->_trackMatteLayer->weakThis = pagTextLayer->_trackMatteLayer;
                   pagTextLayer->_trackMatteLayer->trackMatteOwner = pagTextLayer.get();
+                  pagTextLayer->_trackMatteLayer->setFrameRate(movie.video.fps);
                 }
                 jsonComposition->addLayer(pagTextLayer);
               } else if (layer->type() == LayerType::Solid) {
