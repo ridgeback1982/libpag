@@ -632,6 +632,22 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     solidLayer->timeRemap = new Property<float>(0);      //hard code
     solidLayer->name = "纯色背景";
     //暂时忽略蒙板masks，来年再做
+    auto maskData = new MaskData();
+    maskData->id = UniqueID::Next();
+    auto pathData = std::make_shared<PathData>();
+    auto top = visibleMiddleY - visibleHeight/2;
+    auto bottom = visibleMiddleY + visibleHeight/2;
+    auto left = visibleMiddleX - visibleWidth/2;
+    auto right = visibleMiddleX + visibleWidth/2;
+    pathData->moveTo(left, top);
+    pathData->lineTo(right, top);
+    pathData->lineTo(right, bottom);
+    pathData->lineTo(left, bottom);
+    pathData->close();  //close will make it a closed path
+    maskData->maskPath = new Property<PathHandle>(pathData);
+    maskData->maskOpacity = new Property<Opacity>(255);      //hard code
+    maskData->maskExpansion = new Property<float>(0);      //hard code
+    solidLayer->masks.push_back(maskData);
 
     solidLayer->solidColor = bgColor;
     solidLayer->width = width;
