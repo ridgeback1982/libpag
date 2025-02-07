@@ -169,11 +169,14 @@ namespace movie {
 
     class VerticalScope {
     public:
-        float top = 0.2;
-        float bottom = 0.8;
+        float top = 0.1;        //in video size
+        float bottom = 0.9;
+        float indent = 0.0;     //in font size
         static void from_json(const json& j, VerticalScope& v) {
             j.at("top").get_to(v.top);
             j.at("bottom").get_to(v.bottom);
+            if (j.contains("indent"))
+                j.at("indent").get_to(v.indent);
         }
     };
     static void from_json(const json& j, VerticalScope& v) {
@@ -182,11 +185,14 @@ namespace movie {
 
     class HorizontalScope {
     public:
-        float left = 0.3;
-        float right = 0.7;
+        float left = 0.1;       //in video size
+        float right = 0.9;
+        float indent = 0.0;     //in font size
         static void from_json(const json& j, HorizontalScope& h) {
             j.at("left").get_to(h.left);
             j.at("right").get_to(h.right);
+            if (j.contains("indent"))
+                j.at("indent").get_to(h.indent);
         }
     };
     static void from_json(const json& j, HorizontalScope& h) {
@@ -202,7 +208,7 @@ namespace movie {
         float horizontalSpacing = 0.0f;     //0.0 - 1.0, times of fontSize
         float paragraphSpacing = 0.0f;      //0.0 - 5.0, times of fontSize
         float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280), 0 is bottom, 1 is top
-        float speed = 0.2f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
+        float speed = 0.1f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
         bool indented = true;               //indented(缩进) or not
         float fontSize = 0.05f;
         std::string fontFamilyName;

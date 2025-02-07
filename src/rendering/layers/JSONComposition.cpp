@@ -55,7 +55,7 @@ extern "C" {
 #include <locale>
 #include <codecvt>
 #include <algorithm>
-
+#include <unordered_set>
 
 
 #if defined(__linux__)
@@ -69,8 +69,6 @@ extern "C" {
 
 //NOTE:
 //zzy, work alone
-
-#define DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX (1.0)      //ratio of font size, NOTE: 单边的
 
 namespace movie {
 
@@ -464,7 +462,7 @@ std::vector<std::string> splitStringByNewline(const std::string& input, bool add
     std::string line;
     while (std::getline(ss, line, '\n')) {
         if (addIndent) {
-            line = "    " + line;   //4 spaces is an indent
+            line = std::string(4, ' ') + std::string(4, ' ') + line;   //4 spaces is a character
         }
         result.push_back(line);
     }
@@ -482,6 +480,21 @@ bool isLineBreak(char32_t unicode) {
            unicode == U'\r' ||   // Carriage Return
            unicode == U'\u2028' || // Line Separator
            unicode == U'\u2029';  // Paragraph Separator
+}
+
+bool isUnicodeSpace(char32_t ch) {
+    static const std::unordered_set<char32_t> unicode_spaces = {
+        U' ',  // U+0020 空格
+        U'\t', U'\n', U'\r', U'\f', U'\v',  // 控制字符
+        U'\u00A0',  // 不间断空格 (No-Break Space)
+        U'\u1680',  // Ogham Space Mark
+        U'\u2000', U'\u2001', U'\u2002', U'\u2003', U'\u2004', U'\u2005',
+        U'\u2006', U'\u2007', U'\u2008', U'\u2009', U'\u200A',  // 多种空格
+        U'\u202F',  // Narrow No-Break Space
+        U'\u205F',  // Medium Mathematical Space
+        U'\u3000'   // Ideographic Space (全角空格)
+    };
+    return unicode_spaces.find(ch) != unicode_spaces.end();
 }
 
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
@@ -548,9 +561,9 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         countChars(unicodeStr, chineseCount, englishCount);
         int charCount = (int)(chineseCount + englishCount);
         if (charCount > MAX_CHARS_PER_LINE) {
-          int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
-          int charPerLine = (int)std::floor((float)charCount / lineCount);
-          int durPerLine = (int)std::floor((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
+          int lineCount = (int)std::round((float)charCount / FIT_CHARS_PER_LINE);
+          int charPerLine = (int)std::round((float)charCount / lineCount);
+          int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
           std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
           for (int i=0; i<lineCount; i++) {
             movie::LifeTime lineLifetime;
@@ -586,7 +599,11 @@ int getBoxTextHeight(const std::string& text, int fontSize/*单位是像素*/, i
       ++lineCount;
       currentLineLength = 0;
     } else {
-      currentLineLength += fontSize + tracking;
+      if (isUnicodeSpace(c)) {
+        currentLineLength += std::round((fontSize + tracking)*0.25);
+      } else {
+        currentLineLength += fontSize + tracking;
+      }
     }
     if (currentLineLength > boxWidth) {
       ++lineCount;
@@ -604,19 +621,19 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   auto paragraphs = splitStringByNewline(content->text, articleTrack->content.indented);
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
-  int fontSize = std::ceil(std::min(width, height) * content->fontSize);
-  int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;
-  int trackingInP = std::ceil(content->horizontalSpacing * fontSize);
-  int boxWidth = std::ceil(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
-  boxWidth -= std::ceil(DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX * fontSize) * 2;
+  int fontSize = std::round(std::min(width, height) * content->fontSize);
+  int leadingInP = std::round(content->verticalSpacing * fontSize) + fontSize;
+  int trackingInP = std::round(content->horizontalSpacing * fontSize);
+  int boxWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
+  boxWidth -= std::round(content->horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = ((boxWidth >> 1) << 1);
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
-  int startPositionFrame = std::ceil((content->startPosition * height) / movePerFrame);
-  int visibleWidth = std::ceil(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
-  int visibleHeight = std::ceil(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
-  int visibleMiddleX = std::ceil(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
-  int visibleMiddleY = std::ceil(height * (content->verticalVisibleScope.top + content->verticalVisibleScope.bottom) / 2);
+  int startPositionFrame = std::round((content->startPosition * height) / movePerFrame);
+  int visibleWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
+  int visibleHeight = std::round(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
+  int visibleMiddleX = std::round(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
+  int visibleMiddleY = std::round(height * (content->verticalVisibleScope.top + content->verticalVisibleScope.bottom) / 2);
   
 
   //step 1: create bgc layer(background color)
@@ -627,7 +644,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     solidLayer->startTime = 0;      //hard code
     solidLayer->duration = TimeToFrame(spec.stories[0].duration, spec.fps);
     solidLayer->transform = Transform2D::MakeDefault().release();
-    solidLayer->transform->anchorPoint->value.set(width/2, height/2);
+    solidLayer->transform->anchorPoint->value.set(visibleMiddleX, visibleMiddleY);
     solidLayer->transform->position->value.set(visibleMiddleX, visibleMiddleY);
     solidLayer->timeRemap = new Property<float>(0);      //hard code
     solidLayer->name = "纯色背景";
@@ -679,19 +696,19 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   shapeElement->transform->opacity = new Property<Opacity>(255);      //hard code
 
   auto rectElement = new RectangleElement();
-  rectElement->size = new Property<Point>(pag::Point::Make(visibleWidth, visibleHeight));
-  rectElement->position = new Property<Point>(pag::Point::Make(0, 0));                     //hard code
-  rectElement->roundness = new Property<float>(0);                    //hard code
+  rectElement->size = new Property<Point>(pag::Point::Make(visibleWidth, visibleHeight - int(content->verticalVisibleScope.indent*fontSize*2)));
+  rectElement->position = new Property<Point>(pag::Point::Make(0, 0));        //hard code
+  rectElement->roundness = new Property<float>(0);                            //hard code
   shapeElement->elements.push_back(rectElement);
   auto strokeElement = new StrokeElement();
-  strokeElement->color = new Property<pag::Color>(pag::White);
-  strokeElement->opacity = new Property<Opacity>(255);
-  strokeElement->strokeWidth = new Property<float>(0);
-  strokeElement->miterLimit = new Property<float>(4);
+  strokeElement->color = new Property<pag::Color>(pag::White);                //hard code
+  strokeElement->opacity = new Property<Opacity>(255);                        //hard code
+  strokeElement->strokeWidth = new Property<float>(0);                        //hard code
+  strokeElement->miterLimit = new Property<float>(4);                         //hard code
   shapeElement->elements.push_back(strokeElement);
   auto fillElement = new FillElement();
-  fillElement->color = new Property<pag::Color>(pag::White);
-  fillElement->opacity = new Property<Opacity>(255);
+  fillElement->color = new Property<pag::Color>(pag::White);                  //hard code
+  fillElement->opacity = new Property<Opacity>(255);                          //hard code
   shapeElement->elements.push_back(fillElement);
   
   shapeLayer->contents.push_back(shapeElement);
@@ -704,7 +721,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     //paragraph height in pixels
     auto heightInP = getBoxTextHeight(p, fontSize, leadingInP/*纵向*/, trackingInP/*横向*/, boxWidth);
     //vertial space in pixels
-    int spaceInP = std::ceil(content->paragraphSpacing * fontSize);
+    int spaceInP = std::round(content->paragraphSpacing * fontSize);
 
     auto textData = new TextDocument();
     textData->fontSize = fontSize;
@@ -724,7 +741,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     }
     textData->justification = pag::ParagraphJustification::LeftJustify;   //hard code
     textData->leading = leadingInP;
-    textData->tracking = std::max(std::min((int)std::ceil(trackingInP * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
+    textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
     //apply box
     //box text will affect the real anchor point, so we can hard code it to the top-center of a paragraph(x=w/2, y=0)
     textData->boxText = true;     //hard code
@@ -738,7 +755,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
     textLayer->startTime = frame - startPositionFrame;
-    textLayer->duration = std::ceil((heightInP + spaceInP + height) / movePerFrame);
+    textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame);
     textLayer->transform = Transform2D::MakeDefault().release();
     textLayer->transform->anchorPoint->value.set(0, 0); //hard code
     textLayer->transform->position->value.set(width/2, height/2);    //hard code
@@ -751,11 +768,11 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     auto keyFrame = new SingleEaseKeyframe<pag::Point>();
     keyFrame->startTime = textLayer->startTime;
     keyFrame->endTime = textLayer->startTime + textLayer->duration;
-    float startx = width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) * 0.5;
-    float starty = height + 0;
+    float startx = visibleMiddleX;
+    float starty = height + 0;              //from bottom
     keyFrame->startValue = pag::Point::Make(startx, starty);   //set by json
-    float endx = startx;
-    float endy = -heightInP - spaceInP;
+    float endx = visibleMiddleX;
+    float endy = - heightInP - spaceInP;    //to top
     keyFrame->endValue = pag::Point::Make(endx, endy);   //set by json
     keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
     std::vector<Keyframe<pag::Point>*> keyframes = {};
@@ -769,7 +786,10 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
 
     layers.push_back(textLayer);
 
-    frame += std::ceil((heightInP + spaceInP) / movePerFrame);
+    frame += std::round((heightInP + spaceInP) / movePerFrame);
+    std::cout << "paragraph height:" << heightInP << ", space:" << spaceInP 
+      << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration
+      << ", frame:" << frame << ", movePerFrame:" << movePerFrame << std::endl;
   }
 
   return layers;
@@ -852,25 +872,25 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
 }
 
 int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height) {
-  auto paragraphs = splitStringByNewline(articleTrack->content.text);
+  auto paragraphs = splitStringByNewline(articleTrack->content.text, articleTrack->content.indented);
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int articleHeight = 0;
-  int fontSize = std::ceil(std::min(width, height) * articleTrack->content.fontSize);
-  int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
-  int tracking = std::ceil(articleTrack->content.horizontalSpacing * fontSize);
-  int boxWidth = std::ceil(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
-  boxWidth -= std::ceil(DEFAULT_HORIZONTAL_INDENT_RATIO_IN_BOX * fontSize) * 2;
+  int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
+  int leading = std::round(articleTrack->content.verticalSpacing * fontSize) + fontSize;
+  int tracking = std::round(articleTrack->content.horizontalSpacing * fontSize);
+  int boxWidth = std::round(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
+  boxWidth -= std::round(articleTrack->content.horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = ((boxWidth >> 1) << 1);
+  //vertial space in pixels
+  int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
   for (auto& p : paragraphs) {
     //paragraph height in pixels
     auto heightInP = getBoxTextHeight(p, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth);
-    //vertial space in pixels
-    int spaceInP = std::ceil(articleTrack->content.paragraphSpacing * fontSize);
     articleHeight += heightInP + spaceInP;
   }
   float speedInP = height * articleTrack->content.speed;
-  int duration = std::ceil((float)articleHeight * 1000 / speedInP);
+  int duration = std::round((float)articleHeight * 1000 / speedInP);
 
   return duration;
 }
