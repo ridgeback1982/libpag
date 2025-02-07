@@ -210,6 +210,7 @@ namespace movie {
         float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280), 0 is bottom, 1 is top
         float speed = 0.1f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
         bool indented = true;               //indented(缩进) or not
+        float freezeTime = 0.0f;            //seconds; 0 means no freeze
         float fontSize = 0.05f;
         std::string fontFamilyName;
         std::string textColor;
@@ -233,6 +234,8 @@ namespace movie {
                 j.at("speed").get_to(a.speed);
             if (j.contains("indented"))
                 j.at("indented").get_to(a.indented);
+            if (j.contains("freezeTime"))
+                j.at("freezeTime").get_to(a.freezeTime);
             if (j.contains("fontSize"))
                 j.at("fontSize").get_to(a.fontSize);
             if (j.contains("fontFamilyName"))
@@ -254,7 +257,8 @@ namespace movie {
         int begin_time = 0;
         int end_time = 0;
         static void from_json(const json& j, LifeTime& l) {
-            j.at("begin_time").get_to(l.begin_time);
+            if (j.contains("end_time"))
+                j.at("begin_time").get_to(l.begin_time);
             if (j.contains("end_time"))
                 j.at("end_time").get_to(l.end_time);
         }
@@ -270,7 +274,8 @@ namespace movie {
         int zorder = 0;
         static void from_json(const json& j, Track& t) {
             j.at("type").get_to(t.type);
-            j.at("lifetime").get_to(t.lifetime);
+            if (j.contains("lifetime"))
+                j.at("lifetime").get_to(t.lifetime);
             if (j.contains("zorder"))
                 j.at("zorder").get_to(t.zorder);
         }

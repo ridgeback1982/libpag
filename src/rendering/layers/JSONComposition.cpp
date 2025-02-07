@@ -634,7 +634,6 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   int visibleHeight = std::round(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
   int visibleMiddleX = std::round(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
   int visibleMiddleY = std::round(height * (content->verticalVisibleScope.top + content->verticalVisibleScope.bottom) / 2);
-  
 
   //step 1: create bgc layer(background color)
   if (!content->backgroundColor.empty()) {
@@ -891,7 +890,7 @@ int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height)
   }
   float speedInP = height * articleTrack->content.speed;
   int duration = std::round((float)articleHeight * 1000 / speedInP);
-
+  duration += articleTrack->content.freezeTime * 1000;
   return duration;
 }
 
