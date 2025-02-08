@@ -210,7 +210,7 @@ namespace movie {
         float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280), 0 is bottom, 1 is top
         float speed = 0.1f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
         bool indented = true;               //indented(缩进) or not
-        float freezeTime = 0.0f;            //seconds; 0 means no freeze
+        int freezeTime = 0;                 //milli-seconds; 0 means no freeze
         float fontSize = 0.05f;
         std::string fontFamilyName;
         std::string textColor;

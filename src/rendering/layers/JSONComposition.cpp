@@ -629,7 +629,9 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   boxWidth = ((boxWidth >> 1) << 1);
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
+  int startPosition = std::round(content->startPosition * height);
   int startPositionFrame = std::round((content->startPosition * height) / movePerFrame);
+  int freezedFrame = std::round(content->freezeTime / 1000.0f * spec.fps);
   int visibleWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
   int visibleHeight = std::round(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
   int visibleMiddleX = std::round(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
@@ -716,12 +718,11 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
 
   //step 2: create text layers
   int frame = 0;
+  int spaceInP = std::round(content->paragraphSpacing * fontSize);    //vertial space in pixels
   for (auto& p : paragraphs) {
-    //paragraph height in pixels
+    // get paragraph height in pixels
     auto heightInP = getBoxTextHeight(p, fontSize, leadingInP/*纵向*/, trackingInP/*横向*/, boxWidth);
-    //vertial space in pixels
-    int spaceInP = std::round(content->paragraphSpacing * fontSize);
-
+    // step 1: create text data
     auto textData = new TextDocument();
     textData->fontSize = fontSize;
     textData->text = p;
@@ -736,59 +737,79 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
       textData->strokeColor = translateColor(content->stroke);
       textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
       textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
-      textData->tracking = textData->strokeWidth * 1000 * 0.7 / textData->fontSize;   //横向间距，如果使用了外描边
     }
     textData->justification = pag::ParagraphJustification::LeftJustify;   //hard code
     textData->leading = leadingInP;
     textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
-    //apply box
-    //box text will affect the real anchor point, so we can hard code it to the top-center of a paragraph(x=w/2, y=0)
+    //// box text will affect the real anchor point, so we can hard code it to the top-center of a paragraph(x=w/2, y=0)
     textData->boxText = true;     //hard code
     textData->boxTextSize = pag::Point::Zero();
-    //set the boxTextSize exactly same as the paragraph size, so that the real anchor point is the top-center
+    // set the boxTextSize exactly same as the paragraph size, so that the real anchor point is the top-center
     textData->boxTextSize.x = boxWidth;
     textData->boxTextSize.y = heightInP;
     textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
     textData->firstBaseLine = fontSize;   //set firstBaseLine the same as font size
-
+    
+    //step 2: create text layer
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
-    textLayer->startTime = frame - startPositionFrame;
-    textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame);
     textLayer->transform = Transform2D::MakeDefault().release();
     textLayer->transform->anchorPoint->value.set(0, 0); //hard code
     textLayer->transform->position->value.set(width/2, height/2);    //hard code
     textLayer->timeRemap = new Property<float>(0);      //hard code
     textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
-    //set shaper layer to text layer as matte(遮罩)
     textLayer->trackMatteType = TrackMatteType::Alpha;
-    textLayer->trackMatteLayer = shapeLayer;
-
-    auto keyFrame = new SingleEaseKeyframe<pag::Point>();
-    keyFrame->startTime = textLayer->startTime;
-    keyFrame->endTime = textLayer->startTime + textLayer->duration;
-    float startx = visibleMiddleX;
-    float starty = height + 0;              //from bottom
-    keyFrame->startValue = pag::Point::Make(startx, starty);   //set by json
-    float endx = visibleMiddleX;
-    float endy = - heightInP - spaceInP;    //to top
-    keyFrame->endValue = pag::Point::Make(endx, endy);   //set by json
-    keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+    textLayer->trackMatteLayer = shapeLayer;  //set shaper layer to text layer as matte(遮罩)
+      
+    //step 3: create key frames for movement
     std::vector<Keyframe<pag::Point>*> keyframes = {};
-    keyframes.push_back(keyFrame);
-    //release former scale property
+    if (frame < startPositionFrame) {
+      textLayer->startTime = 0;
+      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame) - startPositionFrame + frame + freezedFrame;
+      //two key frames
+      int staticX = visibleMiddleX;
+      int staticY = height - startPosition + std::round(frame * movePerFrame);
+      if (freezedFrame > 0) {
+        //freezed time
+        auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+        keyFrame->startTime = textLayer->startTime;
+        keyFrame->endTime = textLayer->startTime + freezedFrame;
+        keyFrame->startValue = pag::Point::Make(staticX, staticY);
+        keyFrame->endValue = pag::Point::Make(staticX, staticY);
+        keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+        keyframes.push_back(keyFrame);
+      } 
+      //moving time
+      auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+      keyFrame->startTime = textLayer->startTime + freezedFrame;
+      keyFrame->endTime = textLayer->startTime + textLayer->duration;
+      keyFrame->startValue = pag::Point::Make(staticX, staticY);                       //from bottom 
+      keyFrame->endValue = pag::Point::Make(staticX, - heightInP - spaceInP);          //to top
+      keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+      keyframes.push_back(keyFrame);
+    } else {
+      textLayer->startTime = frame - startPositionFrame + freezedFrame;
+      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame);
+      //single key frame
+      auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+      keyFrame->startTime = textLayer->startTime;
+      keyFrame->endTime = textLayer->startTime + textLayer->duration;
+      keyFrame->startValue = pag::Point::Make(visibleMiddleX, height);                    //from bottom
+      keyFrame->endValue = pag::Point::Make(visibleMiddleX, - heightInP - spaceInP);      //to top
+      keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+      keyframes.push_back(keyFrame);
+    }
     if (textLayer->transform->position) {
       delete textLayer->transform->position;
     }
     textLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
-    
-
+    //add one text layer to layers
     layers.push_back(textLayer);
-
+    //IMPORTANT: update frame for the next paragraph
     frame += std::round((heightInP + spaceInP) / movePerFrame);
-    std::cout << "paragraph height:" << heightInP << ", space:" << spaceInP 
-      << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration
-      << ", frame:" << frame << ", movePerFrame:" << movePerFrame << std::endl;
+    // std::cout << "paragraph height:" << heightInP << ", space:" << spaceInP 
+    //   << ", start:" << textLayer->startTime << ", duration:" << textLayer->duration
+    //   << ", frame:" << frame << ", movePerFrame:" << movePerFrame << std::endl;
   }
 
   return layers;
@@ -890,7 +911,7 @@ int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height)
   }
   float speedInP = height * articleTrack->content.speed;
   int duration = std::round((float)articleHeight * 1000 / speedInP);
-  duration += articleTrack->content.freezeTime * 1000;
+  duration += articleTrack->content.freezeTime;
   return duration;
 }
 
