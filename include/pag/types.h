@@ -1567,6 +1567,9 @@ class PAG_API TextDocument {
   uint8_t backgroundAlpha = 0;
 
   Enum direction = TextDirection::Default;
+
+  //zzy, 避免第一个字符是标点符号（滚屏专用）
+  bool avoidFirstPunctuation = false;
 };
 
 typedef std::shared_ptr<TextDocument> TextDocumentHandle;

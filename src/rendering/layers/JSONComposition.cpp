@@ -517,11 +517,11 @@ Color translateColor(const std::string& color_string) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-bool isChineseChar(char32_t c) {
+static bool isChineseChar(char32_t c) {
     return (c >= 0x4E00 && c <= 0x9FFF); // 中文字符范围
 }
 
-bool isEnglishChar(char32_t c) {
+static bool isEnglishChar(char32_t c) {
     return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')); // 英文字母范围
 }
 
@@ -686,8 +686,8 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
 movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, int leading/*纵向*/, int tracking/*横向*/, int boxWidth, bool indented) {
   movie::ArticleParagraph p;
   int lineCount = 1;
+  //模糊地计算每个段落的长度，不要求非常精准
   int currentLineLength = 0;
-  bool avoidFirstPunctuation = true;
 
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string unicodeStr = converter.from_bytes(text);
@@ -706,29 +706,13 @@ movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, i
         currentLineLength += std::round((fontSize + tracking)*0.25);
       } else if (isChinesePunctuation(*it)) {
         currentLineLength += fontSize + tracking;
+      } else if (isEnglishChar(*it)) {
+        currentLineLength += std::round((fontSize + tracking)*0.5);
       } else {
         currentLineLength += fontSize + tracking;
       }
     }
     if (currentLineLength > boxWidth) {
-      if (avoidFirstPunctuation) {
-        if (isEnglishPunctuation(*it) || isChinesePunctuation(*it)) {
-          int count = 1;
-          auto preIt = it - 1;
-          while(isEnglishPunctuation(*preIt) || isChinesePunctuation(*preIt)) {
-            if (preIt == unicodeStr.begin())
-              break;
-            preIt --;
-            count ++;
-          }
-          for (int i=0; i<count; i++) {
-            //insert a unicode “全角空格” before the previous character
-            it = unicodeStr.insert(preIt, U'\u3000');
-            preIt = it;
-          }
-          it ++;
-        }
-      }
       ++lineCount;
       currentLineLength = fontSize + tracking;
     }
@@ -891,6 +875,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     textData->boxTextSize.y = heightInP;
     textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
     textData->firstBaseLine = fontSize;   //set firstBaseLine the same as font size
+    textData->avoidFirstPunctuation = true;
     
     //step 2: create text layer
     auto textLayer = new TextLayer();

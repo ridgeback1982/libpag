@@ -25,6 +25,13 @@
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 
+//zzy
+#include <string>
+#include <locale>
+#include <codecvt>
+#include <algorithm>
+#include <unordered_set>
+
 namespace pag {
 
 #define LINE_GAP_FACTOR 1.2f
@@ -289,9 +296,30 @@ static float FindMiniAscent(const std::vector<GlyphInfo*>& line) {
   return minAscent;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+static bool isEnglishPunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> englishPunctuationSet = {
+        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
+        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
+        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
+    };
+    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
+}
+
+static bool isChinesePunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> chinesePunctuationSet = {
+        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
+        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000',
+        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'
+    };
+    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
+}
+
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds,
-    float* firstLineMiniAscent) {
+    float* firstLineMiniAscent, bool avoidFirstPunctuation/*zzy*/) {
   float maxWidth, maxY;
   if (layout.boxRect.isEmpty()) {
     maxWidth = std::numeric_limits<float>::infinity();
@@ -314,6 +342,22 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     auto lineWidth = 0.0f;
     auto nextLineIndex =
         CalculateNextLineIndex(*glyphInfos, index, 1.0f, maxWidth, layout.tracking, &lineWidth);
+    
+    //zzy，避免第一个字符是标点符号
+    if (avoidFirstPunctuation) {
+      if (nextLineIndex < glyphCount)
+      {
+        std::string nextLineCharacter = (*glyphInfos)[nextLineIndex].name;
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+        std::u32string uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+        while(isEnglishPunctuation(uniNextLineCharacter[0]) || isChinesePunctuation(uniNextLineCharacter[0])) {
+          nextLineIndex--;
+          nextLineCharacter = (*glyphInfos)[nextLineIndex].name;
+          uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+        }
+      }
+    }
+      
     auto hasLineBreaker = (*glyphInfos)[nextLineIndex - 1].name[0] == '\n';  // 换行符
     auto lineGlyphEnd = nextLineIndex - (hasLineBreaker ? 1 : 0);
     index = nextLineIndex;
@@ -352,6 +396,8 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
   }
   return lineList;
 }
+
+#pragma clang diagnostic pop
 
 static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
     const TextLayout& layout, const std::vector<std::vector<GlyphInfo*>>& glyphInfoLines,
@@ -513,7 +559,7 @@ std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
   tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
   float firstLineMiniAscent = 0;
   auto glyphInfoLines =
-      ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds, &firstLineMiniAscent);
+      ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds, &firstLineMiniAscent, textDocument->avoidFirstPunctuation);
   if (pathOptions != nullptr && textDocument->direction != TextDirection::Vertical) {
     // 由于框文本的路径规则是文字顶部从路径开始排列，这里需要计算出首行文字的 ascent(绝对值最大)，
     // 把所有文字沿法线移动 ascent，使得框文字的首行顶部在路径上
