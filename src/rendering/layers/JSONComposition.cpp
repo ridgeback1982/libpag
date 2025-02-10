@@ -30,6 +30,7 @@
 #include "codec/tags/VideoSequence.h"
 #include "rendering/utils/media/FFAudioReader.h"
 #include "rendering/utils/media/FFAudioMixer.h"
+#include "rendering/utils/media/FFImageReader.h"
 
 //ffmpeg
 extern "C" {
@@ -67,6 +68,8 @@ extern "C" {
 #endif
 
 
+namespace fs = std::filesystem;
+
 //NOTE:
 //zzy, work alone
 
@@ -92,6 +95,11 @@ size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
 }
 
 int curlDownload(const std::string& url, const std::string& localPath) {
+    // Check if file already exists
+    if (fs::exists(localPath)) {
+        std::cout << "curlDownload, localPath already exists: " << localPath << std::endl;
+        return 0;
+    }
     CURL* curl = curl_easy_init();
     if (curl) {
         std::ofstream file(localPath);
@@ -109,6 +117,43 @@ int curlDownload(const std::string& url, const std::string& localPath) {
         }
         // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
     }
+    return 0;
+}
+
+int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, uint8_t* b) {
+    pag::FFImageReader imgReeader(image_path);
+    int width = imgReeader.width();
+    int height = imgReeader.height();
+    if (width <= 0 || height <= 0) {
+      return -1;
+    }
+    float offsetRatio = 0.1f;
+    int samples[4][2] = {
+        {(int)std::round(width * offsetRatio),             (int)std::round(height * offsetRatio)},
+        {width - (int)std::round(width * offsetRatio),     (int)std::round(height * offsetRatio)},
+        {(int)std::round(width * offsetRatio),             height - (int)std::round(height * offsetRatio)},
+        {width - (int)std::round(width * offsetRatio),     height - (int)std::round(height * offsetRatio)}
+    };
+    int rows = sizeof(samples) / sizeof(samples[0]);
+    int tr = 0, tg = 0, tb = 0;
+    for (int row = 0; row < rows; row++) {
+        int x = samples[row][0];
+        int y = samples[row][1];
+        uint8_t r, g, b;
+        if (imgReeader.getColor(x, y, &r, &g, &b) < 0) {
+            std::cerr << "Failed to get color at (" << x << ", " << y << ")" << std::endl;
+            tr = 0;
+            tg = 0;
+            tb = 0;
+            break;
+        }
+        tr += r;
+        tg += g;
+        tb += b;
+    }
+    *r = tr / rows;
+    *g = tg / rows;
+    *b = tb / rows;
     return 0;
 }
 
@@ -268,6 +313,44 @@ int ImageContent::init(const std::string& tmpDir) {
 
   avformat_close_input(&fmt_ctx);
   avformat_free_context(fmt_ctx);
+  return 0;
+}
+
+int ArticleContent::init(const std::string& tmpDir) {
+  if (backgroundColor.empty()) {
+    if (!backgroundColorFromImage.empty()) {
+      bool remote = starts_with(backgroundColorFromImage, "http://") || starts_with(backgroundColorFromImage, "https://");
+      if (remote) {
+          //create local path
+          _bgcImagePath = tmpDir + "/" + getFileNameFromUrl(backgroundColorFromImage);
+          
+          //download to local path
+          printf("ArticleContent::init, will download %s to %s\n", backgroundColorFromImage.c_str(), _bgcImagePath.c_str());
+          auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+          if (curlDownload(backgroundColorFromImage, _bgcImagePath) < 0) {
+              return -1;
+          }
+          auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+          printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
+      } else {
+        _bgcImagePath = backgroundColorFromImage;
+      }
+      uint8_t r, g, b;
+      if (pickColorFromImage(_bgcImagePath, &r, &g, &b) == 0) {
+        float compensate = 0.8;
+        r = r + std::ceil((255 - r) * compensate);
+        g = g + std::ceil((255 - g) * compensate);
+        b = b + std::ceil((255 - b) * compensate);
+        uint8_t max = std::max(std::max(r, g), b);
+        r += 255 - max;
+        g += 255 - max;
+        b += 255 - max;
+        std::stringstream ss;
+        ss << "rgb(" << (int)r << "," << (int)g << "," << int(b) << ")";
+        backgroundColor = ss.str();
+      }
+    }
+  }
   return 0;
 }
 
@@ -456,45 +539,60 @@ void countChars(const std::u32string& unicodeStr, size_t& chineseCount, size_t& 
     }
 }
 
-std::vector<std::string> splitStringByNewline(const std::string& input, bool addIndent = false) {
+static std::vector<std::string> splitStringByNewline(const std::string& input) {
     std::vector<std::string> result;
     std::stringstream ss(input);
     std::string line;
     while (std::getline(ss, line, '\n')) {
-        if (addIndent) {
-            line = std::string(4, ' ') + std::string(4, ' ') + line;   //4 spaces is a character
-        }
         result.push_back(line);
     }
     return result;
 }
 
-std::string getFileNameWithoutExtension(const std::string& filePath) {
+static std::string getFileNameWithoutExtension(const std::string& filePath) {
     // 使用 std::filesystem 提取文件名
     std::filesystem::path path(filePath);
     return path.stem().string(); // stem() 返回不带扩展名的文件名
 }
 
-bool isLineBreak(char32_t unicode) {
+static bool isLineBreak(char32_t unicode) {
     return unicode == U'\n' ||   // Line Feed
            unicode == U'\r' ||   // Carriage Return
            unicode == U'\u2028' || // Line Separator
            unicode == U'\u2029';  // Paragraph Separator
 }
 
-bool isUnicodeSpace(char32_t ch) {
-    static const std::unordered_set<char32_t> unicode_spaces = {
-        U' ',  // U+0020 空格
-        U'\t', U'\n', U'\r', U'\f', U'\v',  // 控制字符
-        U'\u00A0',  // 不间断空格 (No-Break Space)
-        U'\u1680',  // Ogham Space Mark
-        U'\u2000', U'\u2001', U'\u2002', U'\u2003', U'\u2004', U'\u2005',
-        U'\u2006', U'\u2007', U'\u2008', U'\u2009', U'\u200A',  // 多种空格
-        U'\u202F',  // Narrow No-Break Space
-        U'\u205F',  // Medium Mathematical Space
-        U'\u3000'   // Ideographic Space (全角空格)
+//static bool isUnicodeSpace(char32_t ch) {
+//    static const std::unordered_set<char32_t> unicode_spaces = {
+//        U' ',  // U+0020 空格
+//        U'\t', U'\n', U'\r', U'\f', U'\v',  // 控制字符
+//        U'\u00A0',  // 不间断空格 (No-Break Space)
+//        U'\u1680',  // Ogham Space Mark
+//        U'\u2000', U'\u2001', U'\u2002', U'\u2003', U'\u2004', U'\u2005',
+//        U'\u2006', U'\u2007', U'\u2008', U'\u2009', U'\u200A',  // 多种空格
+//        U'\u202F',  // Narrow No-Break Space
+//        U'\u205F',  // Medium Mathematical Space
+//        U'\u3000'   // Ideographic Space (全角空格)
+//    };
+//    return unicode_spaces.find(ch) != unicode_spaces.end();
+//}
+
+static bool isEnglishPunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> englishPunctuationSet = {
+        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
+        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
+        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
+        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'    //中文，但是只占半个字符
     };
-    return unicode_spaces.find(ch) != unicode_spaces.end();
+    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
+}
+
+static bool isChinesePunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> chinesePunctuationSet = {
+        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
+        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000'
+    };
+    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
 }
 
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
@@ -585,32 +683,59 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
-int getBoxTextHeight(const std::string& text, int fontSize/*单位是像素*/, int leading/*纵向*//*单位是像素*/, 
-                     int tracking/*横向*//*单位是像素*/, int boxWidth/*单位是像素*/) {
-  //算法核心是计算每行的高度以及行数
+movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, int leading/*纵向*/, int tracking/*横向*/, int boxWidth, bool indented) {
+  movie::ArticleParagraph p;
   int lineCount = 1;
   int currentLineLength = 0;
+  bool avoidFirstPunctuation = true;
 
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string unicodeStr = converter.from_bytes(text);
+  if (indented) {
+    std::u32string indent1(1, U'\u3000');  // `\u3000` 为全角空格，更适合中文缩进
+    std::u32string indent2(2, U' ');
+    unicodeStr = indent1 + indent2 + unicodeStr;
+  }
 
-  for (char32_t c : unicodeStr) {
-    if (isLineBreak(c)) {
+  for (auto it = unicodeStr.begin(); it != unicodeStr.end(); ++it) {
+    if (isLineBreak(*it)) {
       ++lineCount;
       currentLineLength = 0;
     } else {
-      if (isUnicodeSpace(c)) {
+      if (isEnglishPunctuation(*it)) {
         currentLineLength += std::round((fontSize + tracking)*0.25);
+      } else if (isChinesePunctuation(*it)) {
+        currentLineLength += fontSize + tracking;
       } else {
         currentLineLength += fontSize + tracking;
       }
     }
     if (currentLineLength > boxWidth) {
+      if (avoidFirstPunctuation) {
+        if (isEnglishPunctuation(*it) || isChinesePunctuation(*it)) {
+          int count = 1;
+          auto preIt = it - 1;
+          while(isEnglishPunctuation(*preIt) || isChinesePunctuation(*preIt)) {
+            if (preIt == unicodeStr.begin())
+              break;
+            preIt --;
+            count ++;
+          }
+          for (int i=0; i<count; i++) {
+            //insert a unicode “全角空格” before the previous character
+            it = unicodeStr.insert(preIt, U'\u3000');
+            preIt = it;
+          }
+          it ++;
+        }
+      }
       ++lineCount;
       currentLineLength = fontSize + tracking;
     }
-  } 
-  return lineCount * leading;
+  }
+  p.text = converter.to_bytes(unicodeStr);
+  p.heightInP = lineCount * leading;
+  return p;
 }
 
 std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
@@ -618,7 +743,6 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
   int height = spec.height;
-  auto paragraphs = splitStringByNewline(content->text, articleTrack->content.indented);
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int fontSize = std::round(std::min(width, height) * content->fontSize);
@@ -626,7 +750,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   int trackingInP = std::round(content->horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
   boxWidth -= std::round(content->horizontalVisibleScope.indent * fontSize) * 2;
-  boxWidth = ((boxWidth >> 1) << 1);
+  boxWidth = boxWidth - boxWidth % (fontSize+trackingInP);
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
   int startPosition = std::round(content->startPosition * height);
@@ -657,11 +781,29 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     auto bottom = visibleMiddleY + visibleHeight/2;
     auto left = visibleMiddleX - visibleWidth/2;
     auto right = visibleMiddleX + visibleWidth/2;
-    pathData->moveTo(left, top);
-    pathData->lineTo(right, top);
-    pathData->lineTo(right, bottom);
-    pathData->lineTo(left, bottom);
-    pathData->close();  //close will make it a closed path
+    if (content->backgroundShape == "rectangle") {
+      pathData->moveTo(left, top);
+      pathData->lineTo(right, top);
+      pathData->lineTo(right, bottom);
+      pathData->lineTo(left, bottom);
+      pathData->close();  //close will make it a closed path
+    } else if (content->backgroundShape == "round-rectangle") {
+
+    } else if (content->backgroundShape == "hexagon") {
+      int radius = std::round(std::min(visibleWidth, visibleHeight) / 20.0f);
+      pathData->moveTo(left + radius, top);
+      pathData->lineTo(right - radius, top);
+      pathData->lineTo(right, top + radius);
+      pathData->lineTo(right, bottom - radius);
+      pathData->lineTo(right - radius, bottom);
+      pathData->lineTo(left + radius, bottom);
+      pathData->lineTo(left, bottom - radius);
+      pathData->lineTo(left, top + radius);
+      pathData->close();  //close will make it a closed path
+    } else {
+      std::cerr << "Invalid background shape: " << content->backgroundShape << std::endl;
+    }
+    
     maskData->maskPath = new Property<PathHandle>(pathData);
     maskData->maskOpacity = new Property<Opacity>(255);      //hard code
     maskData->maskExpansion = new Property<float>(0);      //hard code
@@ -719,13 +861,13 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   //step 2: create text layers
   int frame = 0;
   int spaceInP = std::round(content->paragraphSpacing * fontSize);    //vertial space in pixels
-  for (auto& p : paragraphs) {
+  for (auto& p : content->paragraphs) {
     // get paragraph height in pixels
-    auto heightInP = getBoxTextHeight(p, fontSize, leadingInP/*纵向*/, trackingInP/*横向*/, boxWidth);
+    auto heightInP = p.heightInP;
     // step 1: create text data
     auto textData = new TextDocument();
     textData->fontSize = fontSize;
-    textData->text = p;
+    textData->text = p.text;
     if (!content->fontFamilyName.empty()) {
       textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
@@ -892,27 +1034,44 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
 }
 
 int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height) {
-  auto paragraphs = splitStringByNewline(articleTrack->content.text, articleTrack->content.indented);
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int articleHeight = 0;
+  int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
+  //vertial space in pixels
+  int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
+  for (auto& p : articleTrack->content.paragraphs) {
+    articleHeight += p.heightInP + spaceInP;
+  }
+  float speedInP = height * articleTrack->content.speed;
+  int duration = std::round((float)articleHeight * 1000 / speedInP);
+  duration += articleTrack->content.freezeTime;  
+  return duration;
+}
+
+void preProcessArticleText(movie::ArticleTrack* articleTrack) {
+  std::string new_text = articleTrack->content.text;
+  //删除英文空格
+  new_text.erase(std::remove(new_text.begin(), new_text.end(), ' '), new_text.end());
+
+  //todo: 
+
+  articleTrack->content.text = new_text;
+}
+
+void prepareArticleTrack(movie::ArticleTrack* articleTrack, int width, int height) {
+  preProcessArticleText(articleTrack);
+  auto texts = splitStringByNewline(articleTrack->content.text);
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   int leading = std::round(articleTrack->content.verticalSpacing * fontSize) + fontSize;
   int tracking = std::round(articleTrack->content.horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
   boxWidth -= std::round(articleTrack->content.horizontalVisibleScope.indent * fontSize) * 2;
-  boxWidth = ((boxWidth >> 1) << 1);
-  //vertial space in pixels
-  int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
-  for (auto& p : paragraphs) {
-    //paragraph height in pixels
-    auto heightInP = getBoxTextHeight(p, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth);
-    articleHeight += heightInP + spaceInP;
+  boxWidth = boxWidth - boxWidth % (fontSize+tracking);
+  for (auto& t : texts) {
+    auto p = formatParagraph(t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
+    articleTrack->content.paragraphs.push_back(p);
   }
-  float speedInP = height * articleTrack->content.speed;
-  int duration = std::round((float)articleHeight * 1000 / speedInP);
-  duration += articleTrack->content.freezeTime;
-  return duration;
 }
 
 void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps) {
@@ -923,6 +1082,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       movie::ArticleTrack* articleTrack = static_cast<movie::ArticleTrack*>(track);
+      prepareArticleTrack(articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
       printf("article duration:%d\n", articleDuration);
       break;
@@ -1102,6 +1262,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "article") {
             auto track = static_cast<movie::ArticleTrack*>(t);
+            track->content.init(tmpDir);
             printf("article track, count:%zu\n", track->content.text.size());
             auto layers = createArticleRelatedLayers(track, movie.video);
             for (auto layer : layers) {

@@ -199,6 +199,13 @@ namespace movie {
         HorizontalScope::from_json(j, h);
     }
 
+    class ArticleParagraph {
+    public:
+        std::string text;
+        int heightInP = 0;
+    };
+    
+
     class ArticleContent {
     public:
         std::string text;
@@ -215,7 +222,9 @@ namespace movie {
         std::string fontFamilyName;
         std::string textColor;
         std::string stroke;
-        std::string backgroundColor;        //if not specified, bgc is transparent
+        std::string backgroundColor;            //if not specified, bgc is transparent
+        std::string backgroundColorFromImage;   //if backgroundColor specified, bgcFromImage is ignored
+        std::string backgroundShape = "rectangle";  //rectangle, round-rectangle, hexagon
         static void from_json(const json& j, ArticleContent& a) {
             j.at("text").get_to(a.text);
             if (j.contains("verticalVisibleScope"))
@@ -246,7 +255,18 @@ namespace movie {
                 j.at("stroke").get_to(a.stroke);
             if (j.contains("backgroundColor"))
                 j.at("backgroundColor").get_to(a.backgroundColor);
+            else if (j.contains("backgroundColorFromImage"))
+                j.at("backgroundColorFromImage").get_to(a.backgroundColorFromImage);
+            if (j.contains("backgroundShape"))
+                j.at("backgroundShape").get_to(a.backgroundShape);
         }
+
+        std::vector<ArticleParagraph> paragraphs;
+
+        int init(const std::string& tmpDir);
+
+    protected:
+        std::string _bgcImagePath;
     };
     void from_json(const json& j, ArticleContent& a) {
         ArticleContent::from_json(j, a);
