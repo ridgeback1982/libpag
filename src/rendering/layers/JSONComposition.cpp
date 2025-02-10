@@ -692,9 +692,10 @@ movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, i
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string unicodeStr = converter.from_bytes(text);
   if (indented) {
-    std::u32string indent1(1, U'\u3000');  // `\u3000` 为全角空格，更适合中文缩进
-    std::u32string indent2(2, U' ');
-    unicodeStr = indent1 + indent2 + unicodeStr;
+    // std::u32string indent1(1, U'\u3000');  // `\u3000` 为全角空格，更适合中文缩进
+    //但是有的字体不能处理全角空格，比如“阿里巴巴普惠体-常规.ttf”，所以都用半角
+    std::u32string indent(6, U' ');
+    unicodeStr = indent + unicodeStr;
   }
 
   for (auto it = unicodeStr.begin(); it != unicodeStr.end(); ++it) {
