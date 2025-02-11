@@ -732,7 +732,7 @@ movie::ArticleParagraph formatParagraph(const std::string& fontFamilyName, const
   return p;
 }
 
-std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
+std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec, int duration) {
   std::vector<Layer*> layers;
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
@@ -749,7 +749,12 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   float movePerFrame = speedInP / spec.fps;
   int startPosition = std::round(content->startPosition * height);
   int startPositionFrame = std::round((content->startPosition * height) / movePerFrame);
-  int freezedFrame = std::round(content->freezeTime / 1000.0f * spec.fps);
+  //how many frames of the "begin freeze" will occupy
+  int framesOfBeginFreeze = std::round(content->freezeBeginTime / 1000.0f * spec.fps);
+  int framesOfEndFreeze = std::round(content->freezeEndTime / 1000.0f * spec.fps);
+  int totalFrames = std::round(duration / 1000.0f * spec.fps);
+  //the frame point before the "end freeze" starts
+  int framesBeforeEndFreeze = totalFrames - framesOfEndFreeze;
   int visibleWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
   int visibleHeight = std::round(height * (content->verticalVisibleScope.bottom - content->verticalVisibleScope.top));
   int visibleMiddleX = std::round(width * (content->horizontalVisibleScope.left + content->horizontalVisibleScope.right) / 2);
@@ -902,39 +907,50 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     std::vector<Keyframe<pag::Point>*> keyframes = {};
     if (frame < startPositionFrame) {
       textLayer->startTime = 0;
-      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame) - startPositionFrame + frame + freezedFrame;
-      //two key frames
+      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame) - startPositionFrame + frame + framesOfBeginFreeze;
       int staticX = visibleMiddleX;
       int staticY = height - startPosition + std::round(frame * movePerFrame);
-      if (freezedFrame > 0) {
-        //freezed time
-        auto keyFrame = new SingleEaseKeyframe<pag::Point>();
-        keyFrame->startTime = textLayer->startTime;
-        keyFrame->endTime = textLayer->startTime + freezedFrame;
-        keyFrame->startValue = pag::Point::Make(staticX, staticY);
-        keyFrame->endValue = pag::Point::Make(staticX, staticY);
-        keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
-        keyframes.push_back(keyFrame);
-      } 
-      //moving time
+      //if the key frame's start time is bigger than the layer's start time, the layer is still until the key frame's start time
+      //this is perfect for the "still and move" case
       auto keyFrame = new SingleEaseKeyframe<pag::Point>();
-      keyFrame->startTime = textLayer->startTime + freezedFrame;
+      keyFrame->startTime = textLayer->startTime + framesOfBeginFreeze;
       keyFrame->endTime = textLayer->startTime + textLayer->duration;
       keyFrame->startValue = pag::Point::Make(staticX, staticY);                       //from bottom 
       keyFrame->endValue = pag::Point::Make(staticX, - heightInP - spaceInP);          //to top
       keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
       keyframes.push_back(keyFrame);
     } else {
-      textLayer->startTime = frame - startPositionFrame + freezedFrame;
+      textLayer->startTime = frame - startPositionFrame + framesOfBeginFreeze;
       textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame);
-      //single key frame
-      auto keyFrame = new SingleEaseKeyframe<pag::Point>();
-      keyFrame->startTime = textLayer->startTime;
-      keyFrame->endTime = textLayer->startTime + textLayer->duration;
-      keyFrame->startValue = pag::Point::Make(visibleMiddleX, height);                    //from bottom
-      keyFrame->endValue = pag::Point::Make(visibleMiddleX, - heightInP - spaceInP);      //to top
-      keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
-      keyframes.push_back(keyFrame);
+      
+      //cut the duration if it is beyond the "end freeze" point
+      if (textLayer->startTime + textLayer->duration > framesBeforeEndFreeze) {
+        Frame cutDuration = framesBeforeEndFreeze - textLayer->startTime;
+        //this text's lifetime go beyond the "end freeze" point and we could not let it move after the "end freeze" point 
+        //so cut it by recalculating the key frame, and make it stop at the very "end freeze" point 
+        //and also make the duration longer so it will be still after key frame ends and keep still to the end of the article
+        auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+        keyFrame->startTime = textLayer->startTime;
+        keyFrame->endTime = textLayer->startTime + cutDuration;
+        keyFrame->startValue = pag::Point::Make(visibleMiddleX, height);                                //from bottom
+        keyFrame->endValue = pag::Point::Make(visibleMiddleX, height - int(cutDuration * movePerFrame));      //to top
+        keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+        keyframes.push_back(keyFrame);
+
+        //set the duration of the remaining text to the end of article
+        textLayer->duration = totalFrames - textLayer->startTime;
+      } else {
+        //the text's lifetime doesn't go beyond the "end freeze" point
+        //so no need to cut it, and let it go
+        auto keyFrame = new SingleEaseKeyframe<pag::Point>();
+        keyFrame->startTime = textLayer->startTime;
+        keyFrame->endTime = textLayer->startTime + textLayer->duration;
+        keyFrame->startValue = pag::Point::Make(visibleMiddleX, height);                    //from bottom
+        keyFrame->endValue = pag::Point::Make(visibleMiddleX, - heightInP - spaceInP);      //to top
+        keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+        keyframes.push_back(keyFrame);
+      }
+      
     }
     if (textLayer->transform->position) {
       delete textLayer->transform->position;
@@ -1040,7 +1056,8 @@ int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height)
   }
   float speedInP = height * articleTrack->content.speed;
   int duration = std::round((float)articleHeight * 1000 / speedInP);
-  duration += articleTrack->content.freezeTime;  
+  duration += articleTrack->content.freezeBeginTime;
+  duration += articleTrack->content.freezeEndTime;
   return duration;
 }
 
@@ -1259,7 +1276,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto track = static_cast<movie::ArticleTrack*>(t);
             track->content.init(tmpDir);
             printf("article track, count:%zu\n", track->content.text.size());
-            auto layers = createArticleRelatedLayers(track, movie.video);
+            auto layers = createArticleRelatedLayers(track, movie.video, story->duration);
             for (auto layer : layers) {
               vecComposition->layers.push_back(layer);
               if (layer->type() == LayerType::Text) {

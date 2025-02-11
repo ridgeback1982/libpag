@@ -217,7 +217,8 @@ namespace movie {
         float startPosition = 0.5f;         //0.0 - 1.0, times of height(e.g. 1280), 0 is bottom, 1 is top
         float speed = 0.1f;                 //0.0 - 1.0, times of height(e.g. 1280) per second
         bool indented = true;               //indented(缩进) or not
-        int freezeTime = 0;                 //milli-seconds; 0 means no freeze
+        int freezeBeginTime = 0;               //milli-seconds; 0 means no freeze
+        int freezeEndTime = 0;                 //milli-seconds; 0 means no freeze
         float fontSize = 0.05f;
         std::string fontFamilyName;
         std::string textColor;
@@ -243,8 +244,10 @@ namespace movie {
                 j.at("speed").get_to(a.speed);
             if (j.contains("indented"))
                 j.at("indented").get_to(a.indented);
-            if (j.contains("freezeTime"))
-                j.at("freezeTime").get_to(a.freezeTime);
+            if (j.contains("freezeBeginTime"))
+                j.at("freezeBeginTime").get_to(a.freezeBeginTime);
+            if (j.contains("freezeEndTime"))
+                j.at("freezeEndTime").get_to(a.freezeEndTime);
             if (j.contains("fontSize"))
                 j.at("fontSize").get_to(a.fontSize);
             if (j.contains("fontFamilyName"))
