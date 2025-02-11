@@ -31,6 +31,7 @@
 #include "rendering/utils/media/FFAudioReader.h"
 #include "rendering/utils/media/FFAudioMixer.h"
 #include "rendering/utils/media/FFImageReader.h"
+#include "rendering/graphics/Glyph.h"
 
 //ffmpeg
 extern "C" {
@@ -555,12 +556,12 @@ static std::string getFileNameWithoutExtension(const std::string& filePath) {
     return path.stem().string(); // stem() 返回不带扩展名的文件名
 }
 
-static bool isLineBreak(char32_t unicode) {
-    return unicode == U'\n' ||   // Line Feed
-           unicode == U'\r' ||   // Carriage Return
-           unicode == U'\u2028' || // Line Separator
-           unicode == U'\u2029';  // Paragraph Separator
-}
+//static bool isLineBreak(char32_t unicode) {
+//    return unicode == U'\n' ||   // Line Feed
+//           unicode == U'\r' ||   // Carriage Return
+//           unicode == U'\u2028' || // Line Separator
+//           unicode == U'\u2029';  // Paragraph Separator
+//}
 
 //static bool isUnicodeSpace(char32_t ch) {
 //    static const std::unordered_set<char32_t> unicode_spaces = {
@@ -577,23 +578,23 @@ static bool isLineBreak(char32_t unicode) {
 //    return unicode_spaces.find(ch) != unicode_spaces.end();
 //}
 
-static bool isEnglishPunctuation(char32_t ch) {
-    static const std::unordered_set<char32_t> englishPunctuationSet = {
-        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
-        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
-        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
-        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'    //中文，但是只占半个字符
-    };
-    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
-}
-
-static bool isChinesePunctuation(char32_t ch) {
-    static const std::unordered_set<char32_t> chinesePunctuationSet = {
-        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
-        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000'
-    };
-    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
-}
+//static bool isEnglishPunctuation(char32_t ch) {
+//    static const std::unordered_set<char32_t> englishPunctuationSet = {
+//        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
+//        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
+//        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
+//        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'    //中文，但是只占半个字符
+//    };
+//    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
+//}
+//
+//static bool isChinesePunctuation(char32_t ch) {
+//    static const std::unordered_set<char32_t> chinesePunctuationSet = {
+//        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
+//        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000'
+//    };
+//    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
+//}
 
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
   int visual_width = std::min(spec.width, spec.height) * content->fontSize;
@@ -683,12 +684,37 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
-movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, int leading/*纵向*/, int tracking/*横向*/, int boxWidth, bool indented) {
-  movie::ArticleParagraph p;
-  int lineCount = 1;
-  //模糊地计算每个段落的长度，不要求非常精准
-  int currentLineLength = 0;
+//use "GetLines" in TextRenderer.cpp to get the exact text lines
+std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
+    const TextDocument* textDocument, const TextPathOptions* pathOptions);
 
+int testTheTextLines(const std::string& fontFamilyName, const std::string& text, int fontSize, int leading, int tracking, int boxWidth) {
+  //test to get the exact text lines
+  auto textData = new TextDocument();
+  textData->fontSize = fontSize;
+  textData->text = text;
+  if (!fontFamilyName.empty()) {
+    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(fontFamilyName));     //set by json
+  }
+  textData->justification = pag::ParagraphJustification::LeftJustify;   //hard code
+  textData->leading = leading;
+  textData->tracking = std::max(std::min((int)std::round(tracking * 1000.0f / fontSize), 1000), 0);   //横向间距，protect tracking
+  //// box text will affect the real anchor point, so we can hard code it to the top-center of a paragraph(x=w/2, y=0)
+  textData->boxText = true;     //hard code
+  textData->boxTextSize = pag::Point::Zero();
+  // set the boxTextSize exactly same as the paragraph size, so that the real anchor point is the top-center
+  textData->boxTextSize.x = boxWidth;
+  textData->boxTextSize.y = 1920*1000;   //very big value, enough to carry the long text
+  textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
+  textData->firstBaseLine = 0;   //hard code
+  textData->avoidFirstPunctuation = true;
+  auto [lines, bounds] = GetLines(textData, nullptr);
+  delete textData;
+  return (int)lines.size();
+}
+
+movie::ArticleParagraph formatParagraph(const std::string& fontFamilyName, const std::string& text, int fontSize, 
+      int leading/*纵向*/, int tracking/*横向*/, int boxWidth, bool indented) {
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string unicodeStr = converter.from_bytes(text);
   if (indented) {
@@ -698,28 +724,11 @@ movie::ArticleParagraph formatParagraph(const std::string& text, int fontSize, i
     unicodeStr = indent + unicodeStr;
   }
 
-  for (auto it = unicodeStr.begin(); it != unicodeStr.end(); ++it) {
-    if (isLineBreak(*it)) {
-      ++lineCount;
-      currentLineLength = 0;
-    } else {
-      if (isEnglishPunctuation(*it)) {
-        currentLineLength += std::round((fontSize + tracking)*0.25);
-      } else if (isChinesePunctuation(*it)) {
-        currentLineLength += fontSize + tracking;
-      } else if (isEnglishChar(*it)) {
-        currentLineLength += std::round((fontSize + tracking)*0.5);
-      } else {
-        currentLineLength += fontSize + tracking;
-      }
-    }
-    if (currentLineLength > boxWidth) {
-      ++lineCount;
-      currentLineLength = fontSize + tracking;
-    }
-  }
+  movie::ArticleParagraph p;
   p.text = converter.to_bytes(unicodeStr);
-  p.heightInP = lineCount * leading;
+  //test to get the exact text lines
+  int lines = testTheTextLines(fontFamilyName, p.text, fontSize, leading, tracking, boxWidth);
+  p.heightInP = lines * leading;
   return p;
 }
 
@@ -731,8 +740,8 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
   //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int fontSize = std::round(std::min(width, height) * content->fontSize);
-  int leadingInP = std::round(content->verticalSpacing * fontSize) + fontSize;
-  int trackingInP = std::round(content->horizontalSpacing * fontSize);
+  int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;
+  int trackingInP = std::ceil(content->horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
   boxWidth -= std::round(content->horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = boxWidth - boxWidth % (fontSize+trackingInP);
@@ -875,7 +884,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     textData->boxTextSize.x = boxWidth;
     textData->boxTextSize.y = heightInP;
     textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
-    textData->firstBaseLine = fontSize;   //set firstBaseLine the same as font size
+    textData->firstBaseLine = 0;   //hardcode
     textData->avoidFirstPunctuation = true;
     
     //step 2: create text layer
@@ -1049,13 +1058,13 @@ void prepareArticleTrack(movie::ArticleTrack* articleTrack, int width, int heigh
   preProcessArticleText(articleTrack);
   auto texts = splitStringByNewline(articleTrack->content.text);
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
-  int leading = std::round(articleTrack->content.verticalSpacing * fontSize) + fontSize;
-  int tracking = std::round(articleTrack->content.horizontalSpacing * fontSize);
+  int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
+  int tracking = std::ceil(articleTrack->content.horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
   boxWidth -= std::round(articleTrack->content.horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = boxWidth - boxWidth % (fontSize+tracking);
   for (auto& t : texts) {
-    auto p = formatParagraph(t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
+    auto p = formatParagraph(articleTrack->content.fontFamilyName, t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
     articleTrack->content.paragraphs.push_back(p);
   }
 }

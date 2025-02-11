@@ -118,6 +118,24 @@ TextLayout CreateTextLayout(const TextDocument* textDocument,
   return layout;
 }
 
+static bool isEnglishPunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> englishPunctuationSet = {
+        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
+        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
+        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
+    };
+    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
+}
+
+static bool isChinesePunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> chinesePunctuationSet = {
+        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
+        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000',
+        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'
+    };
+    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
+}
+
 static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, size_t index,
                                      float scaleFactor, float maxWidth, float tracking,
                                      float* lineWidth) {
@@ -145,9 +163,11 @@ static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, si
   return index;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static float CalculateGlyphScale(const TextLayout* layout, const std::vector<GlyphInfo>& glyphInfos,
                                  float oldFontSize, float lineTop, float lineBottom,
-                                 float visibleTop, float visibleBottom, float* totalTextLines) {
+                                 float visibleTop, float visibleBottom, float* totalTextLines, bool avoidFirstPunctuation/*zzy*/) {
   auto maxWidth = layout->boxRect.width();
   auto fontSize = oldFontSize;
   while (fontSize > 5) {
@@ -169,6 +189,22 @@ static float CalculateGlyphScale(const TextLayout* layout, const std::vector<Gly
         canFit = false;
         break;
       }
+        
+      //zzy，避免第一个字符是标点符号
+      if (avoidFirstPunctuation) {
+        if (index < glyphCount)
+        {
+          std::string nextLineCharacter = glyphInfos[index].name;
+          std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+          std::u32string uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+          while(isEnglishPunctuation(uniNextLineCharacter[0]) || isChinesePunctuation(uniNextLineCharacter[0])) {
+            index--;
+            nextLineCharacter = glyphInfos[index].name;
+            uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+          }
+        }
+      }
+        
       baseLine += currentLineHeight;
       (*totalTextLines)++;
     }
@@ -179,8 +215,9 @@ static float CalculateGlyphScale(const TextLayout* layout, const std::vector<Gly
   }
   return fontSize / oldFontSize;
 }
+#pragma clang diagnostic pop
 
-static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfos, float fontSize) {
+static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfos, float fontSize, bool avoidFirstPunctuation/*zzy*/) {
   auto boxYOffset = layout->firstBaseLine - layout->boxRect.top;
   auto boxTextLines = floorf((layout->boxRect.height() - boxYOffset) / layout->lineGap) + 1;
   auto visibleTop = layout->firstBaseLine + layout->fontTop;
@@ -189,7 +226,7 @@ static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfo
   float totalTextLines = 0;
   auto scaleFactor =
       CalculateGlyphScale(layout, *glyphInfos, fontSize, layout->fontTop, layout->fontBottom,
-                          visibleTop, visibleBottom, &totalTextLines);
+                          visibleTop, visibleBottom, &totalTextLines, avoidFirstPunctuation/*zzy*/);
   if (scaleFactor != 1) {
     layout->glyphScale = scaleFactor;
     layout->firstBaseLine = visibleTop + -layout->fontTop * scaleFactor;
@@ -298,25 +335,6 @@ static float FindMiniAscent(const std::vector<GlyphInfo*>& line) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
-static bool isEnglishPunctuation(char32_t ch) {
-    static const std::unordered_set<char32_t> englishPunctuationSet = {
-        U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
-        U'(', U')', U'[', U']', U'{', U'}', U'-', U'_',
-        U'/', U'\\', U'@', U'#', U'&', U'*', U'%', U'+', U'=', U' ',
-    };
-    return englishPunctuationSet.find(ch) != englishPunctuationSet.end();
-}
-
-static bool isChinesePunctuation(char32_t ch) {
-    static const std::unordered_set<char32_t> chinesePunctuationSet = {
-        U'。', U'，', U'、', U'？', U'！', U'：', U'；',
-        U'（', U'）', U'【', U'】', U'《', U'》', U'〈', U'〉', U'～', U'\u3000',
-        U'“', U'”', U'‘', U'’', U'—', U'…', U'·'
-    };
-    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
-}
-
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds,
     float* firstLineMiniAscent, bool avoidFirstPunctuation/*zzy*/) {
@@ -396,7 +414,6 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
   }
   return lineList;
 }
-
 #pragma clang diagnostic pop
 
 static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
@@ -549,7 +566,9 @@ std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
   auto glyphInfos = CreateGlyphInfos(glyphList);
   auto textLayout = CreateTextLayout(textDocument, glyphList);
   if (textDocument->boxText) {
-    AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize);
+    //zzy, we should also avoid first punctuation in this fit function, or the "firstBaseLine" of textLayout is bigger than we expected.
+    //and it will affect the final text position
+    AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize, textDocument->avoidFirstPunctuation);
   }
   // 文字路径是根据路径重新计算Y轴的位置，这里 firstBaseLine 为零表示，
   // 首行文字的 baseline 从路径上沿法线方向往外排列
