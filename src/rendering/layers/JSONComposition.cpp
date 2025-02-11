@@ -181,38 +181,44 @@ int VideoContent::init(const std::string& tmpDir) {
     _localPath = path;
   }
 
-  // 初始化 FFmpeg 库
-  avformat_network_init();
+  if (_width == 0 || _height == 0 || _fps == 0) {
+    // 初始化 FFmpeg 库
+    avformat_network_init();
 
-  // 打开输入文件
-  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
-    std::cerr << "Could not open input file:" << _localPath << std::endl;
-    avformat_free_context(fmt_ctx);
-    return -1;
-  }
-
-  // 查找流信息
-  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-    std::cerr << "Could not find stream information" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    avformat_free_context(fmt_ctx);
-    return -1;
-  }
-
-  // 查找视频流
-  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
-    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-      video_stream_index = i;
-      break;
+    // 打开输入文件
+    if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
+      std::cerr << "Could not open input file:" << _localPath << std::endl;
+      avformat_free_context(fmt_ctx);
+      return -1;
     }
-  }
 
-  if (video_stream_index == -1) {
-    std::cerr << "Could not find a video stream" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    avformat_free_context(fmt_ctx);
-    return -1;
-  }
+    // 查找流信息
+    if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
+      std::cerr << "Could not find stream information" << std::endl;
+      avformat_close_input(&fmt_ctx);
+      avformat_free_context(fmt_ctx);
+      return -1;
+    }
+
+    int64_t duration = fmt_ctx->duration;
+    if (duration != AV_NOPTS_VALUE) {
+      _duration = std::floor((duration / (double)AV_TIME_BASE) * 1000);
+    }
+
+    // 查找视频流
+    for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
+      if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        video_stream_index = i;
+        break;
+      }
+    }
+
+    if (video_stream_index == -1) {
+      std::cerr << "Could not find a video stream" << std::endl;
+      avformat_close_input(&fmt_ctx);
+      avformat_free_context(fmt_ctx);
+      return -1;
+    }
 
     // Get codec parameters for the video stream
     AVStream* video_stream = fmt_ctx->streams[video_stream_index];
@@ -227,7 +233,9 @@ int VideoContent::init(const std::string& tmpDir) {
 
     avformat_close_input(&fmt_ctx);
     avformat_free_context(fmt_ctx);
-    return 0;
+  }
+  
+  return 0;
 }
 
 int AudioContent::init(const std::string& tmpDir) {
@@ -732,7 +740,24 @@ movie::ArticleParagraph formatParagraph(const std::string& fontFamilyName, const
   return p;
 }
 
-std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec, int duration) {
+int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height) {
+  //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
+  //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
+  int articleHeight = 0;
+  int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
+  //vertial space in pixels
+  int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
+  for (auto& p : articleTrack->content.paragraphs) {
+    articleHeight += p.heightInP + spaceInP;
+  }
+  float speedInP = height * articleTrack->content.speed;
+  int duration = std::round((float)articleHeight * 1000 / speedInP);
+  duration += articleTrack->content.freezeBeginTime;
+  duration += articleTrack->content.freezeEndTime;
+  return duration;
+}
+
+std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack, const movie::MovieSpec& spec) {
   std::vector<Layer*> layers;
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
@@ -752,6 +777,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   //how many frames of the "begin freeze" will occupy
   int framesOfBeginFreeze = std::round(content->freezeBeginTime / 1000.0f * spec.fps);
   int framesOfEndFreeze = std::round(content->freezeEndTime / 1000.0f * spec.fps);
+  int duration = getArticleDuration(articleTrack, width, height);
   int totalFrames = std::round(duration / 1000.0f * spec.fps);
   //the frame point before the "end freeze" starts
   int framesBeforeEndFreeze = totalFrames - framesOfEndFreeze;
@@ -1044,23 +1070,6 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
   return audioSource;
 }
 
-int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height) {
-  //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
-  //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
-  int articleHeight = 0;
-  int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
-  //vertial space in pixels
-  int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
-  for (auto& p : articleTrack->content.paragraphs) {
-    articleHeight += p.heightInP + spaceInP;
-  }
-  float speedInP = height * articleTrack->content.speed;
-  int duration = std::round((float)articleHeight * 1000 / speedInP);
-  duration += articleTrack->content.freezeBeginTime;
-  duration += articleTrack->content.freezeEndTime;
-  return duration;
-}
-
 void preProcessArticleText(movie::ArticleTrack* articleTrack) {
   std::string new_text = articleTrack->content.text;
   //删除英文空格
@@ -1086,7 +1095,7 @@ void prepareArticleTrack(movie::ArticleTrack* articleTrack, int width, int heigh
   }
 }
 
-void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps) {
+void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps, const std::string& tmpDir) {
   printf("prepareAllTracks, duration:%d\n", story->duration);
 
   //check if article track exists
@@ -1102,10 +1111,19 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   }
   //modify lifetime and duration
   if (articleDuration > 0) {
+    int totalDuration = articleDuration;
     for (auto& track : story->tracks) {
       track->lifetime.end_time = articleDuration;
+      if (track->type == "video") {
+        auto videoTrack = static_cast<movie::VideoTrack*>(track);
+        if (videoTrack->content.init(tmpDir) == 0) {
+          track->lifetime.begin_time = articleDuration;
+          track->lifetime.end_time = articleDuration + videoTrack->content.duration();
+          totalDuration = articleDuration + videoTrack->content.duration();
+        }
+      }
     }
-    story->duration = articleDuration;
+    story->duration = totalDuration;
   }
 
   //add water mark
@@ -1143,20 +1161,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
       return nullptr;
     }
     movie::Story* story = &movie.video.stories[0];
-
-    //prepare all tracks for rendering(including article tracks and water mark)
-    prepareAllTracks(story, movie.video.width, movie.video.height, movie.video.fps);
-
-    //last check
-    if (story->duration == 0) {
-      std::cerr << "Error: story duration is zero" << std::endl;
-      return nullptr;
-    }
-    printf("JSONComposition::Load, json to movie\n");
-    if (progressCB) {
-      progressCB(0);
-    }
-
+    
     std::string tmpDir;
     if (tmp_dir.empty()) {
       std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
@@ -1177,6 +1182,19 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     } else {
       tmpDir = tmp_dir;
       printf("customer tmp dir: %s\n", tmpDir.c_str());
+    }
+
+    //prepare all tracks for rendering(including article tracks and water mark)
+    prepareAllTracks(story, movie.video.width, movie.video.height, movie.video.fps, tmpDir);
+
+    //last check
+    if (story->duration == 0) {
+      std::cerr << "Error: story duration is zero" << std::endl;
+      return nullptr;
+    }
+    printf("JSONComposition::Load, json to movie\n");
+    if (progressCB) {
+      progressCB(0);
     }
 
     auto vecComposition = new VectorComposition();
@@ -1276,7 +1294,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto track = static_cast<movie::ArticleTrack*>(t);
             track->content.init(tmpDir);
             printf("article track, count:%zu\n", track->content.text.size());
-            auto layers = createArticleRelatedLayers(track, movie.video, story->duration);
+            auto layers = createArticleRelatedLayers(track, movie.video);
             for (auto layer : layers) {
               vecComposition->layers.push_back(layer);
               if (layer->type() == LayerType::Text) {

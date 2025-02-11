@@ -55,11 +55,13 @@ namespace movie {
         int width() const { return _width; }
         int height() const { return _height; }
         int fps() const { return _fps; }
+        int duration() const { return _duration; }
         std::string localPath() const { return _localPath; }
     private:
         int _width = 0;
         int _height = 0;
         int _fps = 0;
+        int _duration = 0;
         std::string _localPath;
     };
     void from_json(const json& j, VideoContent& v) {
