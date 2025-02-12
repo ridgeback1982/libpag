@@ -326,26 +326,25 @@ int ImageContent::init(const std::string& tmpDir) {
 }
 
 int ArticleContent::init(const std::string& tmpDir) {
-  if (backgroundColor.empty()) {
-    if (!backgroundColorFromImage.empty()) {
-      bool remote = starts_with(backgroundColorFromImage, "http://") || starts_with(backgroundColorFromImage, "https://");
+  if (backgroundColor == "auto") {
+    if (!_bgcImageUrl.empty()) {
+      auto bgcLocalPath = _bgcImageUrl;
+      bool remote = starts_with(_bgcImageUrl, "http://") || starts_with(_bgcImageUrl, "https://");
       if (remote) {
           //create local path
-          _bgcImagePath = tmpDir + "/" + getFileNameFromUrl(backgroundColorFromImage);
+          bgcLocalPath = tmpDir + "/" + getFileNameFromUrl(_bgcImageUrl);
           
           //download to local path
-          printf("ArticleContent::init, will download %s to %s\n", backgroundColorFromImage.c_str(), _bgcImagePath.c_str());
+          printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
           auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-          if (curlDownload(backgroundColorFromImage, _bgcImagePath) < 0) {
+          if (curlDownload(_bgcImageUrl, bgcLocalPath) < 0) {
               return -1;
           }
           auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
           printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
-      } else {
-        _bgcImagePath = backgroundColorFromImage;
       }
       uint8_t r, g, b;
-      if (pickColorFromImage(_bgcImagePath, &r, &g, &b) == 0) {
+      if (pickColorFromImage(bgcLocalPath, &r, &g, &b) == 0) {
         float compensate = 0.8;
         r = r + std::ceil((255 - r) * compensate);
         g = g + std::ceil((255 - g) * compensate);
@@ -357,8 +356,15 @@ int ArticleContent::init(const std::string& tmpDir) {
         std::stringstream ss;
         ss << "rgb(" << (int)r << "," << (int)g << "," << int(b) << ")";
         backgroundColor = ss.str();
+        printf("ArticleContent::init, pick bgc:%s\n,", backgroundColor.c_str());
       }
     }
+  }
+
+  //final protection
+  if (backgroundColor == "auto") {
+    backgroundColor = "rgba(255,255,255,1)";
+    printf("ArticleContent::init, bgc final protection\n,");
   }
   return 0;
 }
@@ -721,7 +727,7 @@ int testTheTextLines(const std::string& fontFamilyName, const std::string& text,
   return (int)lines.size();
 }
 
-movie::ArticleParagraph formatParagraph(const std::string& fontFamilyName, const std::string& text, int fontSize, 
+movie::ArticleParagraph generateParagraph(const std::string& fontFamilyName, const std::string& text, int fontSize, 
       int leading/*纵向*/, int tracking/*横向*/, int boxWidth, bool indented) {
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string unicodeStr = converter.from_bytes(text);
@@ -1080,8 +1086,13 @@ void preProcessArticleText(movie::ArticleTrack* articleTrack) {
   articleTrack->content.text = new_text;
 }
 
-void prepareArticleTrack(movie::ArticleTrack* articleTrack, int width, int height) {
+void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
+  //step 1: pro-process text
+  std::cout << "prepareArticleTrack, pre-process text" << std::endl;
   preProcessArticleText(articleTrack);
+
+  //step 2: split text into paragraphs
+  std::cout << "prepareArticleTrack, split to paragraphs" << std::endl;
   auto texts = splitStringByNewline(articleTrack->content.text);
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
@@ -1090,8 +1101,34 @@ void prepareArticleTrack(movie::ArticleTrack* articleTrack, int width, int heigh
   boxWidth -= std::round(articleTrack->content.horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = boxWidth - boxWidth % (fontSize+tracking);
   for (auto& t : texts) {
-    auto p = formatParagraph(articleTrack->content.fontFamilyName, t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
+    auto p = generateParagraph(articleTrack->content.fontFamilyName, t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
     articleTrack->content.paragraphs.push_back(p);
+  }
+
+  //step 3: handle other variables
+  if (articleTrack->content.backgroundColor == "auto") {
+    //search the possible background image
+    std::cout << "prepareArticleTrack, searching for background image" << std::endl;
+    for (auto& track : story->tracks) {
+      if (track->type == "image") {
+        auto imageTrack = static_cast<movie::ImageTrack*>(track);
+        auto location = imageTrack->content.location;
+        if (
+            (std::abs(location.center_x - 0.5f) < 0.01f && std::abs(location.center_y - 0.5f) < 0.01f) &&
+            (std::abs(location.w - 1.0f) < 0.01f && std::abs(location.h - 1.0f) < 0.01f) &&
+            imageTrack->zorder < articleTrack->zorder
+        ) {
+          //find the possible background image
+          articleTrack->content._bgcImageUrl = imageTrack->content.path;
+          std::cout << "prepareArticleTrack, got cha:" << imageTrack->content.path << std::endl;
+          break;
+        } else {
+          std::cout << "prepareArticleTrack, pass it:" << imageTrack->content.path 
+            << ", center_x:" << location.center_x << ", center_y:" << location.center_y 
+            << ", w:" << location.w << ", h:" << location.h << ", zorder:" << imageTrack->zorder << std::endl;
+        }
+      }
+    }
   }
 }
 
@@ -1103,22 +1140,27 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       movie::ArticleTrack* articleTrack = static_cast<movie::ArticleTrack*>(track);
-      prepareArticleTrack(articleTrack, width, height);
+      prepareArticleTrack(story, articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
       printf("article duration:%d\n", articleDuration);
       break;
     }
   }
-  //modify lifetime and duration
+  //modify lifetime and duration, if article exists
   if (articleDuration > 0) {
     int totalDuration = articleDuration;
     for (auto& track : story->tracks) {
+      //rewrite all track's lifetime
+      track->lifetime.begin_time = 0;
       track->lifetime.end_time = articleDuration;
       if (track->type == "video") {
         auto videoTrack = static_cast<movie::VideoTrack*>(track);
+        //init video to get its duration
         if (videoTrack->content.init(tmpDir) == 0) {
+          //make the video at the end of article
           track->lifetime.begin_time = articleDuration;
           track->lifetime.end_time = articleDuration + videoTrack->content.duration();
+          //add video duration
           totalDuration = articleDuration + videoTrack->content.duration();
         }
       }
