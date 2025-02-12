@@ -129,11 +129,26 @@ int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, ui
       return -1;
     }
     float offsetRatio = 0.1f;
-    int samples[4][2] = {
+    int samples[][2] = {
         {(int)std::round(width * offsetRatio),             (int)std::round(height * offsetRatio)},
         {width - (int)std::round(width * offsetRatio),     (int)std::round(height * offsetRatio)},
         {(int)std::round(width * offsetRatio),             height - (int)std::round(height * offsetRatio)},
-        {width - (int)std::round(width * offsetRatio),     height - (int)std::round(height * offsetRatio)}
+        {width - (int)std::round(width * offsetRatio),     height - (int)std::round(height * offsetRatio)},
+
+        {(int)std::round(width * offsetRatio * 2),             (int)std::round(height * offsetRatio * 2)},
+        {width - (int)std::round(width * offsetRatio * 2),     (int)std::round(height * offsetRatio * 2)},
+        {(int)std::round(width * offsetRatio * 2),             height - (int)std::round(height * offsetRatio * 2)},
+        {width - (int)std::round(width * offsetRatio * 2),     height - (int)std::round(height * offsetRatio * 2)},
+        
+        {(int)std::round(width * offsetRatio * 3),             (int)std::round(height * offsetRatio * 3)},
+        {width - (int)std::round(width * offsetRatio * 3),     (int)std::round(height * offsetRatio * 3)},
+        {(int)std::round(width * offsetRatio * 3),             height - (int)std::round(height * offsetRatio * 3)},
+        {width - (int)std::round(width * offsetRatio * 3),     height - (int)std::round(height * offsetRatio * 3)},
+        
+        {(int)std::round(width * offsetRatio * 4),             (int)std::round(height * offsetRatio * 4)},
+        {width - (int)std::round(width * offsetRatio * 4),     (int)std::round(height * offsetRatio * 4)},
+        {(int)std::round(width * offsetRatio * 4),             height - (int)std::round(height * offsetRatio * 4)},
+        {width - (int)std::round(width * offsetRatio * 4),     height - (int)std::round(height * offsetRatio * 4)}
     };
     int rows = sizeof(samples) / sizeof(samples[0]);
     int tr = 0, tg = 0, tb = 0;
@@ -325,6 +340,89 @@ int ImageContent::init(const std::string& tmpDir) {
   return 0;
 }
 
+struct RGB {
+    double r; // 0-255
+    double g; // 0-255
+    double b; // 0-255
+};
+
+struct HSV {
+    double h; // 0-360 (色相)
+    double s; // 0-1   (饱和度)
+    double v; // 0-1   (明度)
+};
+
+// RGB 转 HSV
+static HSV rgbToHsv(const RGB& rgb) {
+    double r = rgb.r / 255.0;
+    double g = rgb.g / 255.0;
+    double b = rgb.b / 255.0;
+
+    double maxVal = std::max({r, g, b});
+    double minVal = std::min({r, g, b});
+    double delta = maxVal - minVal;
+
+    HSV hsv;
+    hsv.v = maxVal;
+
+    // 计算饱和度
+    hsv.s = (maxVal == 0) ? 0 : (delta / maxVal);
+
+    // 计算色相
+    if (delta == 0) {
+        hsv.h = 0; // 灰色（无色相）
+    } else {
+        if (maxVal == r) {
+            hsv.h = 60 * fmod(((g - b) / delta), 6);
+        } else if (maxVal == g) {
+            hsv.h = 60 * (((b - r) / delta) + 2);
+        } else if (maxVal == b) {
+            hsv.h = 60 * (((r - g) / delta) + 4);
+        }
+
+        if (hsv.h < 0) {
+            hsv.h += 360; // 确保色相为正
+        }
+    }
+
+    return hsv;
+}
+
+// HSV 转 RGB
+static RGB hsvToRgb(const HSV& hsv) {
+    double h = hsv.h;
+    double s = hsv.s;
+    double v = hsv.v;
+
+    double c = v * s; // 色调的强度
+    double x = c * (1 - fabs(fmod(h / 60.0, 2) - 1));
+    double m = v - c;
+
+    double r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 60) {
+        r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+        r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+        r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+        r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+        r = x; g = 0; b = c;
+    } else if (h >= 300 && h < 360) {
+        r = c; g = 0; b = x;
+    }
+
+    // 调整到 [0, 255] 范围
+    RGB rgb;
+    rgb.r = (r + m) * 255;
+    rgb.g = (g + m) * 255;
+    rgb.b = (b + m) * 255;
+
+    return rgb;
+}
+
 int ArticleContent::init(const std::string& tmpDir) {
   if (backgroundColor == "auto") {
     if (!_bgcImageUrl.empty()) {
@@ -345,14 +443,15 @@ int ArticleContent::init(const std::string& tmpDir) {
       }
       uint8_t r, g, b;
       if (pickColorFromImage(bgcLocalPath, &r, &g, &b) == 0) {
-        float compensate = 0.8;
-        r = r + std::ceil((255 - r) * compensate);
-        g = g + std::ceil((255 - g) * compensate);
-        b = b + std::ceil((255 - b) * compensate);
-        uint8_t max = std::max(std::max(r, g), b);
-        r += 255 - max;
-        g += 255 - max;
-        b += 255 - max;
+        RGB rgb = {(double)r, (double)g, (double)b};
+        // https://www.jyshare.com/front-end/868/   在线调整颜色
+        HSV hsv = rgbToHsv(rgb);    //色相不变
+        hsv.s = 0.05;               //低饱和度
+        hsv.v = 0.95;               //高亮度，向白色靠近
+        RGB newRGB = hsvToRgb(hsv);
+        r = (uint8_t)newRGB.r;
+        g = (uint8_t)newRGB.g; 
+        b = (uint8_t)newRGB.b;
         std::stringstream ss;
         ss << "rgb(" << (int)r << "," << (int)g << "," << int(b) << ")";
         backgroundColor = ss.str();
@@ -753,10 +852,14 @@ int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height)
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   //vertial space in pixels
   int spaceInP = std::round(articleTrack->content.paragraphSpacing * fontSize);
+  float speedInP = height * articleTrack->content.speed;
   for (auto& p : articleTrack->content.paragraphs) {
     articleHeight += p.heightInP + spaceInP;
   }
-  float speedInP = height * articleTrack->content.speed;
+  articleHeight -= spaceInP;  //minus the last space
+
+  articleHeight -= (fontSize + spaceInP);  //workround: minus one line height to make it look better when the last line stops
+
   int duration = std::round((float)articleHeight * 1000 / speedInP);
   duration += articleTrack->content.freezeBeginTime;
   duration += articleTrack->content.freezeEndTime;
