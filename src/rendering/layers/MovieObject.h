@@ -11,6 +11,7 @@ namespace movie {
         float h = 0;
         float center_x = 0;
         float center_y = 0;
+        std::string fitMode = "";       //"fill", "center-contain", "right-top-contain"
         static void from_json(const json& j, Location& l) {
             if (j.contains("w"))
                 j.at("w").get_to(l.w);
@@ -18,6 +19,8 @@ namespace movie {
                 j.at("h").get_to(l.h);
             j.at("center_x").get_to(l.center_x);
             j.at("center_y").get_to(l.center_y);
+            if (j.contains("fitMode"))
+                j.at("fitMode").get_to(l.fitMode);
         }
     };
     static void from_json(const json& j, Location& l) {

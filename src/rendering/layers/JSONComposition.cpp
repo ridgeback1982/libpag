@@ -346,6 +346,13 @@ struct RGB {
     double b; // 0-255
 };
 
+struct RGBA {
+    uint8_t r; // 0-255
+    uint8_t g; // 0-255
+    uint8_t b; // 0-255 
+    uint8_t a; // 0-255
+};
+
 struct HSV {
     double h; // 0-360 (色相)
     double s; // 0-1   (饱和度)
@@ -442,6 +449,7 @@ int ArticleContent::init(const std::string& tmpDir) {
           printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
       }
       uint8_t r, g, b;
+      float alpha = 0.4;
       if (pickColorFromImage(bgcLocalPath, &r, &g, &b) == 0) {
         RGB rgb = {(double)r, (double)g, (double)b};
         // https://www.jyshare.com/front-end/868/   在线调整颜色
@@ -453,7 +461,7 @@ int ArticleContent::init(const std::string& tmpDir) {
         g = (uint8_t)newRGB.g; 
         b = (uint8_t)newRGB.b;
         std::stringstream ss;
-        ss << "rgb(" << (int)r << "," << (int)g << "," << int(b) << ")";
+        ss << "rgba(" << (int)r << "," << (int)g << "," << int(b) << "," << alpha << ")";
         backgroundColor = ss.str();
         printf("ArticleContent::init, pick bgc:%s\n,", backgroundColor.c_str());
       }
@@ -462,7 +470,7 @@ int ArticleContent::init(const std::string& tmpDir) {
 
   //final protection
   if (backgroundColor == "auto") {
-    backgroundColor = "rgba(255,255,255,1)";
+    backgroundColor = "rgba(255,255,255,0.4)";
     printf("ArticleContent::init, bgc final protection\n,");
   }
   return 0;
@@ -527,6 +535,49 @@ float findValueFromFloatPairSet(const FloatPairSet &fps, float key) {
     return fps.rbegin()->second;
 }
 
+#define CenterContainCode \
+  float obj_aspect = (float)obj_width / obj_height; \
+  float region_aspect = (float)region_width / region_height; \
+  int new_region_width = region_width; \
+  int new_region_height = region_height; \
+  if (obj_aspect > region_aspect) { \
+    new_region_height = (int)(region_width / obj_aspect); \
+  } else { \
+    new_region_width = (int)(region_height * obj_aspect); \
+  }
+
+void fitLocation(movie::Location& location, int obj_width, int obj_height, int screen_width, int screen_height) {
+  if (location.fitMode.empty()) {
+    return;
+  }
+  int region_width = screen_width * location.w;
+  int region_height = screen_height * location.h;
+  int center_x = screen_width * location.center_x;
+  int center_y = screen_height * location.center_y;
+  if (location.fitMode == "fill") {
+    //todo: 实现fill模式，默认就是“中心”充满
+  } else if (location.fitMode == "center-contain") {
+    //普通的contain模式，左右或者上下留黑边
+    CenterContainCode;
+    location.w = (float)new_region_width / screen_width;
+    location.h = (float)new_region_height / screen_height;
+  } else if (location.fitMode == "right-top-contain") {
+    CenterContainCode;
+    //在"center-contain"的基础上，移动到右上角，即左下角留黑边
+    center_x += int((region_width - new_region_width) / 2);        //go to right so "+"
+    center_y -= int((region_height - new_region_height) / 2);      //go to top so "-"
+    location.center_x = (float)center_x / screen_width;
+    location.center_y = (float)center_y / screen_height;
+    location.w = (float)new_region_width / screen_width;
+    location.h = (float)new_region_height / screen_height;
+  } else {
+    //not support
+    std::cerr << "not support fitMode:" << location.fitMode << std::endl;
+  }
+
+  return;
+}
+
 PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec) {
     int visual_width = spec.width * track->content.location.w;   //visual width, not video og width
     int visual_height = spec.height * track->content.location.h;
@@ -575,18 +626,17 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 }
 
 //rgb(216, 27, 67) or rgba(255,255,255,1) or #FFF
-Color translateColor(const std::string& color_string) {
-  Color c = pag::White;
-//  float alpha = 1.0f;
+movie::RGBA translateColor(const std::string& color_string) {
+  movie::RGBA color = {255, 255, 255, 255};
   if (movie::starts_with(color_string, "rgba")) {
     std::regex regex_pattern(R"(rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d+(\.\d+)?)\s*\))");
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
         // 提取 RGB 分量
-        c.red = std::stoi(match[1].str());
-        c.green = std::stoi(match[2].str());
-        c.blue = std::stoi(match[3].str());
-//        alpha = std::stof(match[4].str());
+        color.r = std::stoi(match[1].str());
+        color.g = std::stoi(match[2].str());
+        color.b = std::stoi(match[3].str());
+        color.a = std::stof(match[4].str()) * 255;
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
@@ -595,9 +645,9 @@ Color translateColor(const std::string& color_string) {
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
         // 提取 RGB 分量
-        c.red = std::stoi(match[1].str());
-        c.green = std::stoi(match[2].str());
-        c.blue = std::stoi(match[3].str());
+        color.r = std::stoi(match[1].str());
+        color.g = std::stoi(match[2].str());
+        color.b = std::stoi(match[3].str());
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
@@ -610,14 +660,14 @@ Color translateColor(const std::string& color_string) {
         std::string hex = match[1]; // 提取颜色部分
         if (hex.size() == 3) {
             // 如果是简写形式，例如 #FFF
-            c.red = std::stoi(std::string(2, hex[0]), nullptr, 16);
-            c.green = std::stoi(std::string(2, hex[1]), nullptr, 16);
-            c.blue = std::stoi(std::string(2, hex[2]), nullptr, 16);
+            color.r = std::stoi(std::string(2, hex[0]), nullptr, 16);
+            color.g = std::stoi(std::string(2, hex[1]), nullptr, 16);
+            color.b = std::stoi(std::string(2, hex[2]), nullptr, 16);
         } else if (hex.size() == 6) {
             // 如果是标准形式，例如 #FFFFFF
-            c.red = std::stoi(hex.substr(0, 2), nullptr, 16);
-            c.green = std::stoi(hex.substr(2, 2), nullptr, 16);
-            c.blue = std::stoi(hex.substr(4, 2), nullptr, 16);
+            color.r = std::stoi(hex.substr(0, 2), nullptr, 16);
+            color.g = std::stoi(hex.substr(2, 2), nullptr, 16);
+            color.b = std::stoi(hex.substr(4, 2), nullptr, 16);
         } else {
             std::cerr << "Invalid color code format." << std::endl;
         }
@@ -625,7 +675,7 @@ Color translateColor(const std::string& color_string) {
         std::cerr << "Invalid color code: " << color_string << std::endl;
     }
   }
-  return c;
+  return color;
 }
 
 #pragma clang diagnostic push
@@ -730,11 +780,13 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
     textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
   }
   if (!content->textColor.empty()) {
-    textData->fillColor = translateColor(content->textColor);
+    auto c = translateColor(content->textColor);
+    textData->fillColor = Color{c.r, c.g, c.b};
   }
   if (!content->stroke.empty()) {
     textData->applyStroke = true;
-    textData->strokeColor = translateColor(content->stroke);
+    auto c = translateColor(content->stroke);
+    textData->strokeColor = Color{c.r, c.g, c.b};
     textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
     textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
     textData->tracking = textData->strokeWidth * 1000 * 0.7 / textData->fontSize;   //横向间距，如果使用了外描边
@@ -897,7 +949,8 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
 
   //step 1: create bgc layer(background color)
   if (!content->backgroundColor.empty()) {
-    auto bgColor = translateColor(content->backgroundColor);
+    auto c = translateColor(content->backgroundColor);
+    auto bgColor = Color{c.r, c.g, c.b};
     auto solidLayer = new SolidLayer();
     solidLayer->id = UniqueID::Next();
     solidLayer->startTime = 0;      //hard code
@@ -905,6 +958,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     solidLayer->transform = Transform2D::MakeDefault().release();
     solidLayer->transform->anchorPoint->value.set(visibleMiddleX, visibleMiddleY);
     solidLayer->transform->position->value.set(visibleMiddleX, visibleMiddleY);
+    solidLayer->transform->opacity = new Property<Opacity>(c.a);      //hard code
     solidLayer->timeRemap = new Property<float>(0);      //hard code
     solidLayer->name = "纯色背景";
     //暂时忽略蒙板masks，来年再做
@@ -1006,11 +1060,13 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
       textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
-      textData->fillColor = translateColor(content->textColor);
+      auto c = translateColor(content->textColor);
+      textData->fillColor = Color{c.r, c.g, c.b};
     }
     if (!content->stroke.empty()) {
       textData->applyStroke = true;
-      textData->strokeColor = translateColor(content->stroke);
+      auto c = translateColor(content->stroke);
+      textData->strokeColor = Color{c.r, c.g, c.b};
       textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
       textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
     }
@@ -1407,6 +1463,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto track = static_cast<movie::ImageTrack*>(t);
             track->content.init(tmpDir);
             printf("image track, path:%s\n", track->content.path.c_str());
+            fitLocation(track->content.location, track->content.width(), track->content.height(), movie.video.width, movie.video.height);
             auto layer = createImageLayer(track, movie.video);
             vecComposition->layers.push_back(layer);
             auto pagImageLayer = std::make_shared<PAGImageLayer>(nullptr, layer);
