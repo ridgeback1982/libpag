@@ -387,6 +387,7 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     find_package(CURL REQUIRED)
     list(APPEND PAG_SHARED_LIBS ${CURL_LIBRARIES})
     list(APPEND PAG_INCLUDES ${CURL_INCLUDE_DIRS})
+    list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/include)
     file(GLOB_RECURSE UTILS_FILES src/utils/linux/*.*)
     list(APPEND PAG_FILES ${UTILS_FILES})
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavcodec.so 
@@ -395,6 +396,13 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavutil.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswscale.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libswresample.so)
+    list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_core.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_features2d.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_flann.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_calib3d.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_imgproc.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_imgcodecs.so
+                                ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/linux/libopencv_objdetect.so)
     
     message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
     list(APPEND PAG_COMPILE_OPTIONS -fPIC -pthread)

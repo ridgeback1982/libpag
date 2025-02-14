@@ -63,6 +63,7 @@ extern "C" {
 #if defined(__linux__)
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "rendering/utils/media/CVImageTool.h"
 #elif defined(__APPLE__) && defined(__MACH__)
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -431,23 +432,27 @@ static RGB hsvToRgb(const HSV& hsv) {
 }
 
 int ArticleContent::init(const std::string& tmpDir) {
-  if (backgroundColor == "auto") {
-    if (!_bgcImageUrl.empty()) {
-      auto bgcLocalPath = _bgcImageUrl;
-      bool remote = starts_with(_bgcImageUrl, "http://") || starts_with(_bgcImageUrl, "https://");
-      if (remote) {
-          //create local path
-          bgcLocalPath = tmpDir + "/" + getFileNameFromUrl(_bgcImageUrl);
-          
-          //download to local path
-          printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
-          auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-          if (curlDownload(_bgcImageUrl, bgcLocalPath) < 0) {
-              return -1;
-          }
-          auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-          printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
-      }
+  std::string bgcLocalPath;
+  if (!_bgcImageUrl.empty()) {
+    bgcLocalPath = _bgcImageUrl;
+    bool remote = starts_with(_bgcImageUrl, "http://") || starts_with(_bgcImageUrl, "https://");
+    if (remote) {
+        //create local path
+        bgcLocalPath = tmpDir + "/" + getFileNameFromUrl(_bgcImageUrl);
+        
+        //download to local path
+        printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
+        auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+        if (curlDownload(_bgcImageUrl, bgcLocalPath) < 0) {
+            return -1;
+        }
+        auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+        printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
+    }
+  }
+
+  if (!bgcLocalPath.empty()) {
+    if (backgroundColor == "auto") {
       uint8_t r, g, b;
       float alpha = 0.4;
       if (pickColorFromImage(bgcLocalPath, &r, &g, &b) == 0) {
@@ -463,15 +468,24 @@ int ArticleContent::init(const std::string& tmpDir) {
         std::stringstream ss;
         ss << "rgba(" << (int)r << "," << (int)g << "," << int(b) << "," << alpha << ")";
         backgroundColor = ss.str();
-        printf("ArticleContent::init, pick bgc:%s\n,", backgroundColor.c_str());
+        printf("ArticleContent::init, pick bgc:%s\n", backgroundColor.c_str());
       }
+    } else {
+  #if defined(__linux__)
+      printf("ArticleContent::init, check if bgi has rect frame\n");
+      if (pag::CVImageTool::hasRectFrameInside(bgcLocalPath)) {
+        //if there is a rectangle frame(边框) in the bgi, bgc will be useless
+        //so hard code it to totally transparent(any color)
+        backgroundColor = "rgba(255,255,255,0.0)";
+        printf("ArticleContent::init, make bgc totally transparent\n");
+      }
+  #endif
     }
   }
-
   //final protection
   if (backgroundColor == "auto") {
-    backgroundColor = "rgba(255,255,255,0.4)";
-    printf("ArticleContent::init, bgc final protection\n,");
+    backgroundColor = "rgba(255,255,255,0.5)";
+    printf("ArticleContent::init, bgc final protection\n");
   }
   return 0;
 }
@@ -1265,7 +1279,11 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
   }
 
   //step 3: handle other variables
-  if (articleTrack->content.backgroundColor == "auto") {
+  bool search4BGI = (articleTrack->content.backgroundColor == "auto");
+#if defined(__linux__)
+  search4BGI = true;
+#endif
+  if (search4BGI) {
     //search the possible background image
     std::cout << "prepareArticleTrack, searching for background image" << std::endl;
     for (auto& track : story->tracks) {
