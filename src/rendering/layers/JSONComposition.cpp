@@ -568,6 +568,9 @@ void fitLocation(movie::Location& location, int obj_width, int obj_height, int s
   int region_height = screen_height * location.h;
   int center_x = screen_width * location.center_x;
   int center_y = screen_height * location.center_y;
+  if (obj_width == 0 || obj_height == 0 || region_width == 0 || region_height == 0) {
+    return;
+  }
   if (location.fitMode == "fill") {
     //todo: 实现fill模式，默认就是“中心”充满
   } else if (location.fitMode == "center-contain") {
@@ -937,8 +940,6 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   movie::ArticleContent* content = &articleTrack->content;
   int width = spec.width;
   int height = spec.height;
-  //tricky: 可以只考虑文章的长度，不用考虑第一段从哪个位置开始，最后一段在哪个位置结束。
-  //因为一般情况下第一段是从中间位置开始，所以结束也在中间位置结束
   int fontSize = std::round(std::min(width, height) * content->fontSize);
   int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;
   int trackingInP = std::ceil(content->horizontalSpacing * fontSize);
@@ -1110,26 +1111,26 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
       
     //step 3: create key frames for movement
     std::vector<Keyframe<pag::Point>*> keyframes = {};
+    Frame idealDuration = std::round((heightInP + spaceInP + height) / movePerFrame);
     if (frame < startPositionFrame) {
+      //first few paragrahs(have still times)
       textLayer->startTime = 0;
-      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame) - startPositionFrame + frame + framesOfBeginFreeze;
-      int staticX = visibleMiddleX;
-      int staticY = height - startPosition + std::round(frame * movePerFrame);
+      textLayer->duration = idealDuration - startPositionFrame + frame + framesOfBeginFreeze;
       //if the key frame's start time is bigger than the layer's start time, the layer is still until the key frame's start time
       //this is perfect for the "still and move" case
       auto keyFrame = new SingleEaseKeyframe<pag::Point>();
       keyFrame->startTime = textLayer->startTime + framesOfBeginFreeze;
       keyFrame->endTime = textLayer->startTime + textLayer->duration;
-      keyFrame->startValue = pag::Point::Make(staticX, staticY);                       //from bottom 
-      keyFrame->endValue = pag::Point::Make(staticX, - heightInP - spaceInP);          //to top
+      keyFrame->startValue = pag::Point::Make(visibleMiddleX, (int)(height - startPosition + std::round(frame * movePerFrame)));                       //from bottom 
+      keyFrame->endValue = pag::Point::Make(visibleMiddleX, - heightInP - spaceInP);          //to top
       keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
       keyframes.push_back(keyFrame);
     } else {
+      //after the first few paragrahs
       textLayer->startTime = frame - startPositionFrame + framesOfBeginFreeze;
-      textLayer->duration = std::round((heightInP + spaceInP + height) / movePerFrame);
       
       //cut the duration if it is beyond the "end freeze" point
-      if (textLayer->startTime + textLayer->duration > framesBeforeEndFreeze) {
+      if (textLayer->startTime + idealDuration > framesBeforeEndFreeze) {
         Frame cutDuration = framesBeforeEndFreeze - textLayer->startTime;
         //this text's lifetime go beyond the "end freeze" point and we could not let it move after the "end freeze" point 
         //so cut it by recalculating the key frame, and make it stop at the very "end freeze" point 
@@ -1149,13 +1150,14 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
         //so no need to cut it, and let it go
         auto keyFrame = new SingleEaseKeyframe<pag::Point>();
         keyFrame->startTime = textLayer->startTime;
-        keyFrame->endTime = textLayer->startTime + textLayer->duration;
+        keyFrame->endTime = textLayer->startTime + idealDuration;
         keyFrame->startValue = pag::Point::Make(visibleMiddleX, height);                    //from bottom
         keyFrame->endValue = pag::Point::Make(visibleMiddleX, - heightInP - spaceInP);      //to top
         keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
         keyframes.push_back(keyFrame);
+
+        textLayer->duration = idealDuration;
       }
-      
     }
     if (textLayer->transform->position) {
       delete textLayer->transform->position;
