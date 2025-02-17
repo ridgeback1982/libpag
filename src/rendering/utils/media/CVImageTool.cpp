@@ -45,8 +45,8 @@ bool CVImageTool::hasRectFrameInside(const std::string& path) {
 
             // 检查是否接近图片中心
             cv::Point imageCenter(img.cols / 2, img.rows / 2);
-            std::cout << "Find bounding reect, w:" << boundingRect.width << ", h:" << boundingRect.height
-                << ", x:" << boundingRect.x << ", y:" << boundingRect.y << std::endl;
+            std::cout << "Find bounding rect, x:" << boundingRect.x << ", y:" << boundingRect.y 
+                << ", w:" << boundingRect.width << ", h:" << boundingRect.height << std::endl;
             if (boundingRect.contains(imageCenter)) {
                 if (boundingRect.width > img.cols / 2 && boundingRect.height > img.rows / 2) {
                     std::cout << "Rectangle frame found at: "

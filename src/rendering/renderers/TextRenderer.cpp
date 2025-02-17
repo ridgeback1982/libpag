@@ -31,6 +31,7 @@
 #include <codecvt>
 #include <algorithm>
 #include <unordered_set>
+#include <iostream>
 
 namespace pag {
 
@@ -197,11 +198,18 @@ static float CalculateGlyphScale(const TextLayout* layout, const std::vector<Gly
           std::string nextLineCharacter = glyphInfos[index].name;
           std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
           std::u32string uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+          auto verifiedIndex = index;
           while(isEnglishPunctuation(uniNextLineCharacter[0]) || isChinesePunctuation(uniNextLineCharacter[0])) {
-            index--;
-            nextLineCharacter = glyphInfos[index].name;
+            if (verifiedIndex == 0) {
+              //the whole line ara all punctuations
+              verifiedIndex = index;
+              break;
+            }
+            verifiedIndex--;
+            nextLineCharacter = glyphInfos[verifiedIndex].name;
             uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
           }
+          index = verifiedIndex;
         }
       }
         
@@ -368,11 +376,18 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
         std::string nextLineCharacter = (*glyphInfos)[nextLineIndex].name;
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
         std::u32string uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
+        auto verifiedNextLineIndex = nextLineIndex;
         while(isEnglishPunctuation(uniNextLineCharacter[0]) || isChinesePunctuation(uniNextLineCharacter[0])) {
-          nextLineIndex--;
-          nextLineCharacter = (*glyphInfos)[nextLineIndex].name;
+          if (verifiedNextLineIndex == 0) {
+            //the whole line ara all punctuations
+            verifiedNextLineIndex = nextLineIndex;
+            break;
+          }
+          verifiedNextLineIndex--;
+          nextLineCharacter = (*glyphInfos)[verifiedNextLineIndex].name;
           uniNextLineCharacter = converter.from_bytes(nextLineCharacter);
         }
+        nextLineIndex = verifiedNextLineIndex;
       }
     }
       

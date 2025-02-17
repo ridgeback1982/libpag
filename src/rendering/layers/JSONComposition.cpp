@@ -911,6 +911,7 @@ movie::ArticleParagraph generateParagraph(const std::string& fontFamilyName, con
   //test to get the exact text lines
   int lines = testTheTextLines(fontFamilyName, p.text, fontSize, leading, tracking, boxWidth);
   p.heightInP = lines * leading;
+  // std::cout << "generateParagraph, get one, text:" << p.text << ", height:" << p.heightInP << std::endl;
   return p;
 }
 
@@ -1515,7 +1516,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         } else if (t->type == "article") {
             auto track = static_cast<movie::ArticleTrack*>(t);
             track->content.init(tmpDir);
-            printf("article track, count:%zu\n", track->content.text.size());
+            printf("article track, paragraph count:%zu\n", track->content.paragraphs.size());
             auto layers = createArticleRelatedLayers(track, movie.video);
             for (auto layer : layers) {
               vecComposition->layers.push_back(layer);
