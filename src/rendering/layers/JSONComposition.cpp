@@ -560,6 +560,17 @@ float findValueFromFloatPairSet(const FloatPairSet &fps, float key) {
     new_region_width = (int)(region_height * obj_aspect); \
   }
 
+#define FillCode \
+  float obj_aspect = (float)obj_width / obj_height; \
+  float region_aspect = (float)region_width / region_height; \
+  int new_region_width = region_width; \
+  int new_region_height = region_height; \
+  if (obj_aspect > region_aspect) { \
+    new_region_width = (int)(region_height * obj_aspect); \
+  } else { \
+    new_region_height = (int)(region_width / obj_aspect); \
+  }
+
 void fitLocation(movie::Location& location, int obj_width, int obj_height, int screen_width, int screen_height) {
   if (location.fitMode.empty()) {
     return;
@@ -572,10 +583,15 @@ void fitLocation(movie::Location& location, int obj_width, int obj_height, int s
     return;
   }
   if (location.fitMode == "fill") {
-    //todo: 实现fill模式，默认就是“中心”充满
+    //默认就是“中心”充满
+    FillCode;
+    //keep center unchanged
+    location.w = (float)new_region_width / screen_width;
+    location.h = (float)new_region_height / screen_height;
   } else if (location.fitMode == "center-contain") {
     //普通的contain模式，左右或者上下留黑边
     CenterContainCode;
+    //keep center unchanged
     location.w = (float)new_region_width / screen_width;
     location.h = (float)new_region_height / screen_height;
   } else if (location.fitMode == "right-top-contain") {
