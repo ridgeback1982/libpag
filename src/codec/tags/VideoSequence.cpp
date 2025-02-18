@@ -25,6 +25,7 @@ extern "C" {
     #include <libavcodec/avcodec.h>
     #include <libavformat/avformat.h>
     #include <libavutil/avutil.h>
+    #include <libavutil/display.h>
 }
 
 namespace pag {
@@ -181,6 +182,9 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
     }
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 //zzy
 VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const int targetFrames) {
   printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d, targetFrames:%d\n", filePath.c_str(), cutFrom, cutTo, targetFrames);
@@ -226,8 +230,22 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     return nullptr;
   }
 
+  AVStream *video_stream = fmt_ctx->streams[video_stream_index];
+  //Detect rotation from side data, by iterating through the side data to find the display matrix
+  for (int i = 0; i < video_stream->nb_side_data; i++) {
+    AVPacketSideData *side_data = &video_stream->side_data[i];
+    if (side_data->type == AV_PKT_DATA_DISPLAYMATRIX) {
+      // Extract the display matrix
+      int32_t *matrix = (int32_t *)side_data->data;
+      double theta = av_display_rotation_get(matrix);
+      sequence->rotation = static_cast<float>(theta);
+      printf("Video rotation: %f degrees\n", theta);
+      break;
+    }
+  }
+
   // 获取解码器
-  codec = avcodec_find_decoder(fmt_ctx->streams[video_stream_index]->codecpar->codec_id);
+  codec = avcodec_find_decoder(video_stream->codecpar->codec_id);
   if (!codec) {
     std::cerr << "Could not find codec for video stream" << std::endl;
     avformat_close_input(&fmt_ctx);
@@ -242,7 +260,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     return nullptr;
   }
 
-  if (avcodec_parameters_to_context(codec_ctx, fmt_ctx->streams[video_stream_index]->codecpar) < 0) {
+  if (avcodec_parameters_to_context(codec_ctx, video_stream->codecpar) < 0) {
     std::cerr << "Could not copy codec parameters to codec context" << std::endl;
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
@@ -257,17 +275,17 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     return nullptr;
   }
 
-  sequence->width = fmt_ctx->streams[video_stream_index]->codecpar->width;
-  sequence->height = fmt_ctx->streams[video_stream_index]->codecpar->height;
-  sequence->frameRate = fmt_ctx->streams[video_stream_index]->avg_frame_rate.num / fmt_ctx->streams[video_stream_index]->avg_frame_rate.den;
+  sequence->width = video_stream->codecpar->width;
+  sequence->height = video_stream->codecpar->height;
+  sequence->frameRate = video_stream->avg_frame_rate.num / video_stream->avg_frame_rate.den;
 
-  if (fmt_ctx->streams[video_stream_index]->nb_frames > 0 && fmt_ctx->streams[video_stream_index]->duration > 0) {
-    frame_interval = (fmt_ctx->streams[video_stream_index]->duration / fmt_ctx->streams[video_stream_index]->nb_frames);
+  if (video_stream->nb_frames > 0 && video_stream->duration > 0) {
+    frame_interval = (video_stream->duration / video_stream->nb_frames);
   }
 
   //seek to start frame and flush frames before
   float seekTarget = cutFrom/sequence->frameRate;
-//  int64_t seekTargetStreamTime = av_rescale_q(seekTarget * AV_TIME_BASE, AV_TIME_BASE_Q, fmt_ctx->streams[video_stream_index]->time_base);
+//  int64_t seekTargetStreamTime = av_rescale_q(seekTarget * AV_TIME_BASE, AV_TIME_BASE_Q, video_stream->time_base);
 //  if (av_seek_frame(fmt_ctx, video_stream_index, seekTargetStreamTime, AVSEEK_FLAG_BACKWARD) < 0) {
 //    printf("Seeking failed\n");
 //    return nullptr;
@@ -289,24 +307,21 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   }
 
   //read sps/pps
-  bool is_hevc = fmt_ctx->streams[video_stream_index]->codecpar->codec_id == AV_CODEC_ID_HEVC;
-  bool is_avc = fmt_ctx->streams[video_stream_index]->codecpar->codec_id == AV_CODEC_ID_H264;
+  uint8_t* extradata = video_stream->codecpar->extradata;
+  const int extradata_size = video_stream->codecpar->extradata_size;
+  bool is_hevc = video_stream->codecpar->codec_id == AV_CODEC_ID_HEVC;
+  bool is_avc = video_stream->codecpar->codec_id == AV_CODEC_ID_H264;
   //TBD: support other codecs, like hevc
   //hevc: parse to nal is supported, but pag decoder does not support it yet
   //vpx: not supported totally
-  if (is_avc == false) {
-    std::cerr << "Unsupported codec" << std::endl;
-    return nullptr;
-  }
-
-  uint8_t* extradata = fmt_ctx->streams[video_stream_index]->codecpar->extradata;
-  const int extradata_size = fmt_ctx->streams[video_stream_index]->codecpar->extradata_size;
   if (is_avc) {
+    sequence->codecType = VideoCodecType::AVC;
     parse_h264_extradata(extradata, extradata_size, sequence);
   } else if (is_hevc) {
+    sequence->codecType = VideoCodecType::HEVC;
     parse_h265_extradata(extradata, extradata_size, sequence);
   } else {
-    std::cerr << "Unsupported codec" << std::endl;
+    std::cerr << "Unsupported codec " << video_stream->codecpar->codec_id << std::endl;
     return nullptr;
   }
 
@@ -315,7 +330,6 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     std::cerr << "No SPS/PPS/VPS found" << std::endl;
     return nullptr;
   }
-  
 
   while (accuSrcFrames < cutTo - cutFrom) {
     if (av_read_frame(fmt_ctx, pkt) < 0) {
@@ -348,7 +362,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
         if (is_avc && (nal_type == 6/*SEI*/ || nal_type == 7/*SPS*/ || nal_type == 8/*PPS*/ || nal_type == 9/*AUD*/)) {
         } else if (is_hevc && (nal_type == 32/*VPS*/ || nal_type == 33/*SPS*/ || nal_type == 34/*PPS*/ || nal_type == 39/*SEI*/)) {
         } else {
-          //if hevc, 19 is I frame, 1 is p frame
+          //if hevc, 19/20 is I frame, 1 is p frame
           //if avc, 5 is I frame, 1 is p frame
           auto videoFrame = new VideoFrame();
           videoFrame->isKeyframe = (pkt->flags & AV_PKT_FLAG_KEY) != 0;
@@ -361,8 +375,6 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     av_packet_unref(pkt);
   }
 
-
-
   // 清理资源
   av_packet_free(&pkt);
   avcodec_free_context(&codec_ctx);
@@ -371,6 +383,8 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 
   return sequence;
 }
+
+#pragma clang diagnostic pop
 
 static void WriteByteDataWithoutStartCode(EncodeStream* stream, ByteData* byteData) {
   auto length = static_cast<uint32_t>(byteData->length());

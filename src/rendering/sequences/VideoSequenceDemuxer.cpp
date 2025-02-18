@@ -29,7 +29,14 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
     auto bytes = tgfx::Data::MakeWithoutCopy(header->data(), header->length());
     format.headers.push_back(std::move(bytes));
   }
-  format.mimeType = "video/avc";
+  //zzy, expand to hevc
+  if (sequence->codecType == VideoCodecType::AVC) {
+    format.mimeType = "video/avc";
+  } else if (sequence->codecType == VideoCodecType::HEVC) {
+    format.mimeType = "video/hevc";
+  } else {
+    format.mimeType = "video/unknown";
+  }
   format.colorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   format.duration = FrameToTime(sequence->duration(), sequence->frameRate);
   format.frameRate = sequence->frameRate;

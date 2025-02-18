@@ -43,6 +43,9 @@ class VideoDecoderFactory {
    */
   static const VideoDecoderFactory* SoftwareAVCDecoderFactory();
 
+  //zzy
+  static const VideoDecoderFactory* SoftwareHEVCDecoderFactory();
+
   /**
    * Returns true if a external software decoder is registered. We assume that it has better
    * performance than libavc.

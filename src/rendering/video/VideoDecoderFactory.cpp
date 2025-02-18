@@ -20,6 +20,7 @@
 #include <atomic>
 #include "SoftAVCDecoder.h"
 #include "FFAVCDecoder.h"
+#include "FFHEVCDecoder.h"
 #include "SoftwareDecoderWrapper.h"
 #include "base/utils/USE.h"
 #include "pag/pag.h"
@@ -82,26 +83,54 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
  protected:
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
+    if (format.mimeType == "video/avc") {
 #ifdef PAG_USE_LIBAVC
-    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
-    if (videoDecoder != nullptr) {
-      LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
-    }
+      videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
+      if (videoDecoder != nullptr) {
+        LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+      }
 #elif PAG_USE_FFAVC2
-    //zzy, use FFAvcDecoder instead
-    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFAVCDecoder>(), format);
-    if (videoDecoder != nullptr) {
-      LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");
-    }
+      //zzy, use FFAvcDecoder instead
+      videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFAVCDecoder>(), format);
+      if (videoDecoder != nullptr) {
+        LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");
+      }
 #else
-    USE(format);
+      USE(format);
 #endif
+    }
+
+    return videoDecoder;
+  }
+};
+
+class SoftwareHEVCDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
+    if (format.mimeType == "video/hevc") {
+#ifdef PAG_USE_FFHEVC
+      videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFHEVCDecoder>(), format);
+      if (videoDecoder != nullptr) {
+        LOGI("All other video decoders are not available, fallback to FFHEVCDecoder!");
+      }
+#else
+      USE(format);
+#endif
+    }
+
     return videoDecoder;
   }
 };
 
 static ExternalDecoderFactory externalDecoderFactory = {};
 static SoftwareAVCDecoderFactory softwareAVCDecoderFactory = {};
+static SoftwareHEVCDecoderFactory softwareHEVCDecoderFactory = {};    //zzy
 
 const VideoDecoderFactory* VideoDecoderFactory::ExternalDecoderFactory() {
   return &externalDecoderFactory;
@@ -109,6 +138,10 @@ const VideoDecoderFactory* VideoDecoderFactory::ExternalDecoderFactory() {
 
 const VideoDecoderFactory* VideoDecoderFactory::SoftwareAVCDecoderFactory() {
   return &softwareAVCDecoderFactory;
+}
+
+const VideoDecoderFactory* VideoDecoderFactory::SoftwareHEVCDecoderFactory() {
+  return &softwareHEVCDecoderFactory;
 }
 
 bool VideoDecoderFactory::HasExternalSoftwareDecoder() {

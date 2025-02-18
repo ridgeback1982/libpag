@@ -2309,6 +2309,8 @@ class PAG_API VideoFrame {
   ByteData* fileBytes = nullptr;
 };
 
+enum class VideoCodecType { AVC, HEVC };
+
 class PAG_API VideoSequence : public Sequence {
  public:
   ~VideoSequence() override;
@@ -2342,6 +2344,11 @@ class PAG_API VideoSequence : public Sequence {
   int32_t getVideoWidth() const;
 
   int32_t getVideoHeight() const;
+
+  //zzy
+  VideoCodecType codecType = VideoCodecType::AVC;
+  //zzy
+  float rotation = 0;
 
   RTTR_ENABLE(Sequence)
 };

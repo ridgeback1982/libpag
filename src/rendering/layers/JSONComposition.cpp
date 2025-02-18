@@ -58,6 +58,7 @@ extern "C" {
 #include <codecvt>
 #include <algorithm>
 #include <unordered_set>
+#include <utility>
 
 
 #if defined(__linux__)
@@ -614,17 +615,14 @@ void fitLocation(movie::Location& location, int obj_width, int obj_height, int s
 PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec) {
     int visual_width = spec.width * track->content.location.w;   //visual width, not video og width
     int visual_height = spec.height * track->content.location.h;
-    int video_width = track->content.width();
-    int video_height = track->content.height();
+    volatile int video_width = track->content.width();
+    volatile int video_height = track->content.height();
     int video_fps = track->content.fps();
     auto vidComposition = new VideoComposition();
     vidComposition->id = UniqueID::Next();
-    vidComposition->width = video_width;
-    vidComposition->height = video_height;
     vidComposition->frameRate = video_fps * track->content.speed;
     vidComposition->duration = LifetimeToFrameDuration(track->lifetime, vidComposition->frameRate);
     vidComposition->backgroundColor = {0, 0, 0};     //hard code
-
     int ogCutFrom = track->content.cutFrom * track->content.speed;
     int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
     auto videoSequence = ReadVideoSequenceFromFile(track->content.localPath(), 
@@ -637,6 +635,8 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     }
     videoSequence->frameRate = vidComposition->frameRate;   //modify fps of video sequence
     videoSequence->composition = vidComposition;
+    vidComposition->width = video_width;
+    vidComposition->height = video_height;
     vidComposition->sequences.push_back(videoSequence);
 
     auto vidPreComposeLayer = new PreComposeLayer();
@@ -649,9 +649,23 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     //set transform
     vidPreComposeLayer->transform->anchorPoint->value.set(video_width/2, video_height/2);
     vidPreComposeLayer->transform->position->value.set(spec.width*track->content.location.center_x, spec.height*track->content.location.center_y);
+    //check rotation
+    //我实验了多次，发现只能在这里颠倒宽高，不知道为啥。
+    //我本以为vidComposition->width也需要颠倒，transform->anchorPoint也需要颠倒，但是我试验了多次，结果都不对。我就不去扣那点源码了。
+    //既然试验证明前面两个不需要颠倒，我就不管了。但是试验证明这个地方需要颠倒，好吧。
+    int rotation = 360 - (int)videoSequence->rotation;
+    if (rotation % 360 == 90 || rotation % 360 == 270) {
+      //如果视频是需要旋转90度或270度，则需要颠倒宽高
+      std::swap(video_width, video_height);
+      std::cout << "createVideoLayer, video need rotate " << rotation << std::endl;
+    } else if (rotation % 360 == 180) {
+      std::cout << "createVideoLayer, video need rotate up side down " << rotation << std::endl;
+    } else {
+    }
     float scale_x = (float)visual_width/video_width;
     float scale_y = (float)visual_height/video_height;
     vidPreComposeLayer->transform->scale->value.set(scale_x, scale_y);
+    vidPreComposeLayer->transform->rotation = new Property<float>((float)rotation);
     vidPreComposeLayer->timeRemap = new Property<float>(0);      //hard code
     vidPreComposeLayer->composition = vidComposition;
 

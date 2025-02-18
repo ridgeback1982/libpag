@@ -26,6 +26,7 @@ option(PAG_USE_QT "Allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "Enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "Enable HarfBuzz support" OFF)
 option(PAG_USE_C "Enable c API" OFF)
+option(PAG_USE_FFHEVC "Enable FF HEVC decoder" ON)
 
 if (NOT MACOS AND NOT IOS AND NOT WEB)
     option(PAG_USE_FREETYPE "Allow use of embedded freetype library" ON)
@@ -100,6 +101,7 @@ message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_FRAMEWORK: ${PAG_BUILD_FRAMEWORK}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
 message("PAG_USE_FFAVC2: ${PAG_USE_FFAVC2}")
+message("PAG_USE_FFHEVC: ${PAG_USE_FFHEVC}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -179,6 +181,10 @@ endif ()
 
 if (PAG_USE_FFAVC2)
     list(APPEND PAG_DEFINES PAG_USE_FFAVC2)
+endif ()
+
+if (PAG_USE_FFHEVC)
+    list(APPEND PAG_DEFINES PAG_USE_FFHEVC)
 endif ()
 
 if (PAG_USE_QT)

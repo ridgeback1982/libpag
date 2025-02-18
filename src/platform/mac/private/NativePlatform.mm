@@ -41,7 +41,8 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
   // return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
   //         VideoDecoderFactory::SoftwareAVCDecoderFactory()};
   //zzy, test
-  return {VideoDecoderFactory::SoftwareAVCDecoderFactory()};
+  return {VideoDecoderFactory::SoftwareAVCDecoderFactory(),
+          VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
