@@ -187,6 +187,7 @@ void VideoReader::resetParams() {
 
 std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
   static const auto factories = Platform::Current()->getVideoDecoderFactories();
+  // printf("VideoReader::makeVideoDecoder, factory count:%d, index:%d\n", factories.size(), factoryIndex);
   while (factoryIndex < static_cast<int>(factories.size())) {
     auto factory = factories[factoryIndex];
     if (factory->isHardwareBacked() && preferSoftware) {
@@ -194,8 +195,9 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
       continue;
     }
     tgfx::Clock clock = {};
-    auto decoder = factory->createDecoder(demuxer->getFormat());
-    // printf("VideoReader::makeVideoDecoder, decoder:%p \n", decoder.get());
+    auto format = demuxer->getFormat();
+    auto decoder = factory->createDecoder(format);
+    // printf("VideoReader::makeVideoDecoder, format:%s, decoder:%p \n", format.mimeType.c_str(), decoder.get());
     if (decoder != nullptr) {
       if (decoder->isHardwareBacked()) {
         hardDecodingInitialTime = clock.elapsedTime();
