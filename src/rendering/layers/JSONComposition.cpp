@@ -182,10 +182,9 @@ int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, ui
     return 0;
 }
 
-const bool replaceOssUrlPrefix = true;    //NOTE: check it always
+static const bool g_on_server = std::getenv("PAG_ON_SERVER") != nullptr;    //NOTE: check it always
 #define AliyunOssUrlPrefix ".aliyuncs.com"
 #define InternalUrlPrefix "-internal.aliyuncs.com"
-
 static void stringReplace(std::string& str, const std::string& old_value, const std::string& new_value) {
   size_t pos = 0;
   while ((pos = str.find(old_value, pos)) != std::string::npos) {
@@ -204,7 +203,7 @@ int VideoContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (replaceOssUrlPrefix) {
+      if (g_on_server) {
           //replace oss url with internal url, if needed
           stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
@@ -286,7 +285,7 @@ int AudioContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (replaceOssUrlPrefix) {
+      if (g_on_server) {
           //replace oss url with internal url, if needed
           stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
@@ -315,7 +314,7 @@ int ImageContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (replaceOssUrlPrefix) {
+      if (g_on_server) {
           //replace oss url with internal url, if needed
           stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
@@ -538,8 +537,8 @@ namespace pag {
 #define TEST_IMAGE_HEIGHT 512
 
 // 定义一些常量
-#define MAX_CHARS_PER_LINE 16
-#define FIT_CHARS_PER_LINE 12
+#define MAX_CHARS_PER_LINE 14
+#define FIT_CHARS_PER_LINE 10
 
 int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
@@ -913,7 +912,7 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         size_t chineseCount = 0, englishCount = 0;
         countChars(unicodeStr, chineseCount, englishCount);
         int charCount = (int)(chineseCount + englishCount);
-        if (charCount > MAX_CHARS_PER_LINE) {
+        if (charCount >= MAX_CHARS_PER_LINE) {
           int lineCount = (int)std::round((float)charCount / FIT_CHARS_PER_LINE);
           int charPerLine = (int)std::round((float)charCount / lineCount);
           int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
@@ -1478,6 +1477,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
 }
 
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
+    printf("JSONComposition::Load, on server:%d\n", movie::g_on_server);
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     if (movie.video.stories.size() != 1) {
