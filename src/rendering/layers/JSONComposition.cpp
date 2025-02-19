@@ -115,8 +115,15 @@ int curlDownload(const std::string& url, const std::string& localPath) {
         curl_easy_cleanup(curl);
         file.close();
         if (res != CURLE_OK) {
-            printf("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            printf("curl_easy_perform failed: %s\n", curl_easy_strerror(res));
             return -1;
+        } else {
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            if (http_code != 200) {
+                std::cerr << "HTTP error: " << http_code << " - Download failed!" << std::endl;
+                return -1;
+            }
         }
         // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
     }
@@ -175,6 +182,18 @@ int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, ui
     return 0;
 }
 
+const bool replaceOssUrlPrefix = true;    //NOTE: check it always
+#define AliyunOssUrlPrefix ".aliyuncs.com"
+#define InternalUrlPrefix "-internal.aliyuncs.com"
+
+static void stringReplace(std::string& str, const std::string& old_value, const std::string& new_value) {
+  size_t pos = 0;
+  while ((pos = str.find(old_value, pos)) != std::string::npos) {
+      str.replace(pos, old_value.length(), new_value);
+      pos += new_value.length();  // 移动位置，避免无限循环
+  }
+}
+
 int VideoContent::init(const std::string& tmpDir) {
   AVFormatContext *fmt_ctx = NULL;
   int video_stream_index = -1;
@@ -184,6 +203,11 @@ int VideoContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+
+      if (replaceOssUrlPrefix) {
+          //replace oss url with internal url, if needed
+          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+      }
       
       //download to local path
       printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
@@ -261,6 +285,11 @@ int AudioContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+
+      if (replaceOssUrlPrefix) {
+          //replace oss url with internal url, if needed
+          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+      }
       
       //download to local path
       printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
@@ -285,6 +314,11 @@ int ImageContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+
+      if (replaceOssUrlPrefix) {
+          //replace oss url with internal url, if needed
+          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+      }
       
       //download to local path
       printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
@@ -806,6 +840,14 @@ static std::string getFileNameWithoutExtension(const std::string& filePath) {
 //    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
 //}
 
+static bool isEndLinePunctuation(char32_t ch) {
+   static const std::unordered_set<char32_t> endlinePunctuationSet = {
+       U'。', U'？', U'！', U'；',
+       U'.', U'?', U'!',  U';',
+   };
+   return endlinePunctuationSet.find(ch) != endlinePunctuationSet.end();
+}
+
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
   int visual_width = std::min(spec.width, spec.height) * content->fontSize;
   int visual_height = visual_width;
@@ -1282,30 +1324,61 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
   return audioSource;
 }
 
-void preProcessArticleText(movie::ArticleTrack* articleTrack) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack, [[maybe_unused]]int fontSize, [[maybe_unused]]int tracking, [[maybe_unused]]int boxWidth) {
   std::string new_text = articleTrack->content.text;
   //删除英文空格
   new_text.erase(std::remove(new_text.begin(), new_text.end(), ' '), new_text.end());
 
-  //todo: 
-
-  articleTrack->content.text = new_text;
+  //如果一个段落长度过长，插入换行符
+  auto texts = splitStringByNewline(new_text);
+  const int charCapacityOfLine = std::ceil(boxWidth / (fontSize + tracking));
+  const int maxLinesPerParagraph = 2;
+  auto ite = texts.begin();
+  while (ite != texts.end()) {
+    auto text = *ite;
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    std::u32string unicodeStr = converter.from_bytes(text);
+    if ((int)unicodeStr.length() > charCapacityOfLine * maxLinesPerParagraph) {
+      ite = texts.erase(ite);   //erase the current and get iterator of the next to it
+      //insert "end-line" to the text, and call splitStringByNewline
+      int pos = 0;
+      int lastPos = 0;
+      while (pos < (int)unicodeStr.length()) {
+        if (isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
+          //protect: 1. 最后一个字符；2. 连着的“结尾”标点，比如：。“等，所以给一个比较宽裕的范围，4个字符
+          if (pos < (int)unicodeStr.length() - 4) {
+            pos ++;
+            unicodeStr.insert(pos, 1, U'\n');
+            lastPos = pos;
+            std::cout << "preProcessArticleText, insert end-line at pos:" << pos << " of text:" << text << std::endl;
+          }
+        }
+        pos ++;
+      }
+      auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
+      texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
+    }
+    ite ++;
+  }
+  return texts;
 }
+#pragma clang diagnostic pop
 
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
-  //step 1: pro-process text
-  std::cout << "prepareArticleTrack, pre-process text" << std::endl;
-  preProcessArticleText(articleTrack);
-
-  //step 2: split text into paragraphs
-  std::cout << "prepareArticleTrack, split to paragraphs" << std::endl;
-  auto texts = splitStringByNewline(articleTrack->content.text);
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
   int tracking = std::ceil(articleTrack->content.horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (articleTrack->content.horizontalVisibleScope.right - articleTrack->content.horizontalVisibleScope.left));
   boxWidth -= std::round(articleTrack->content.horizontalVisibleScope.indent * fontSize) * 2;
   boxWidth = boxWidth - boxWidth % (fontSize+tracking);
+  
+  //step 1: pro-process text and output an array of texts
+  std::cout << "prepareArticleTrack, pre-process text" << std::endl;
+  auto texts = preProcessArticleText(articleTrack, fontSize, tracking, boxWidth);
+
+  //step 2: generate each paragraph
   for (auto& t : texts) {
     auto p = generateParagraph(articleTrack->content.fontFamilyName, t, fontSize, leading/*纵向*/, tracking/*横向*/, boxWidth, articleTrack->content.indented);
     articleTrack->content.paragraphs.push_back(p);
@@ -1345,15 +1418,14 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
 void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps, const std::string& tmpDir) {
   printf("prepareAllTracks, duration:%d\n", story->duration);
 
-  //check if article track exists
   int articleDuration = 0;
   for (auto& track : story->tracks) {
     if (track->type == "article") {
+      //check if article track exists
       movie::ArticleTrack* articleTrack = static_cast<movie::ArticleTrack*>(track);
       prepareArticleTrack(story, articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
       printf("article duration:%d\n", articleDuration);
-      break;
     }
   }
   //modify lifetime and duration, if article exists
