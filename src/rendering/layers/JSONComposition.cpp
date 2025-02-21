@@ -59,6 +59,7 @@ extern "C" {
 #include <algorithm>
 #include <unordered_set>
 #include <utility>
+#include <random>
 
 
 #if defined(__linux__)
@@ -1452,6 +1453,33 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   });
 }
 
+std::string generate_random_suffix(size_t length = 6) {
+   const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+   std::random_device rd;
+   std::mt19937 generator(rd());
+   std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
+
+  std::string suffix;
+  for (size_t i = 0; i < length; ++i) {
+     suffix += charset[dist(generator)];
+   }
+   return suffix;
+}
+
+fs::path create_temp_directory(const std::string& prefix = "tmp_") {
+   fs::path temp_dir = fs::temp_directory_path();
+   std::string random_suffix = generate_random_suffix();
+   fs::path new_temp_dir = temp_dir / (prefix + random_suffix);
+
+   if (fs::create_directory(new_temp_dir)) {
+     std::cout << "Temporary directory created: " << new_temp_dir << std::endl;
+   } else {
+     std::cerr << "Failed to create temporary directory." << std::endl;
+   }
+
+   return new_temp_dir;
+}
+
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
     printf("JSONComposition::Load, on server:%d\n", movie::g_on_server);
     json nmjson = json::parse(json_str);
@@ -1464,21 +1492,9 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     
     std::string tmpDir;
     if (tmp_dir.empty()) {
-      std::string tmpDir1 = pag::getPlatformTemporaryDirectory();
-      printf("JSONComposition::Load, platform tmp dir:%s\n", tmpDir1.c_str());
-      char tempTemplate[] = "tmp_XXXXXX";
-      std::string tempFolder(mkdtemp(tempTemplate));
-      tmpDir = tmpDir1 + "/" + tempFolder;
-      printf("JSONComposition::Load, tmp dir:%s\n", tmpDir.c_str());
-  #if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
-      if (mkdir(tmpDir.c_str(), 0755) == 0) {
-          printf("Temp Directory created: %s\n", tmpDir.c_str());
-      } else {
-          std::cerr << "Error creating directory" << std::endl;
-      }
-  #else
-      #error "Unsupported platform"
-  #endif
+      fs::path temp_dir = create_temp_directory();
+      tmpDir = temp_dir.string();
+      printf("system tmp dir: %s\n", tmpDir.c_str());
     } else {
       tmpDir = tmp_dir;
       printf("customer tmp dir: %s\n", tmpDir.c_str());
