@@ -825,6 +825,26 @@ static bool isEndLinePunctuation(char32_t ch) {
    return endlinePunctuationSet.find(ch) != endlinePunctuationSet.end();
 }
 
+static bool isEnglishChar(char32_t ch) {
+    return (ch >= 0x0041 && ch <= 0x005A) ||  // A-Z
+           (ch >= 0x0061 && ch <= 0x007A);   // a-z
+}
+
+static bool isChineseChar(char32_t ch) {
+    return (ch >= 0x4E00 && ch <= 0x9FFF) ||  // 基本汉字
+           (ch >= 0x3400 && ch <= 0x4DBF) ||  // 扩展A
+           (ch >= 0x20000 && ch <= 0x2A6DF) || // 扩展B
+           (ch >= 0x2A700 && ch <= 0x2B73F) || // 扩展C
+           (ch >= 0x2B740 && ch <= 0x2B81F) || // 扩展D
+           (ch >= 0x2B820 && ch <= 0x2CEAF) || // 扩展E
+           (ch >= 0x2CEB0 && ch <= 0x2EBEF) || // 扩展F
+           (ch >= 0x30000 && ch <= 0x3134F);   // 扩展G
+}
+
+static bool isRealChar(char32_t ch) {
+  return isEnglishChar(ch) || isChineseChar(ch);
+}
+
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
   int visual_width = std::min(spec.width, spec.height) * content->fontSize;
   int visual_height = visual_width;
@@ -1315,25 +1335,43 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
     auto text = *ite;
     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
     std::u32string unicodeStr = converter.from_bytes(text);
+    // std::cout << "preProcessArticleText, text:" << text << std::endl;
     if ((int)unicodeStr.length() > charCapacityOfLine * maxLinesPerParagraph) {
       ite = texts.erase(ite);   //erase the current and get iterator of the next to it
       //insert "end-line" to the text, and call splitStringByNewline
       int pos = 0;
       int lastPos = 0;
+      // std::cout << "preProcessArticleText, text too long" << std::endl;
       while (pos < (int)unicodeStr.length()) {
         if (isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
-          //protect: 1. 最后一个字符；2. 连着的“结尾”标点，比如：。“等，所以给一个比较宽裕的范围，4个字符
-          if (pos < (int)unicodeStr.length() - 4) {
+          //protect: 后面还有文字（中文或英文）
+          bool insertEndLine = false;
+          int nextPos = pos + 1;
+          while (nextPos < (int)unicodeStr.length()) {
+            if (isRealChar(unicodeStr[nextPos])) {
+              //if there is real char after that, we can insert EndLine
+              insertEndLine = true;
+              break;
+            }
+            nextPos++;
+          }
+          if (insertEndLine) {
             pos ++;
             unicodeStr.insert(pos, 1, U'\n');
             lastPos = pos;
             std::cout << "preProcessArticleText, insert end-line at pos:" << pos << " of text:" << text << std::endl;
+          } else {
+            break;  //no need to detect the rest
           }
         }
         pos ++;
       }
       auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
-      texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
+      // std::cout << "preProcessArticleText, insert split texts, size:" << sp_texts.size() << std::endl;
+      ite = texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
+      for (int i=0; i<sp_texts.size()-1; i++) {
+        ite++;
+      }
     }
     ite ++;
   }
