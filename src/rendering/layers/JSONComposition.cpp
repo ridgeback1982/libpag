@@ -538,7 +538,7 @@ namespace pag {
 
 // 定义一些常量
 #define MAX_CHARS_PER_LINE 14
-#define FIT_CHARS_PER_LINE 10
+#define FIT_CHARS_PER_LINE 10   //must less than MAX_CHARS_PER_LINE
 
 int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
@@ -761,28 +761,6 @@ movie::RGBA translateColor(const std::string& color_string) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-static bool isChineseChar(char32_t c) {
-    return (c >= 0x4E00 && c <= 0x9FFF); // 中文字符范围
-}
-
-static bool isEnglishChar(char32_t c) {
-    return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')); // 英文字母范围
-}
-
-void countChars(const std::u32string& unicodeStr, size_t& chineseCount, size_t& englishCount) {
-    chineseCount = 0;
-    englishCount = 0;
-
-    // 遍历 Unicode 字符串
-    for (char32_t c : unicodeStr) {
-        if (isChineseChar(c)) {
-            ++chineseCount;
-        } else if (isEnglishChar(c)) {
-            ++englishCount;
-        }
-    }
-}
-
 static std::vector<std::string> splitStringByNewline(const std::string& input) {
     std::vector<std::string> result;
     std::stringstream ss(input);
@@ -909,11 +887,9 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         // 将 UTF-8 字符串转换为 Unicode 字符串（char32_t）
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
         std::u32string unicodeStr = converter.from_bytes(sentence.text);
-        size_t chineseCount = 0, englishCount = 0;
-        countChars(unicodeStr, chineseCount, englishCount);
-        int charCount = (int)(chineseCount + englishCount);
+        int charCount = (int)unicodeStr.length();
         if (charCount >= MAX_CHARS_PER_LINE) {
-          int lineCount = (int)std::round((float)charCount / FIT_CHARS_PER_LINE);
+          int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
           int charPerLine = (int)std::round((float)charCount / lineCount);
           int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
           std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
