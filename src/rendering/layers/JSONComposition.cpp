@@ -1377,7 +1377,7 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
       auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
       // std::cout << "preProcessArticleText, insert split texts, size:" << sp_texts.size() << std::endl;
       ite = texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
-      for (int i=0; i<sp_texts.size()-1; i++) {
+      for (int i=0; i<(int)sp_texts.size()-1; i++) {
         ite++;
       }
     }
