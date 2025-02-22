@@ -382,6 +382,24 @@ elseif (WIN32)
     list(APPEND PAG_SHARED_LIBS ${Bcrypt_LIB})
     find_library(ws2_32_LIB ws2_32)
     list(APPEND PAG_SHARED_LIBS ${ws2_32_LIB})
+
+    #zzy
+    file(GLOB_RECURSE UTILS_FILES src/utils/win/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES})
+    #set(CMAKE_TOOLCHAIN_FILE "D:/code/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
+    set(CURL_INCLUDE_DIR "D:/code/vcpkg/installed/x64-windows/include")
+    set(CURL_LIBRARIES "D:/code/vcpkg/installed/x64-windows/lib/libcurl.lib")
+    #find_package(CURL REQUIRED)
+    list(APPEND PAG_INCLUDES ${CURL_INCLUDE_DIR})
+    list(APPEND PAG_SHARED_LIBS ${CURL_LIBRARIES})
+    message("Win32 curl include: ${CURL_INCLUDE_DIR}")
+    message("Win32 curl lib: ${CURL_LIBRARIES}")
+    list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/avcodec.lib 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/avfilter.lib 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/avformat.lib 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/avutil.lib 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/swscale.lib 
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/win/x64/swresample.lib)
 elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     # finds all required platform libraries.
     find_package(Threads)

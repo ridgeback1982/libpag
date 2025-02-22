@@ -171,7 +171,7 @@ static __inline uint32_t __clz_uint32(uint32_t v) {
     return __builtin_clz(v);
 #elif defined(_MSC_VER)
     // for _BitScanReverse
-#include <intrin.h>
+//#include <intrin.h>       //zzy, build fail on VS2022, have to comment it
     {
         uint32_t idx;
         _BitScanReverse(&idx, v);

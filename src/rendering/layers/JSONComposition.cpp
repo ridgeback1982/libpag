@@ -83,9 +83,16 @@ bool starts_with(const std::string& str, const std::string& prefix) {
 }
 
 std::string getFileNameFromUrl(const std::string& url) {
-    size_t pos = url.find_last_of('/');
-    if (pos != std::string::npos && pos + 1 < url.size()) {
-        return url.substr(pos + 1);
+    size_t pos1 = url.find_last_of('/');
+    if (pos1 != std::string::npos && pos1 + 1 < url.size()) {
+        size_t pos2 = url.find_last_of('?');
+        if (pos2 != std::string::npos && pos1 < pos2) {
+            //zzy, must drop words after "?" e.g. 1e491415e4c9.webp?time=1734489926920
+            //because it will cause file auto deleted by sysmtem on windows
+            return url.substr(pos1 + 1, pos2 - pos1 - 1);
+        } else {
+            return url.substr(pos1 + 1);
+        }
     }
     return ""; // 没有后缀名时返回空字符串
 }
@@ -105,8 +112,9 @@ int curlDownload(const std::string& url, const std::string& localPath) {
     }
     CURL* curl = curl_easy_init();
     if (curl) {
-        std::ofstream file(localPath);
+        std::ofstream file(localPath, std::ios::binary);
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        //curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
