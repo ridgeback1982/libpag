@@ -453,6 +453,16 @@ namespace movie {
             if (j.contains("duration"))
                 j.at("duration").get_to(s.duration);
         }
+
+        void Destroy() {
+            for (auto& t : tracks) {
+                if (t) {
+                    delete t;
+                    t = nullptr;
+                }
+            }
+            tracks.clear();
+        }
     };
     void from_json(const json& j, Story& s) {
         Story::from_json(j, s);
@@ -473,6 +483,12 @@ namespace movie {
             if (j.contains("fileSizeLimit") && j.at("fileSizeLimit").is_number())
                 j.at("fileSizeLimit").get_to(m.fileSizeLimit);
             j.at("stories").get_to(m.stories);
+        }
+        void Destroy() {
+            for (auto& s : stories) {
+                s.Destroy();
+            }
+            stories.clear();
         }
     };
     void from_json(const json& j, MovieSpec& m) {
@@ -497,6 +513,9 @@ namespace movie {
         static void from_json(const json& j, Movie& m) {
             j.at("type").get_to(m.type);
             j.at("video").get_to(m.video);
+        }
+        void Destroy() {
+            video.Destroy();
         }
     };
     void from_json(const json& j, Movie& m) {

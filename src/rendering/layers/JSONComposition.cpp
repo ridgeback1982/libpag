@@ -31,6 +31,7 @@
 #include "rendering/utils/media/FFAudioReader.h"
 #include "rendering/utils/media/FFAudioMixer.h"
 #include "rendering/utils/media/FFImageReader.h"
+#include "rendering/utils/media/FFFormatUtil.h"
 #include "rendering/graphics/Glyph.h"
 
 //ffmpeg
@@ -202,9 +203,6 @@ static void stringReplace(std::string& str, const std::string& old_value, const 
 }
 
 int VideoContent::init(const std::string& tmpDir) {
-  AVFormatContext *fmt_ctx = NULL;
-  int video_stream_index = -1;
-
   bool remote = starts_with(path, "http://") || starts_with(path, "https://");
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
@@ -220,7 +218,6 @@ int VideoContent::init(const std::string& tmpDir) {
       printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
-          avformat_free_context(fmt_ctx);
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -230,57 +227,11 @@ int VideoContent::init(const std::string& tmpDir) {
   }
 
   if (_width == 0 || _height == 0 || _fps == 0) {
-    // 初始化 FFmpeg 库
-    avformat_network_init();
-
-    // 打开输入文件
-    if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
-      std::cerr << "Could not open input file:" << _localPath << std::endl;
-      avformat_free_context(fmt_ctx);
-      return -1;
-    }
-
-    // 查找流信息
-    if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-      std::cerr << "Could not find stream information" << std::endl;
-      avformat_close_input(&fmt_ctx);
-      avformat_free_context(fmt_ctx);
-      return -1;
-    }
-
-    int64_t duration = fmt_ctx->duration;
-    if (duration != AV_NOPTS_VALUE) {
-      _duration = std::floor((duration / (double)AV_TIME_BASE) * 1000);
-    }
-
-    // 查找视频流
-    for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
-      if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-        video_stream_index = i;
-        break;
-      }
-    }
-
-    if (video_stream_index == -1) {
-      std::cerr << "Could not find a video stream" << std::endl;
-      avformat_close_input(&fmt_ctx);
-      avformat_free_context(fmt_ctx);
-      return -1;
-    }
-
-    // Get codec parameters for the video stream
-    AVStream* video_stream = fmt_ctx->streams[video_stream_index];
-    AVCodecParameters* codec_params = video_stream->codecpar;
-    _width = codec_params->width;
-    _height = codec_params->height;
-
-    // Retrieve FPS
-    AVRational frame_rate = video_stream->avg_frame_rate;
-    _fps = (frame_rate.den && frame_rate.num) ? 
-                 static_cast<double>(frame_rate.num) / frame_rate.den : 0;
-
-    avformat_close_input(&fmt_ctx);
-    avformat_free_context(fmt_ctx);
+    pag::FFFormatUtil vutil(_localPath);
+    _width = vutil.width();
+    _height = vutil.height();
+    _fps = vutil.fps();
+    _duration = vutil.durationMS();
   }
   
   return 0;
@@ -313,9 +264,6 @@ int AudioContent::init(const std::string& tmpDir) {
 }
 
 int ImageContent::init(const std::string& tmpDir) {
-  AVFormatContext *fmt_ctx = NULL;
-  int video_stream_index = -1;
-
   bool remote = starts_with(path, "http://") || starts_with(path, "https://");
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
@@ -331,7 +279,6 @@ int ImageContent::init(const std::string& tmpDir) {
       printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
-          avformat_free_context(fmt_ctx);
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -340,46 +287,11 @@ int ImageContent::init(const std::string& tmpDir) {
     _localPath = path;
   }
 
-  // 初始化 FFmpeg 库
-  avformat_network_init();
-
-  // 打开输入文件
-  if (avformat_open_input(&fmt_ctx, _localPath.c_str(), NULL, NULL) < 0) {
-    std::cerr << "Could not open input file:" << _localPath << std::endl;
-    return -1;
+  if (_width == 0 || _height == 0) {
+    pag::FFFormatUtil vutil(_localPath);
+    _width = vutil.width();
+    _height = vutil.height();
   }
-
-  // 查找流信息
-  if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
-    std::cerr << "Could not find stream information" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    avformat_free_context(fmt_ctx);
-    return -1;
-  }
-
-  // 查找视频流
-  for (unsigned i = 0; i < fmt_ctx->nb_streams; i++) {
-    if (fmt_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-      video_stream_index = i;
-      break;
-    }
-  }
-
-  if (video_stream_index == -1) {
-    std::cerr << "Could not find a video stream" << std::endl;
-    avformat_close_input(&fmt_ctx);
-    avformat_free_context(fmt_ctx);
-    return -1;
-  }
-
-  // Get codec parameters for the video stream
-  AVStream* video_stream = fmt_ctx->streams[video_stream_index];
-  AVCodecParameters* codec_params = video_stream->codecpar;
-  _width = codec_params->width;
-  _height = codec_params->height;
-
-  avformat_close_input(&fmt_ctx);
-  avformat_free_context(fmt_ctx);
   return 0;
 }
 
@@ -1696,9 +1608,8 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     }
     
     //zzy, must not do this in destructor of story, because the destructor is called by nlohmann::json ahead of time
-    for (auto& track : story->tracks) {
-        delete track;
-    }
+    //zzy, "Destroy" is a function like "destructor", but it is invoked by user
+    movie.Destroy();
 
     if (progressCB) {
       progressCB(100);
