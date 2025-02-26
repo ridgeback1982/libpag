@@ -59,6 +59,8 @@ extern "C" {
 #include <unordered_set>
 #include <utility>
 #include <random>
+#include <thread>
+#include <utility>
 
 
 #if defined(__linux__)
@@ -104,12 +106,14 @@ size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
     return totalSize;
 }
 
-int curlDownload(const std::string& url, const std::string& localPath) {
+int curlDownload(const std::string& url, const std::string& localPath, bool justOnce = false) {
     // Check if file already exists
-    if (fs::exists(localPath)) {
+    if (fs::exists(localPath) && fs::file_size(localPath) > 0) {
         std::cout << "curlDownload, localPath already exists: " << localPath << std::endl;
         return 0;
     }
+    int ret = 0;
+    bool needRetry = false;
     CURL* curl = curl_easy_init();
     if (curl) {
         std::ofstream file(localPath, std::ios::binary);
@@ -123,19 +127,37 @@ int curlDownload(const std::string& url, const std::string& localPath) {
         curl_easy_cleanup(curl);
         file.close();
         if (res != CURLE_OK) {
+            fs::remove(localPath);
             printf("curl_easy_perform failed: %s\n", curl_easy_strerror(res));
-            return -1;
+            if (justOnce == false) {
+                needRetry = true;
+            }
+            ret = -1;
         } else {
             long http_code = 0;
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
             if (http_code != 200) {
+                fs::remove(localPath);
                 std::cerr << "HTTP error: " << http_code << " - Download failed!" << std::endl;
-                return -1;
+                ret = -1;
             }
         }
         // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
+        if (needRetry) {
+            int retryCount = 2;
+            while (retryCount > 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10000));  //sleep for 10 sec
+                std::cout << "Retry downloading " << url << ", retryCount: " << retryCount << "..." << std::endl;
+                if (curlDownload(url, localPath, true) == 0) {
+                    ret = 0;
+                    break;
+                }
+                retryCount--;
+            }
+        }
     }
-    return 0;
+
+    return ret;
 }
 
 int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, uint8_t* b) {
@@ -220,6 +242,7 @@ int VideoContent::init(const std::string& tmpDir) {
       printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
+          printf("VideoContent::init, download failed\n");
           avformat_free_context(fmt_ctx);
           return -1;
       }
@@ -302,6 +325,7 @@ int AudioContent::init(const std::string& tmpDir) {
       printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
+          printf("AudioContent::init, download failed\n");
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -331,6 +355,7 @@ int ImageContent::init(const std::string& tmpDir) {
       printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
+          printf("ImageContent::init, download failed\n");
           avformat_free_context(fmt_ctx);
           return -1;
       }
@@ -486,6 +511,7 @@ int ArticleContent::init(const std::string& tmpDir) {
         printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
         auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         if (curlDownload(_bgcImageUrl, bgcLocalPath) < 0) {
+            printf("ArticleContent::init, download failed\n");
             return -1;
         }
         auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -1387,6 +1413,13 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
 }
 #pragma clang diagnostic pop
 
+static int get_random_int(int min, int max) {
+    static std::random_device rd;  // 用于生成随机种子
+    static std::mt19937 gen(rd()); // 使用 Mersenne Twister 伪随机数生成器
+    std::uniform_int_distribution<int> dist(min, max); // 均匀分布
+    return dist(gen);
+}
+
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
@@ -1434,6 +1467,12 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
       }
     }
   }
+
+  //step 4: do some random things
+  float speedThred = articleTrack->content.speed * 0.1;
+  float speedOffset = (get_random_int(-100, 100) / 100.0f) * speedThred;
+  articleTrack->content.speed += speedOffset;
+  std::cout << "prepareArticleTrack, speed offset:" << speedOffset << std::endl;
 }
 
 void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps, const std::string& tmpDir) {
@@ -1578,7 +1617,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         if (t->type == "video") {
             //create video PAGComposition and add to JSONComposition
             auto track = static_cast<movie::VideoTrack*>(t);
-            track->content.init(tmpDir);
+            if (track->content.init(tmpDir) < 0) {
+              std::cerr << "Error initializing video track, path:" << track->content.path << std::endl;
+              return nullptr;
+            }
             printf("video track, path:%s\n", track->content.path.c_str());
             auto vidPreComposeLayer = createVideoLayer(track, movie.video);
             if (vidPreComposeLayer != nullptr) {
@@ -1603,7 +1645,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             printf("gif track, path:%s\n", track->content.path.c_str());
         } else if (t->type == "voice") {
             auto track = static_cast<movie::VoiceTrack*>(t);
-            track->content.init(tmpDir);
+            if (track->content.init(tmpDir) < 0) {
+              std::cerr << "Error initializing voice track, path:" << track->content.path << std::endl;
+              return nullptr;
+            }
             printf("voice track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
@@ -1612,7 +1657,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "music") {
             auto track = static_cast<movie::MusicTrack*>(t);
-            track->content.init(tmpDir);
+            if (track->content.init(tmpDir) < 0) {
+              std::cerr << "Error initializing music track, path:" << track->content.path << std::endl;
+              return nullptr;
+            }
             printf("music track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
@@ -1621,7 +1669,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "image") {
             auto track = static_cast<movie::ImageTrack*>(t);
-            track->content.init(tmpDir);
+            if (track->content.init(tmpDir) < 0) {
+              std::cerr << "Error initializing image track, path:" << track->content.path << std::endl;
+              return nullptr;
+            }
             printf("image track, path:%s\n", track->content.path.c_str());
             fitLocation(track->content.location, track->content.width(), track->content.height(), movie.video.width, movie.video.height);
             auto layer = createImageLayer(track, movie.video);
@@ -1654,7 +1705,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "article") {
             auto track = static_cast<movie::ArticleTrack*>(t);
-            track->content.init(tmpDir);
+            if (track->content.init(tmpDir) < 0) {
+              std::cerr << "Error initializing article track" << std::endl;
+              return nullptr;
+            }
             printf("article track, paragraph count:%zu\n", track->content.paragraphs.size());
             auto layers = createArticleRelatedLayers(track, movie.video);
             for (auto layer : layers) {
