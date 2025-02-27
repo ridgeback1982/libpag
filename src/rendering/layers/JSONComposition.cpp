@@ -1482,6 +1482,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     //create JSONComposition
     auto preComposeLayer = PreComposeLayer::Wrap(vecComposition).release();
     auto jsonComposition = std::shared_ptr<JSONComposition>(new JSONComposition(preComposeLayer));
+    jsonComposition->_vectorComposition = vecComposition;
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story->duration : 0;   //set by json
     
@@ -1852,6 +1853,14 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
 JSONComposition::JSONComposition(PreComposeLayer* layer)
   : PAGComposition(nullptr, layer) {
 
+}
+
+JSONComposition::~JSONComposition() {
+  if (_vectorComposition) {
+    delete _vectorComposition;
+    _vectorComposition = nullptr;
+  }
+  std::cout << "JSONComposition destructor" << std::endl;
 }
 
 int JSONComposition::videoEncodeBitrateKPBS() const {
