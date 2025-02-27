@@ -213,17 +213,6 @@ int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, ui
     return 0;
 }
 
-static const bool g_on_server = std::getenv("PAG_ON_SERVER") != nullptr;    //NOTE: check it always
-#define AliyunOssUrlPrefix ".aliyuncs.com"
-#define InternalUrlPrefix "-internal.aliyuncs.com"
-static void stringReplace(std::string& str, const std::string& old_value, const std::string& new_value) {
-  size_t pos = 0;
-  while ((pos = str.find(old_value, pos)) != std::string::npos) {
-      str.replace(pos, old_value.length(), new_value);
-      pos += new_value.length();  // 移动位置，避免无限循环
-  }
-}
-
 int VideoContent::init(const std::string& tmpDir) {
   bool remote = starts_with(path, "http://") || starts_with(path, "https://");
   // printf("VideoContent::init, remote:%d\n", remote);
@@ -231,9 +220,9 @@ int VideoContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (g_on_server) {
+      if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
-          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
       
       //download to local path
@@ -267,9 +256,9 @@ int AudioContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (g_on_server) {
+      if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
-          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
       
       //download to local path
@@ -294,9 +283,9 @@ int ImageContent::init(const std::string& tmpDir) {
       //create local path
       _localPath = tmpDir + "/" + getFileNameFromUrl(path);
 
-      if (g_on_server) {
+      if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
-          stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
+          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
       }
       
       //download to local path
@@ -1450,7 +1439,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
 }
 
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
-    printf("JSONComposition::Load, on server:%d\n", movie::g_on_server);
+    printf("JSONComposition::Load, on server:%d\n", pag::runOnServer());
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     if (movie.video.stories.size() != 1) {
