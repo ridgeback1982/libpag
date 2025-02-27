@@ -12,6 +12,7 @@ namespace movie {
         float center_x = 0;
         float center_y = 0;
         std::string fitMode = "";       //"fill", "center-contain", "right-top-contain"
+        //Location(float w, float h, float center_x, float center_y, const std::string& fitMode) : w(w), h(h), center_x(center_x), center_y(center_y), fitMode(fitMode) {}
         static void from_json(const json& j, Location& l) {
             if (j.contains("w"))
                 j.at("w").get_to(l.w);
@@ -22,9 +23,17 @@ namespace movie {
             if (j.contains("fitMode"))
                 j.at("fitMode").get_to(l.fitMode);
         }
+        static void to_json(json& j, const Location& l) {
+            j = {{"w", l.w}, {"h", l.h}, {"center_x", l.center_x}, {"center_y", l.center_y}};
+            if (!l.fitMode.empty())
+                j["fitMode"] = l.fitMode;
+        }
     };
     static void from_json(const json& j, Location& l) {
         Location::from_json(j, l);
+    }
+    static void to_json(json& j, const Location& l) {
+        Location::to_json(j, l);
     }
 
     class VideoContent {
@@ -36,7 +45,7 @@ namespace movie {
         bool loop = false;
         float speed = 1.0f;
         int cutFrom = 0;
-        int cutTo = 0;
+        int cutTo = -1;
         static void from_json(const json& j, VideoContent& v) {
             j.at("path").get_to(v.path);
             j.at("location").get_to(v.location);
@@ -52,6 +61,11 @@ namespace movie {
                 j.at("cutFrom").get_to(v.cutFrom);
             if (j.contains("cutTo") && j.at("cutTo").is_number())
                 j.at("cutTo").get_to(v.cutTo);
+        }
+        static void to_json(json& j, const VideoContent& v) {
+            j = {{"path", v.path}, {"location", v.location}, {"mixVolume", v.mixVolume}, {"removeGreen", v.removeGreen}, {"loop", v.loop}, {"speed", v.speed}, {"cutFrom", v.cutFrom}};
+            if (v.cutTo >= 0)
+                j["cutTo"] = v.cutTo;
         }
 
         int init(const std::string& tmpDir);
@@ -70,6 +84,9 @@ namespace movie {
     void from_json(const json& j, VideoContent& v) {
         VideoContent::from_json(j, v);
     }
+    void to_json(json& j, const VideoContent& v) {
+        VideoContent::to_json(j, v);
+    }
 
     class AudioContent {
     public:
@@ -78,7 +95,7 @@ namespace movie {
         bool loop = false;
         float speed = 1.0f;
         int cutFrom = 0;
-        int cutTo = 0;
+        int cutTo = -1;
         bool enhance = false;
         static void from_json(const json& j, AudioContent& a) {
             j.at("path").get_to(a.path);
@@ -95,6 +112,11 @@ namespace movie {
             if (j.contains("enhance"))
                 j.at("enhance").get_to(a.enhance);
         }
+        static void to_json(json& j, const AudioContent& a) {
+            j = {{"path", a.path}, {"mixVolume", a.mixVolume}, {"loop", a.loop}, {"speed", a.speed}, {"cutFrom", a.cutFrom}, {"enhance", a.enhance}};
+            if (a.cutTo >= 0)
+                j["cutTo"] = a.cutTo;
+        }
 
         int init(const std::string& tmpDir);
         std::string localPath() const { return _localPath; }
@@ -103,6 +125,9 @@ namespace movie {
     };
     void from_json(const json& j, AudioContent& a) {
         AudioContent::from_json(j, a);
+    }
+    void to_json(json& j, const AudioContent& a) {  
+        AudioContent::to_json(j, a);
     }
 
     class Sentence {
@@ -115,9 +140,15 @@ namespace movie {
             j.at("begin_time").get_to(s.begin_time);
             j.at("end_time").get_to(s.end_time);
         }
+        static void to_json(json& j, const Sentence& s) {
+            j = {{"text", s.text}, {"begin_time", s.begin_time}, {"end_time", s.end_time}};
+        }
     };
     void from_json(const json& j, Sentence& s) {
         Sentence::from_json(j, s);
+    }
+    void to_json(json& j, const Sentence& s) {
+        Sentence::to_json(j, s);
     }
 
     class TitileContent {
@@ -144,9 +175,20 @@ namespace movie {
             if (j.contains("stroke"))
                 j.at("stroke").get_to(t.stroke);
         }
+        static void to_json(json& j, const TitileContent& t) {
+            j = {{"location", t.location}, {"fontSize", t.fontSize}, {"fontFamilyName", t.fontFamilyName}, {"textColor", t.textColor}, {"stroke", t.stroke}};
+            if (t.sentences.size())
+                j["sentences"] = t.sentences;
+            if (!t.text.empty())
+                j["text"] = t.text;
+        }
+            
     };
     void from_json(const json& j, TitileContent& t) {
         TitileContent::from_json(j, t);
+    }
+    void to_json(json& j, const TitileContent& t) {
+        TitileContent::to_json(j, t);
     }
 
     class ImageContent {
@@ -156,6 +198,9 @@ namespace movie {
         static void from_json(const json& j, ImageContent& i) {
             j.at("path").get_to(i.path);
             j.at("location").get_to(i.location);
+        }
+        static void to_json(json& j, const ImageContent& i) {
+            j = {{"path", i.path}, {"location", i.location}};
         }
 
         int init(const std::string& tmpDir);
@@ -171,6 +216,9 @@ namespace movie {
     void from_json(const json& j, ImageContent& i) {
         ImageContent::from_json(j, i);
     }
+    void to_json(json& j, const ImageContent& i) {
+        ImageContent::to_json(j, i);
+    }
 
     class VerticalScope {
     public:
@@ -183,9 +231,15 @@ namespace movie {
             if (j.contains("indent"))
                 j.at("indent").get_to(v.indent);
         }
+        static void to_json(json& j, const VerticalScope& v) {
+            j = {{"top", v.top}, {"bottom", v.bottom}, {"indent", v.indent}};
+        }
     };
     static void from_json(const json& j, VerticalScope& v) {
         VerticalScope::from_json(j, v);
+    }
+    static void to_json(json& j, const VerticalScope& v) {
+        VerticalScope::to_json(j, v);
     }
 
     class HorizontalScope {
@@ -199,9 +253,15 @@ namespace movie {
             if (j.contains("indent"))
                 j.at("indent").get_to(h.indent);
         }
+        static void to_json(json& j, const HorizontalScope& h) {
+            j = {{"left", h.left}, {"right", h.right}, {"indent", h.indent}};            
+        }
     };
     static void from_json(const json& j, HorizontalScope& h) {
         HorizontalScope::from_json(j, h);
+    }
+    static void to_json(json& j, const HorizontalScope& h) {
+        HorizontalScope::to_json(j, h);
     }
 
     class ArticleParagraph {
@@ -210,7 +270,6 @@ namespace movie {
         int heightInP = 0;
     };
     
-
     class ArticleContent {
     public:
         std::string text;
@@ -265,6 +324,15 @@ namespace movie {
             if (j.contains("backgroundShape"))
                 j.at("backgroundShape").get_to(a.backgroundShape);
         }
+        static void to_json(json& j, const ArticleContent& a) {
+            j = {{"text", a.text}, {"verticalVisibleScope", a.verticalVisibleScope}, {"horizontalVisibleScope", a.horizontalVisibleScope}, 
+                {"verticalSpacing", a.verticalSpacing}, {"horizontalSpacing", a.horizontalSpacing}, {"paragraphSpacing", a.paragraphSpacing}, 
+                {"startPosition", a.startPosition}, {"speed", a.speed}, {"indented", a.indented}, {"freezeBeginTime", a.freezeBeginTime}, 
+                {"freezeEndTime", a.freezeEndTime}, {"fontSize", a.fontSize}, {"fontFamilyName", a.fontFamilyName}, {"textColor", a.textColor}, 
+                {"backgroundColor", a.backgroundColor}, {"backgroundShape", a.backgroundShape}};
+            if (!a.stroke.empty())
+                j["stroke"] = a.stroke;
+        }
 
         int init(const std::string& tmpDir);
 
@@ -275,6 +343,9 @@ namespace movie {
     };
     void from_json(const json& j, ArticleContent& a) {
         ArticleContent::from_json(j, a);
+    }
+    void to_json(json& j, const ArticleContent& a) {
+        ArticleContent::to_json(j, a);        
     }
 
     class LifeTime {
@@ -287,9 +358,15 @@ namespace movie {
             if (j.contains("end_time"))
                 j.at("end_time").get_to(l.end_time);
         }
+        static void to_json(json& j, const LifeTime& l) {
+            j = {{"begin_time", l.begin_time}, {"end_time", l.end_time}};
+        }
     };
     void from_json(const json& j, LifeTime& l) {
         LifeTime::from_json(j, l);
+    }
+    void to_json(json& j, const LifeTime& l) {
+        LifeTime::to_json(j, l);
     }
     
     class Track {
@@ -304,9 +381,15 @@ namespace movie {
             if (j.contains("zorder"))
                 j.at("zorder").get_to(t.zorder);
         }
+        static void to_json(json& j, const Track& t) {
+            j = {{"type", t.type}, {"lifetime", t.lifetime}, {"zorder", t.zorder}};
+        }
     };
     void from_json(const json& j, Track& t) {
         Track::from_json(j, t);
+    }
+    void to_json(json& j, const Track& t) {
+        Track::to_json(j, t);
     }
 
     class VideoTrack : public Track {
@@ -316,9 +399,16 @@ namespace movie {
             Track::from_json(j, v);
             j.at("content").get_to(v.content);
         }
+        static void to_json(json& j, const VideoTrack& v) {
+            Track::to_json(j, v);
+            j["content"] = v.content;
+        }
     };
     void from_json(const json& j, VideoTrack& v) {
         VideoTrack::from_json(j, v);
+    }
+    void to_json(json& j, const VideoTrack& v) {
+        VideoTrack::to_json(j, v);
     }
 
     class GifTrack : public Track {
@@ -328,9 +418,16 @@ namespace movie {
             Track::from_json(j, g);
             j.at("content").get_to(g.content);
         }
+        static void to_json(json& j, const GifTrack& g) {
+            Track::to_json(j, g);
+            j["content"] = g.content;
+        }
     };
     void from_json(const json& j, GifTrack& g) {
         GifTrack::from_json(j, g);
+    }
+    void to_json(json& j, const GifTrack& g) {
+        GifTrack::to_json(j, g);
     }
 
     class MusicTrack : public Track {
@@ -340,9 +437,16 @@ namespace movie {
             Track::from_json(j, m);
             j.at("content").get_to(m.content);
         }
+        static void to_json(json& j, const MusicTrack& m) {
+            Track::to_json(j, m);
+            j["content"] = m.content;
+        }
     };
     void from_json(const json& j, MusicTrack& m) {
         MusicTrack::from_json(j, m);
+    }
+    void to_json(json& j, const MusicTrack& m) {
+        MusicTrack::to_json(j, m);
     }
 
     class VoiceTrack : public Track {
@@ -352,9 +456,16 @@ namespace movie {
             Track::from_json(j, v);
             j.at("content").get_to(v.content);
         }
+        static void to_json(json& j, const VoiceTrack& v) {
+            Track::to_json(j, v);
+            j["content"] = v.content;
+        }
     };
     void from_json(const json& j, VoiceTrack& v) {
         VoiceTrack::from_json(j, v);
+    }
+    void to_json(json& j, const VoiceTrack& v) {
+        VoiceTrack::to_json(j, v);
     }
 
     class ImageTrack : public Track {
@@ -364,9 +475,16 @@ namespace movie {
             Track::from_json(j, i);
             j.at("content").get_to(i.content);
         }
+        static void to_json(json& j, const ImageTrack& i) {
+            Track::to_json(j, i);
+            j["content"] = i.content;
+        }
     };
     void from_json(const json& j, ImageTrack& i) {
         ImageTrack::from_json(j, i);
+    }
+    void to_json(json& j, const ImageTrack& i) {
+        ImageTrack::to_json(j, i);
     }
 
     class TitleTrack : public Track {
@@ -376,9 +494,16 @@ namespace movie {
             Track::from_json(j, t);
             j.at("content").get_to(t.content);
         }
+        static void to_json(json& j, const TitleTrack& t) {
+            Track::to_json(j, t);
+            j["content"] = t.content;
+        }
     };
     void from_json(const json& j, TitleTrack& t) {
         TitleTrack::from_json(j, t);
+    }
+    void to_json(json& j, const TitleTrack& t) {
+        TitleTrack::to_json(j, t);
     }
 
     class SubtitleTrack : public Track {
@@ -388,9 +513,16 @@ namespace movie {
             Track::from_json(j, s);
             j.at("content").get_to(s.content);
         }
+        static void to_json(json& j, const SubtitleTrack& s) {
+            Track::to_json(j, s);
+            j["content"] = s.content;
+        }
     };
     void from_json(const json& j, SubtitleTrack& s) {
         SubtitleTrack::from_json(j, s);
+    }
+    void to_json(json& j, const SubtitleTrack& s) {
+        SubtitleTrack::to_json(j, s);
     }
 
     class ArticleTrack : public Track {
@@ -400,9 +532,16 @@ namespace movie {
             Track::from_json(j, a);
             j.at("content").get_to(a.content);
         }
+        static void to_json(json& j, const ArticleTrack& a) {
+            Track::to_json(j, a);
+            j["content"] = a.content;
+        }
     };
     void from_json(const json& j, ArticleTrack& a) {
         ArticleTrack::from_json(j, a);
+    }
+    void to_json(json& j, const ArticleTrack& a) {
+        ArticleTrack::to_json(j, a);
     }
 
     ///////////////////////////////////////
@@ -449,13 +588,73 @@ namespace movie {
 
                 }
             }
-            
             if (j.contains("duration"))
                 j.at("duration").get_to(s.duration);
+        }
+
+        static void to_json(json& j, const Story& s) {
+            // j = {{"tracks", s.tracks}, {"duration", s.duration}};
+            j = {{"duration", s.duration}};
+            auto tracks = json::array();
+            for (auto& t : s.tracks) {
+                if (t->type == "video") {
+                    auto jtrack = json::object();
+                    VideoTrack::to_json(jtrack, *static_cast<VideoTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "gif") {
+                    auto jtrack = json::object();
+                    GifTrack::to_json(jtrack, *static_cast<GifTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "music") {
+                    auto jtrack = json::object();
+                    MusicTrack::to_json(jtrack, *static_cast<MusicTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "voice") {
+                    auto jtrack = json::object();
+                    VoiceTrack::to_json(jtrack, *static_cast<VoiceTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "image") {
+                    auto jtrack = json::object();
+                    ImageTrack::to_json(jtrack, *static_cast<ImageTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "title") {
+                    auto jtrack = json::object();
+                    TitleTrack::to_json(jtrack, *static_cast<TitleTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "subtitle") {
+                    auto jtrack = json::object();
+                    SubtitleTrack::to_json(jtrack, *static_cast<SubtitleTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "article") {
+                    auto jtrack = json::object();
+                    ArticleTrack::to_json(jtrack, *static_cast<ArticleTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else {
+                }
+            }
+            j["tracks"] = tracks;
+        }
+
+        void Reset() {
+            duration = 0;
+            tracks.clear();
+        }
+
+        void Destroy() {
+            for (auto& t : tracks) {
+                if (t) {
+                    delete t;
+                    t = nullptr;
+                }
+            }
+            tracks.clear();
         }
     };
     void from_json(const json& j, Story& s) {
         Story::from_json(j, s);
+    }
+    void to_json(json& j, const Story& s) {
+        Story::to_json(j, s);
     }
 
     class MovieSpec {
@@ -474,9 +673,24 @@ namespace movie {
                 j.at("fileSizeLimit").get_to(m.fileSizeLimit);
             j.at("stories").get_to(m.stories);
         }
+        static void to_json(json& j, const MovieSpec& m) {
+            j = {{"width", m.width}, {"height", m.height}, {"fps", m.fps}, {"stories", m.stories}};
+            if (m.fileSizeLimit > 0)
+                j["fileSizeLimit"] = m.fileSizeLimit;
+        }
+
+        void Destroy() {
+            for (auto& s : stories) {
+                s.Destroy();
+            }
+            stories.clear();
+        }
     };
     void from_json(const json& j, MovieSpec& m) {
         MovieSpec::from_json(j, m);
+    }
+    void to_json(json& j, const MovieSpec& m) {
+        MovieSpec::to_json(j, m);
     }
 
     class Output {
@@ -498,9 +712,19 @@ namespace movie {
             j.at("type").get_to(m.type);
             j.at("video").get_to(m.video);
         }
+        static void to_json(json& j, const Movie& m) {
+            j = {{"type", m.type}, {"video", m.video}};
+        }
+
+        void Destroy() {
+            video.Destroy();
+        }
     };
     void from_json(const json& j, Movie& m) {
         Movie::from_json(j, m);
+    }
+    void to_json(json& j, const Movie& m) {
+        Movie::to_json(j, m);
     }
 
 }

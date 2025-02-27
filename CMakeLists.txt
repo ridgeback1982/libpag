@@ -307,8 +307,9 @@ elseif (MACOS)
     list(APPEND PAG_SHARED_LIBS ${CORE_MEDIA})
 
     #zzy
-    file(GLOB_RECURSE UTILS_FILES src/utils/macos/*.*)
-    list(APPEND PAG_FILES ${UTILS_FILES})
+    file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp)
+    file(GLOB_RECURSE UTILS_FILES_PLATFORM src/utils/macos/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES_COMMON} ${UTILS_FILES_PLATFORM})
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavutil.xcframework/macos-arm64_x86_64/libavutil.framework
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavcodec.xcframework/macos-arm64_x86_64/libavcodec.framework 
                         ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
@@ -384,8 +385,9 @@ elseif (WIN32)
     list(APPEND PAG_SHARED_LIBS ${ws2_32_LIB})
 
     #zzy
-    file(GLOB_RECURSE UTILS_FILES src/utils/win/*.*)
-    list(APPEND PAG_FILES ${UTILS_FILES})
+    file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp)
+    file(GLOB_RECURSE UTILS_FILES_PLATFORM src/utils/win/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES_COMMON} ${UTILS_FILES_PLATFORM})
     #set(CMAKE_TOOLCHAIN_FILE "D:/code/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
     set(CURL_INCLUDE_DIR "D:/code/vcpkg/installed/x64-windows/include")
     set(CURL_LIBRARIES "D:/code/vcpkg/installed/x64-windows/lib/libcurl.lib")
@@ -412,8 +414,9 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     list(APPEND PAG_SHARED_LIBS ${CURL_LIBRARIES})
     list(APPEND PAG_INCLUDES ${CURL_INCLUDE_DIRS})
     list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/include)
-    file(GLOB_RECURSE UTILS_FILES src/utils/linux/*.*)
-    list(APPEND PAG_FILES ${UTILS_FILES})
+    file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp)
+    file(GLOB_RECURSE UTILS_FILES_PLATFORM src/utils/linux/*.*)
+    list(APPEND PAG_FILES ${UTILS_FILES_COMMON} ${UTILS_FILES_PLATFORM})
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavcodec.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavfilter.so 
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/linux/x86_64/libavformat.so 
