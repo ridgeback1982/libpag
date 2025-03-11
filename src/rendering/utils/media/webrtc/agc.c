@@ -2078,7 +2078,7 @@ int WebRtcAgc_get_config(void *agcInst, WebRtcAgcConfig *config) {
     return 0;
 }
 
-void *WebRtcAgc_Create() {
+void *WebRtcAgc_Create(void) {
     LegacyAgc *stt = malloc(sizeof(LegacyAgc));
 
 #ifdef WEBRTC_AGC_DEBUG_DUMP
