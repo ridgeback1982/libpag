@@ -310,12 +310,21 @@ elseif (MACOS)
     file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp)
     file(GLOB_RECURSE UTILS_FILES_PLATFORM src/utils/macos/*.*)
     list(APPEND PAG_FILES ${UTILS_FILES_COMMON} ${UTILS_FILES_PLATFORM})
+    list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/include)
     list(APPEND PAG_SHARED_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavutil.xcframework/macos-arm64_x86_64/libavutil.framework
                             ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavcodec.xcframework/macos-arm64_x86_64/libavcodec.framework 
-                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
-                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswscale.xcframework/macos-arm64_x86_64/libswscale.framework
-                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswresample.xcframework/macos-arm64_x86_64/libswresample.framework
-                        ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavfilter.xcframework/macos-arm64_x86_64/libavfilter.framework)
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavformat.xcframework/macos-arm64_x86_64/libavformat.framework
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswscale.xcframework/macos-arm64_x86_64/libswscale.framework
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libswresample.xcframework/macos-arm64_x86_64/libswresample.framework
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg-6.1.2/lib/macos/libavfilter.xcframework/macos-arm64_x86_64/libavfilter.framework
+                        
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_core.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_calib3d.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_features2d.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_flann.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_imgcodecs.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_imgproc.4.11.0.dylib
+                            ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/lib/macos/libopencv_objdetect.4.11.0.dylib)
     list(APPEND PAG_SHARED_LIBS curl)
     message(PAG_SHARED_LIBS="${PAG_SHARED_LIBS}")
 

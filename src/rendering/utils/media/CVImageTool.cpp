@@ -1,17 +1,15 @@
 #include "CVImageTool.h"
 #include <iostream>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
 #include "opencv2/opencv.hpp"
-
-
 #endif
 
 
 //zzy
 namespace pag {
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
 bool CVImageTool::hasRectFrameInside(const std::string& path) {
     // 1. 读取图片
     cv::Mat img = cv::imread(path);

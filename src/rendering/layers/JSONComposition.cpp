@@ -71,6 +71,7 @@ extern "C" {
 #elif defined(__APPLE__) && defined(__MACH__)
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "rendering/utils/media/CVImageTool.h"
 #endif
 
 
@@ -440,7 +441,7 @@ int ArticleContent::init(const std::string& tmpDir) {
         printf("ArticleContent::init, pick bgc:%s\n", backgroundColor.c_str());
       }
     } else {
-  #if defined(__linux__)
+  #if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
       printf("ArticleContent::init, check if bgi has rect frame\n");
       if (pag::CVImageTool::hasRectFrameInside(bgcLocalPath)) {
         //if there is a rectangle frame(边框) in the bgi, bgc will be useless
@@ -1341,7 +1342,7 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
 
   //step 3: handle other variables
   bool search4BGI = (articleTrack->content.backgroundColor == "auto");
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
   search4BGI = true;
 #endif
   if (search4BGI) {

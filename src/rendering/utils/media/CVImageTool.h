@@ -11,7 +11,7 @@ namespace pag {
 
 class CVImageTool {
 public:
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
     static bool hasRectFrameInside(const std::string& path);
 
 
