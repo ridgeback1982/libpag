@@ -443,7 +443,7 @@ int ArticleContent::init(const std::string& tmpDir) {
     } else {
   #if defined(__linux__) || defined(__APPLE__) && defined(__MACH__)
       printf("ArticleContent::init, check if bgi has rect frame\n");
-      if (pag::CVImageTool::hasRectFrameInside(bgcLocalPath)) {
+      if (pag::CVImageTool::hasApproxRectFrameInside(bgcLocalPath)) {
         //if there is a rectangle frame(边框) in the bgi, bgc will be useless
         //so hard code it to totally transparent(any color)
         backgroundColor = "rgba(255,255,255,0.0)";
