@@ -348,6 +348,53 @@ namespace movie {
         ArticleContent::to_json(j, a);        
     }
 
+    class FPageContent {
+    public:
+        std::vector<Sentence> sentences;
+        Location location;
+        float fontSize = 0.05f;
+        std::string fontFamilyName;
+        std::string textColor;
+        float horizontalIndent = 0.5f;           //0.0 - 1.0, times of fontSize
+        float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
+        float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize
+        std::string backgroundColor = "rgba(255,255,255,0.4)";
+        std::string backgroundImage;            //if not specified, bgc is used
+        static void from_json(const json& j, FPageContent& f) {
+            j.at("sentences").get_to(f.sentences);
+            j.at("location").get_to(f.location);
+            if (j.contains("fontSize"))
+                j.at("fontSize").get_to(f.fontSize);
+            if (j.contains("fontFamilyName"))
+                j.at("fontFamilyName").get_to(f.fontFamilyName);
+            if (j.contains("textColor"))
+                j.at("textColor").get_to(f.textColor);
+            if (j.contains("horizontalIndent"))
+                j.at("horizontalIndent").get_to(f.horizontalIndent);
+            if (j.contains("verticalSpacing"))
+                j.at("verticalSpacing").get_to(f.verticalSpacing);
+            if (j.contains("horizontalSpacing"))
+                j.at("horizontalSpacing").get_to(f.horizontalSpacing);
+            if (j.contains("backgroundColor"))
+                j.at("backgroundColor").get_to(f.backgroundColor);
+            if (j.contains("backgroundImage"))
+                j.at("backgroundImage").get_to(f.backgroundImage);
+        }
+        static void to_json(json& j, const FPageContent& f) {
+            j = {{"sentences", f.sentences}, {"location", f.location}, {"fontSize", f.fontSize}, {"fontFamilyName", f.fontFamilyName}, {"textColor", f.textColor}, 
+                 {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing},
+                {"backgroundColor", f.backgroundColor}, {"backgroundImage", f.backgroundImage}};
+        }
+
+        int init(const std::string& tmpDir);
+    };
+    void from_json(const json& j, FPageContent& f) {
+        FPageContent::from_json(j, f);
+    }
+    void to_json(json& j, const FPageContent& f) {
+        FPageContent::to_json(j, f);
+    }
+
     class LifeTime {
     public:
         int begin_time = 0;
@@ -544,6 +591,25 @@ namespace movie {
         ArticleTrack::to_json(j, a);
     }
 
+    class FPageTrack : public Track {
+    public:
+        FPageContent content;
+        static void from_json(const json& j, FPageTrack& f) {
+            Track::from_json(j, f);
+            j.at("content").get_to(f.content);
+        }
+        static void to_json(json& j, const FPageTrack& f) {
+            Track::to_json(j, f);
+            j["content"] = f.content;
+        }
+    };
+    void from_json(const json& j, FPageTrack& f) {
+        FPageTrack::from_json(j, f);
+    }
+    void to_json(json& j, const FPageTrack& f) {
+        FPageTrack::to_json(j, f);
+    }
+
     ///////////////////////////////////////
     class Story {
     public:
@@ -583,6 +649,10 @@ namespace movie {
                 } else if (jtrack.at("type").get<std::string>() == "article") {
                     auto t = new ArticleTrack();
                     ArticleTrack::from_json(jtrack, *t);
+                    s.tracks.push_back(t);
+                } else if (jtrack.at("type").get<std::string>() == "fpage") {
+                    auto t = new FPageTrack();
+                    FPageTrack::from_json(jtrack, *t);
                     s.tracks.push_back(t);
                 } else {
 
@@ -628,6 +698,10 @@ namespace movie {
                 } else if (t->type == "article") {
                     auto jtrack = json::object();
                     ArticleTrack::to_json(jtrack, *static_cast<ArticleTrack*>(t));
+                    tracks.push_back(jtrack);
+                } else if (t->type == "fpage") {
+                    auto jtrack = json::object();
+                    FPageTrack::to_json(jtrack, *static_cast<FPageTrack*>(t));
                     tracks.push_back(jtrack);
                 } else {
                 }

@@ -310,6 +310,10 @@ int ImageContent::init(const std::string& tmpDir) {
   return 0;
 }
 
+int FPageContent::init([[maybe_unused]]const std::string& tmpDir) {
+  return 0;
+}
+
 struct RGB {
     double r; // 0-255
     double g; // 0-255
@@ -1179,6 +1183,71 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   return layers;
 }
 
+std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, const movie::MovieSpec& spec) {
+  std::vector<Layer*> layers;
+  movie::FPageContent* content = &fpageTrack->content;
+  int width = spec.width;
+  int height = spec.height;
+  int fontSize = std::round(std::min(width, height) * content->fontSize);
+  int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;     //纵向间距
+  int trackingInP = std::ceil(content->horizontalSpacing * fontSize);             //横向间距
+  int horiIndentInP = std::round(content->horizontalIndent * fontSize);             //缩进
+  horiIndentInP = ((horiIndentInP >> 1) << 1);
+  int regionCenterX = std::round(content->location.center_x * width);
+  int regionCenterY = std::round(content->location.center_y * height);
+  int regionWidth = std::round(content->location.w * width);
+  int regionHeight = std::round(content->location.h * height);
+
+  //modify vertical indent
+  int sentenceCount = (int)content->sentences.size();
+  int visibleWidth = regionWidth - horiIndentInP * 2;
+  int visibleHeight = leadingInP * sentenceCount - std::ceil(content->verticalSpacing * fontSize);
+  visibleHeight = ((visibleHeight >> 1) << 1);
+  if (visibleHeight > regionHeight) {
+    std::cerr << "FPage content is too big to fit in the region" << std::endl;
+  }
+  int x = regionCenterX - visibleWidth/2;
+  int y = regionCenterY - visibleHeight/2;
+  for (auto& sentence : content->sentences) {
+    // step 1: create text data
+    auto textData = new TextDocument();
+    textData->fontSize = fontSize;
+    textData->text = sentence.text;
+    if (!content->fontFamilyName.empty()) {
+      textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+    }
+    if (!content->textColor.empty()) {
+      auto c = translateColor(content->textColor);
+      textData->fillColor = Color{c.r, c.g, c.b};
+    }
+    textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
+    textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);
+    textData->firstBaseLine = 0;   //hardcode
+    //step 2: create text layer
+    auto textLayer = new TextLayer();
+    textLayer->id = UniqueID::Next();
+    textLayer->startTime = TimeToFrame(fpageTrack->lifetime.begin_time, spec.fps);
+    textLayer->duration = LifetimeToFrameDuration(fpageTrack->lifetime, spec.fps);
+    textLayer->transform = Transform2D::MakeDefault().release();
+    textLayer->transform->anchorPoint->value.set(0, 0); //hard code
+    //todo: get accurate rect width by calculating each font's width(中文&英文)
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    std::u32string unicodeStr = converter.from_bytes(sentence.text);
+    int sentenceRectWidth = (int)unicodeStr.length() * (trackingInP + fontSize);
+    sentenceRectWidth = ((sentenceRectWidth >> 1) << 1);
+    int sentenceRectHeight = fontSize;
+    sentenceRectHeight = ((sentenceRectHeight >> 1) << 1);
+    textLayer->transform->position->value.set(x + sentenceRectWidth/2, y + sentenceRectHeight/2);
+    textLayer->timeRemap = new Property<float>(0);      //hard code
+    textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
+
+    layers.push_back(textLayer);
+    y += leadingInP;
+  }
+
+  return layers;
+}
+
 #pragma clang diagnostic pop
 
 ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
@@ -1613,6 +1682,32 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
                 jsonComposition->addLayer(pagShapeLayer);
               }
             }
+        } else if (t->type == "fpage") {
+          auto track = static_cast<movie::FPageTrack*>(t);
+          if (track->content.init(tmpDir) < 0) {
+            std::cerr << "Error initializing article track" << std::endl;
+            return nullptr;
+          }
+          auto layers = createFPageRelatedLayers(track, movie.video);
+          for (auto layer : layers) {
+            vecComposition->layers.push_back(layer);
+            if (layer->type() == LayerType::Text) {
+              auto pagTextLayer = std::make_shared<PAGTextLayer>(nullptr, (TextLayer*)layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagTextLayer->setFrameRate(movie.video.fps);
+              jsonComposition->addLayer(pagTextLayer);
+            } else if (layer->type() == LayerType::Solid) {
+              auto pagSolidLayer = std::make_shared<PAGSolidLayer>(nullptr, (SolidLayer*)layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagSolidLayer->setFrameRate(movie.video.fps); 
+              jsonComposition->addLayer(pagSolidLayer);
+            } else if (layer->type() == LayerType::Shape) {
+              auto pagShapeLayer = std::make_shared<PAGShapeLayer>(nullptr, (ShapeLayer*)layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagShapeLayer->setFrameRate(movie.video.fps);
+              jsonComposition->addLayer(pagShapeLayer);
+            }
+          }
         }
         if (progressCB) {
           progressCB(tCount++ * 100 / story->tracks.size());
