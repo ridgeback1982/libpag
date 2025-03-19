@@ -74,6 +74,8 @@ extern "C" {
 #include "rendering/utils/media/CVImageTool.h"
 #endif
 
+#define NAS_USERNAME   "lfznadmin"
+#define NAS_PASSWORD   "Lfzn20250315"
 
 namespace fs = std::filesystem;
 
@@ -116,10 +118,12 @@ int curlDownload(const std::string& url, const std::string& localPath, bool just
     }
     int ret = 0;
     bool needRetry = false;
+    std::string userpwd = std::string(NAS_USERNAME) + ":" + NAS_PASSWORD;
     CURL* curl = curl_easy_init();
     if (curl) {
         std::ofstream file(localPath, std::ios::binary);
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd.c_str());
         //curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
