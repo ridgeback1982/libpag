@@ -382,7 +382,9 @@ namespace movie {
                 j.at("zorder").get_to(t.zorder);
         }
         static void to_json(json& j, const Track& t) {
-            j = {{"type", t.type}, {"lifetime", t.lifetime}, {"zorder", t.zorder}};
+            j = {{"type", t.type}, {"zorder", t.zorder}};
+            if (t.lifetime.end_time > 0)
+                j["lifetime"] = t.lifetime;
         }
     };
     void from_json(const json& j, Track& t) {
@@ -593,8 +595,8 @@ namespace movie {
         }
 
         static void to_json(json& j, const Story& s) {
-            // j = {{"tracks", s.tracks}, {"duration", s.duration}};
-            j = {{"duration", s.duration}};
+            if (s.duration > 0)
+                j["duration"] = s.duration;
             auto tracks = json::array();
             for (auto& t : s.tracks) {
                 if (t->type == "video") {
