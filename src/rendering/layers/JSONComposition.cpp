@@ -1227,6 +1227,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
     textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);
     textData->firstBaseLine = 0;   //hardcode
+
     //step 2: create text layer
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
@@ -1246,6 +1247,61 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     textLayer->sourceText = new Property<TextDocumentHandle>(pag::TextDocumentHandle(textData));
 
     layers.push_back(textLayer);
+
+    //step 3: create shape layer as 画线
+    auto shapeLayer = new ShapeLayer();
+    shapeLayer->id = UniqueID::Next();
+    shapeLayer->startTime = TimeToFrame(sentence.begin_time, spec.fps);
+    shapeLayer->duration = TimeToFrame(sentence.end_time, spec.fps) - TimeToFrame(sentence.begin_time, spec.fps);
+    shapeLayer->transform = Transform2D::MakeDefault().release();
+    shapeLayer->transform->anchorPoint->value.set(0, 0);                //hard code
+    shapeLayer->transform->position->value.set(0, 0);
+    shapeLayer->timeRemap = new Property<float>(0);                     //hard code
+    shapeLayer->name = "文字划线";
+    auto shapeElement = new ShapeGroupElement();
+    shapeElement->transform = new ShapeTransform();
+    shapeElement->transform->anchorPoint = new Property<Point>(pag::Point::Make(0, 0));      //hard code
+    shapeElement->transform->position = new Property<Point>(pag::Point::Make(0, 0));         //hard code
+    shapeElement->transform->scale = new Property<Point>(pag::Point::Make(1, 1));            //hard code
+    shapeElement->transform->skew = new Property<float>(0);             //hard code
+    shapeElement->transform->skewAxis = new Property<float>(0);         //hard code
+    shapeElement->transform->rotation = new Property<float>(0);         //hard code
+    shapeElement->transform->opacity = new Property<Opacity>(255);      //hard code
+    //划线是从哪里到哪里
+    auto shapePathElement = new ShapePathElement();
+    auto pathData = std::make_shared<PathData>();
+    pathData->moveTo(x, y + fontSize);
+    pathData->lineTo(x + sentenceRectWidth, y + fontSize);
+    pathData->close();  //close will make it a closed path
+    shapePathElement->shapePath = new Property<PathHandle>(pathData);
+    shapeElement->elements.push_back(shapePathElement);
+    //通过trim path做动画
+    std::vector<Keyframe<float>*> keyframes = {};
+    auto trimPathsElement = new TrimPathsElement();
+    trimPathsElement->start = new Property<float>(0);           //hard code
+    auto keyFrame = new SingleEaseKeyframe<float>();
+    keyFrame->startTime = shapeLayer->startTime;
+    keyFrame->endTime = shapeLayer->startTime + shapeLayer->duration;
+    keyFrame->startValue = 0.0f;          //hard code
+    keyFrame->endValue = 0.5f;  //zzy, it's wired, it should be 1.0f, but the moving effect is abnormal. Then I tried, and find 0.5 is a good value
+    keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+    keyframes.push_back(keyFrame);
+    trimPathsElement->end = new AnimatableProperty<float>(keyframes);
+    trimPathsElement->offset = new Property<float>(0);           //hard code
+    shapeElement->elements.push_back(trimPathsElement);
+    //划线的静态属性
+    auto strokeElement = new StrokeElement();
+    strokeElement->color = new Property<pag::Color>(pag::Red);                  //hard code
+    strokeElement->opacity = new Property<Opacity>(255);                        //hard code
+    strokeElement->miterLimit = new Property<float>(4);                         //hard code
+    strokeElement->dashOffset = new Property<float>(0);                         //hard code
+    strokeElement->strokeWidth = new Property<float>(8);                        //划线宽度
+    strokeElement->dashes.push_back(new Property<float>(10));                   //虚线密度
+    shapeElement->elements.push_back(strokeElement);
+
+    shapeLayer->contents.push_back(shapeElement);
+    layers.push_back(shapeLayer);
+
     y += leadingInP;
   }
 
