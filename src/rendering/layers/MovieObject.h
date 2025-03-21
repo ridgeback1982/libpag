@@ -382,8 +382,11 @@ namespace movie {
         }
         static void to_json(json& j, const FPageContent& f) {
             j = {{"sentences", f.sentences}, {"location", f.location}, {"fontSize", f.fontSize}, {"fontFamilyName", f.fontFamilyName}, {"textColor", f.textColor}, 
-                 {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing},
-                {"backgroundColor", f.backgroundColor}, {"backgroundImage", f.backgroundImage}};
+                 {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing}};
+            if (!f.backgroundColor.empty())
+                j["backgroundColor"] = f.backgroundColor;
+            if (!f.backgroundImage.empty())
+                j["backgroundImage"] = f.backgroundImage;
         }
 
         int init(const std::string& tmpDir);
@@ -711,12 +714,8 @@ namespace movie {
             j["tracks"] = tracks;
         }
 
-        void Reset() {
-            duration = 0;
-            tracks.clear();
-        }
-
         void Destroy() {
+            duration = 0;
             for (auto& t : tracks) {
                 if (t) {
                     delete t;
