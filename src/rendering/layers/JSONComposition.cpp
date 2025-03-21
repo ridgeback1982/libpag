@@ -46,6 +46,7 @@ extern "C" {
 }
 #include "MovieObject.h"
 #include "file_util.h"
+#include "nas_config.h"
 #include <set>
 #include <cmath>
 #include <iostream>
@@ -74,9 +75,6 @@ extern "C" {
 #include "rendering/utils/media/CVImageTool.h"
 #endif
 
-#define NAS_USERNAME   "lfznadmin"
-#define NAS_PASSWORD   "Lfzn20250315"
-
 namespace fs = std::filesystem;
 
 //NOTE:
@@ -84,7 +82,8 @@ namespace fs = std::filesystem;
 
 namespace movie {
 
-bool starts_with(const std::string& str, const std::string& prefix) {
+//todo: move to a file
+static bool starts_with(const std::string& str, const std::string& prefix) {
     return str.compare(0, prefix.size(), prefix) == 0;
 }
 
