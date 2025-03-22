@@ -13,14 +13,11 @@ extern "C" {
 
 #include "FFError.h"
 #include "nas_config.h"
+#include "utils/common_util.h"
 
 //zzy
 namespace pag {
 
-//todo: move to a file
-static bool starts_with(const std::string& str, const std::string& prefix) {
-  return str.compare(0, prefix.size(), prefix) == 0;
-}
 
 FFFormatUtil::FFFormatUtil(const std::string& url) {
     int video_stream_index = -1;

@@ -45,7 +45,8 @@ extern "C" {
   #include "libavutil/imgutils.h"
 }
 #include "MovieObject.h"
-#include "file_util.h"
+#include "utils/file_util.h"
+#include "utils/common_util.h"
 #include "nas_config.h"
 #include <set>
 #include <cmath>
@@ -82,10 +83,6 @@ namespace fs = std::filesystem;
 
 namespace movie {
 
-//todo: move to a file
-static bool starts_with(const std::string& str, const std::string& prefix) {
-    return str.compare(0, prefix.size(), prefix) == 0;
-}
 
 std::string getFileNameFromUrl(const std::string& url) {
     size_t pos1 = url.find_last_of('/');
@@ -218,7 +215,7 @@ int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, ui
 }
 
 int VideoContent::init(const std::string& tmpDir) {
-  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  bool remote = pag::starts_with(path, "http://") || pag::starts_with(path, "https://");
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
@@ -254,7 +251,7 @@ int VideoContent::init(const std::string& tmpDir) {
 }
 
 int AudioContent::init(const std::string& tmpDir) {
-  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  bool remote = pag::starts_with(path, "http://") || pag::starts_with(path, "https://");
   // printf("AudioContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
@@ -281,7 +278,7 @@ int AudioContent::init(const std::string& tmpDir) {
 }
 
 int ImageContent::init(const std::string& tmpDir) {
-  bool remote = starts_with(path, "http://") || starts_with(path, "https://");
+  bool remote = pag::starts_with(path, "http://") || pag::starts_with(path, "https://");
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
@@ -407,7 +404,7 @@ int ArticleContent::init(const std::string& tmpDir) {
   std::string bgcLocalPath;
   if (!_bgcImageUrl.empty()) {
     bgcLocalPath = _bgcImageUrl;
-    bool remote = starts_with(_bgcImageUrl, "http://") || starts_with(_bgcImageUrl, "https://");
+    bool remote = pag::starts_with(_bgcImageUrl, "http://") || pag::starts_with(_bgcImageUrl, "https://");
     if (remote) {
         //create local path
         bgcLocalPath = tmpDir + "/" + getFileNameFromUrl(_bgcImageUrl);
@@ -647,7 +644,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 //rgb(216, 27, 67) or rgba(255,255,255,1) or #FFF
 movie::RGBA translateColor(const std::string& color_string) {
   movie::RGBA color = {255, 255, 255, 255};
-  if (movie::starts_with(color_string, "rgba")) {
+  if (pag::starts_with(color_string, "rgba")) {
     std::regex regex_pattern(R"(rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d+(\.\d+)?)\s*\))");
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
@@ -659,7 +656,7 @@ movie::RGBA translateColor(const std::string& color_string) {
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
-  } else if (movie::starts_with(color_string, "rgb")) {
+  } else if (pag::starts_with(color_string, "rgb")) {
     std::regex regex_pattern(R"(rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\))");
     std::smatch match;
     if (std::regex_match(color_string, match, regex_pattern)) {
@@ -670,7 +667,7 @@ movie::RGBA translateColor(const std::string& color_string) {
     } else {
         std::cout << "输入字符串不匹配 RGBA 格式" << std::endl;
     }
-  } else if (movie::starts_with(color_string, "#")) {
+  } else if (pag::starts_with(color_string, "#")) {
     // 定义正则表达式
     std::regex regex_pattern("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
     std::smatch match;

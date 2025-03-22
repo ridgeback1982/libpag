@@ -46,12 +46,4 @@ fs::path create_temp_directory(const std::string& prefix) {
    return new_temp_dir;
 }
 
-void stringReplace(std::string& str, const std::string& old_value, const std::string& new_value) {
-  size_t pos = 0;
-  while ((pos = str.find(old_value, pos)) != std::string::npos) {
-      str.replace(pos, old_value.length(), new_value);
-      pos += new_value.length();  // 移动位置，避免无限循环
-  }
-}
-
 } // namespace pag
