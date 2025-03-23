@@ -16,11 +16,9 @@ std::string getPlatformTemporaryDirectory();
 
 std::string findEnglishFontName(const std::string& chineseFontName);
 
-void PAG_API writeStringToFile(const std::string& str, const fs::path& filePath);
+void PAG_API writeStringToFile(const std::string& str, const fs::path& filePath, bool append = false);
 
 fs::path PAG_API create_temp_directory(const std::string& prefix = "tmp_");
-
-void PAG_API stringReplace(std::string& str, const std::string& old_value, const std::string& new_value);
 
 bool PAG_API runOnServer();
 

@@ -12,20 +12,32 @@ extern "C" {
 }
 
 #include "FFError.h"
+#include "nas_config.h"
+#include "utils/common_util.h"
+#include "utils/nas_config.h"
 
 //zzy
 namespace pag {
 
+
 FFFormatUtil::FFFormatUtil(const std::string& url) {
-    AVFormatContext *fmt_ctx = NULL;
     int video_stream_index = -1;
 
     // 初始化 FFmpeg 库
     avformat_network_init();
-
+    
+    AVFormatContext *fmt_ctx = avformat_alloc_context();
+    std::string new_url = url;
+    if (starts_with(new_url, NAS_HTTP_IP) || starts_with(new_url, NAS_HTTP_HOST)) {
+      std::string http = "http://";
+      size_t pos = new_url.find(http);
+      if (pos != std::string::npos) {
+          new_url.insert(pos + http.length(), std::string(NAS_USERNAME) + ":" + std::string(NAS_PASSWORD) + "@");
+      }
+    }
     // 打开输入文件
-    if (avformat_open_input(&fmt_ctx, url.c_str(), NULL, NULL) < 0) {
-      std::cerr << "Could not open input file:" << url << std::endl;
+    if (avformat_open_input(&fmt_ctx, new_url.c_str(), NULL, NULL) < 0) {
+      std::cerr << "Could not open input file:" << new_url << std::endl;
       avformat_free_context(fmt_ctx);
       return;
     }
@@ -52,7 +64,7 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
     }
 
     if (video_stream_index == -1) {
-      std::cerr << "Could not find a video stream" << std::endl;
+//      std::cerr << "Could not find a video stream" << std::endl;
       avformat_close_input(&fmt_ctx);
       avformat_free_context(fmt_ctx);
       return;

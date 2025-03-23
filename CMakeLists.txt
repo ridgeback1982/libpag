@@ -307,7 +307,8 @@ elseif (MACOS)
     list(APPEND PAG_SHARED_LIBS ${CORE_MEDIA})
 
     #zzy
-    file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp)
+    file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp 
+                                 src/utils/common_util.cpp)
     file(GLOB_RECURSE UTILS_FILES_PLATFORM src/utils/macos/*.*)
     list(APPEND PAG_FILES ${UTILS_FILES_COMMON} ${UTILS_FILES_PLATFORM})
     list(APPEND PAG_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../opencv/include)
