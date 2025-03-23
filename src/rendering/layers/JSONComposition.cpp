@@ -848,7 +848,7 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
           int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
           int charPerLine = (int)std::round((float)charCount / lineCount);
           int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
-          std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
+          // std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
           for (int i=0; i<lineCount; i++) {
             movie::LifeTime lineLifetime;
             lineLifetime.begin_time = lifetime.begin_time + i * durPerLine;

@@ -8,8 +8,8 @@ bool runOnServer() {
   return g_on_server;
 }
 
-void writeStringToFile(const std::string& str, const fs::path& filePath) {
-    std::ofstream outFile(filePath);
+void writeStringToFile(const std::string& str, const fs::path& filePath, bool append) {
+    std::ofstream outFile(filePath, append ? std::ios::app : std::ios::out);
     if (!outFile) {
         std::cerr << "Error: Unable to open file for writing: " << filePath << std::endl;
         return;

@@ -14,6 +14,7 @@ extern "C" {
 #include "FFError.h"
 #include "nas_config.h"
 #include "utils/common_util.h"
+#include "utils/nas_config.h"
 
 //zzy
 namespace pag {
@@ -26,14 +27,12 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
     avformat_network_init();
     
     AVFormatContext *fmt_ctx = avformat_alloc_context();
-
     std::string new_url = url;
-    if (starts_with(new_url, "http://192.168")) {
+    if (starts_with(new_url, NAS_HTTP_IP) || starts_with(new_url, NAS_HTTP_HOST)) {
       std::string http = "http://";
       size_t pos = new_url.find(http);
       if (pos != std::string::npos) {
           new_url.insert(pos + http.length(), std::string(NAS_USERNAME) + ":" + std::string(NAS_PASSWORD) + "@");
-//          std::cout << "append NAS username and password to url" << std::endl;
       }
     }
     // 打开输入文件
@@ -65,7 +64,7 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
     }
 
     if (video_stream_index == -1) {
-      std::cerr << "Could not find a video stream" << std::endl;
+//      std::cerr << "Could not find a video stream" << std::endl;
       avformat_close_input(&fmt_ctx);
       avformat_free_context(fmt_ctx);
       return;

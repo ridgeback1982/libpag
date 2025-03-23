@@ -202,7 +202,6 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   // 初始化 FFmpeg 库
   avformat_network_init();
 
-
   // 打开输入文件
   if (avformat_open_input(&fmt_ctx, filePath.c_str(), NULL, NULL) < 0) {
     std::cerr << "Could not open input file:" << filePath << std::endl;
