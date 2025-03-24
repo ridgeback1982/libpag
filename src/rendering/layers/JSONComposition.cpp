@@ -1255,10 +1255,31 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   int regionHeight = std::round(content->location.h * height);
 
   //create image layer as BGI
-  movie::ImageContent& bgi = fpageTrack->content.backgroundImage;
-  fitLocation(bgi.location, bgi.width(), bgi.height(), width, height);
-  auto imageLayer = createImageLayer2(&fpageTrack->content.backgroundImage, fpageTrack->lifetime, spec);
-  layers.push_back(imageLayer);
+  if (fpageTrack->content.backgroundImage.path.empty() == false) {
+    movie::ImageContent& bgi = fpageTrack->content.backgroundImage;
+    fitLocation(bgi.location, bgi.width(), bgi.height(), width, height);
+    auto imageLayer = createImageLayer2(&fpageTrack->content.backgroundImage, fpageTrack->lifetime, spec);
+    layers.push_back(imageLayer);
+    //create a half-transparent solid layer on the BGI, for good looking
+    std::string solidColor = "rgba(255,255,255,0.4)";
+    auto c = translateColor(solidColor);
+    auto bgColor = Color{c.r, c.g, c.b};
+    auto solidLayer = new SolidLayer();
+    solidLayer->id = UniqueID::Next();
+    solidLayer->startTime = TimeToFrame(fpageTrack->lifetime.begin_time, spec.fps);
+    solidLayer->duration = LifetimeToFrameDuration(fpageTrack->lifetime, spec.fps);
+    solidLayer->transform = Transform2D::MakeDefault().release();
+    solidLayer->transform->anchorPoint->value.set(regionCenterX, regionCenterY);
+    solidLayer->transform->position->value.set(regionCenterX, regionCenterY);
+    solidLayer->transform->opacity = new Property<Opacity>(c.a);      //hard code
+    solidLayer->timeRemap = new Property<float>(0);      //hard code
+    solidLayer->name = "纯色背景";
+    solidLayer->solidColor = bgColor;
+    solidLayer->width = width;
+    solidLayer->height = height;
+      
+    layers.push_back(solidLayer);
+  }
 
   //modify vertical indent
   int sentenceCount = (int)content->sentences.size();
