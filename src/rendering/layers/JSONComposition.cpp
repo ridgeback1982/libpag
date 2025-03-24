@@ -310,7 +310,13 @@ int ImageContent::init(const std::string& tmpDir) {
   return 0;
 }
 
-int FPageContent::init([[maybe_unused]]const std::string& tmpDir) {
+int FPageContent::init(const std::string& tmpDir) {
+  if (!backgroundImage.path.empty()) {
+    if (backgroundImage.init(tmpDir) < 0) {
+      printf("FPageContent::init, backgroundImage init failed\n");
+      return -1;
+    }
+  }
   return 0;
 }
 
@@ -794,7 +800,7 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   textLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
   textLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
   textLayer->transform = Transform2D::MakeDefault().release();
-  textLayer->transform->anchorPoint->value.set(0, -30); //hard code
+  textLayer->transform->anchorPoint->value.set(0, 0); //hard code
   textLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
   textLayer->timeRemap = new Property<float>(0);      //hard code
 
@@ -1183,6 +1189,56 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   return layers;
 }
 
+ImageLayer* createImageLayer2(movie::ImageContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
+  int visual_width = spec.width * content->location.w;   //visual width, not image og width
+  int visual_height = spec.height * content->location.h;
+
+  auto imageWidth = content->width();
+  auto imageHeight = content->height();
+  auto imageLayer = new ImageLayer();
+  imageLayer->id = UniqueID::Next();
+  imageLayer->name = "image_xxx";           //hardcode
+  imageLayer->startTime = TimeToFrame(lifetime.begin_time, spec.fps);
+  imageLayer->duration = LifetimeToFrameDuration(lifetime, spec.fps);
+  imageLayer->transform = Transform2D::MakeDefault().release();
+  imageLayer->transform->anchorPoint->value.set(imageWidth/2, imageHeight/2);
+  imageLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
+  float scale_x = (float)visual_width/imageWidth;
+  float scale_y = (float)visual_height/imageHeight;
+  imageLayer->transform->scale->value.set(scale_x, scale_y);
+
+  imageLayer->timeRemap = new Property<float>(0);      //hard code
+  imageLayer->imageBytes = new ImageBytes();
+  imageLayer->imageBytes->id = UniqueID::Next();
+  imageLayer->imageBytes->width = imageWidth;
+  imageLayer->imageBytes->height = imageHeight;
+  imageLayer->imageBytes->fileBytes = ByteData::FromPath(content->localPath()).release();
+
+  //test code
+  // {
+  //     //hard code animation: scale
+  //     auto keyFrame1 = new SingleEaseKeyframe<pag::Point>();
+  //     keyFrame1->startTime = -200;
+  //     keyFrame1->endTime = imageLayer->duration;
+  //     keyFrame1->startValue = pag::Point::Make(spec.width*content->location.center_x, 2400.0);   //set by json
+  //     keyFrame1->endValue = pag::Point::Make(spec.width*content->location.center_x, 0.0f);   //set by json
+  //     keyFrame1->interpolationType = KeyframeInterpolationType::Linear;  //hard code
+  //     std::vector<Keyframe<pag::Point>*> keyframes = {};
+  //     keyframes.push_back(keyFrame1);
+  //     //release former scale property
+  //     if (imageLayer->transform->position) {
+  //       delete imageLayer->transform->position;
+  //     }
+  //     imageLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
+  //   }
+  return imageLayer;
+}
+
+ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
+  movie::ImageContent* content = &static_cast<movie::ImageTrack*>(track)->content;
+  return createImageLayer2(content, track->lifetime, spec);
+}
+
 std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, const movie::MovieSpec& spec) {
   std::vector<Layer*> layers;
   movie::FPageContent* content = &fpageTrack->content;
@@ -1198,6 +1254,12 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   int regionWidth = std::round(content->location.w * width);
   int regionHeight = std::round(content->location.h * height);
 
+  //create image layer as BGI
+  movie::ImageContent& bgi = fpageTrack->content.backgroundImage;
+  fitLocation(bgi.location, bgi.width(), bgi.height(), width, height);
+  auto imageLayer = createImageLayer2(&fpageTrack->content.backgroundImage, fpageTrack->lifetime, spec);
+  layers.push_back(imageLayer);
+
   //modify vertical indent
   int sentenceCount = (int)content->sentences.size();
   int visibleWidth = regionWidth - horiIndentInP * 2;
@@ -1209,7 +1271,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   int x = regionCenterX - visibleWidth/2;
   int y = regionCenterY - visibleHeight/2;
   for (auto& sentence : content->sentences) {
-    // step 1: create text data
+    //step 1: create text layer
     auto textData = new TextDocument();
     textData->fontSize = fontSize;
     textData->text = sentence.text;
@@ -1224,7 +1286,6 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);
     textData->firstBaseLine = 0;   //hardcode
 
-    //step 2: create text layer
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
     textLayer->startTime = TimeToFrame(fpageTrack->lifetime.begin_time, spec.fps);
@@ -1244,7 +1305,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
 
     layers.push_back(textLayer);
 
-    //step 3: create shape layer as 画线
+    //step 2: create shape layer as 画线
     auto shapeLayer = new ShapeLayer();
     shapeLayer->id = UniqueID::Next();
     shapeLayer->startTime = TimeToFrame(sentence.begin_time, spec.fps);
@@ -1297,7 +1358,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
 
     shapeLayer->contents.push_back(shapeElement);
     layers.push_back(shapeLayer);
-
+    
     y += leadingInP;
   }
 
@@ -1305,53 +1366,6 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
 }
 
 #pragma clang diagnostic pop
-
-ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) {
-  movie::ImageContent* content = &static_cast<movie::ImageTrack*>(track)->content;
-  int visual_width = spec.width * content->location.w;   //visual width, not image og width
-  int visual_height = spec.height * content->location.h;
-
-  auto imageWidth = content->width();
-  auto imageHeight = content->height();
-  auto imageLayer = new ImageLayer();
-  imageLayer->id = UniqueID::Next();
-  imageLayer->name = "image_xxx";           //hardcode
-  imageLayer->startTime = TimeToFrame(track->lifetime.begin_time, spec.fps);
-  imageLayer->duration = LifetimeToFrameDuration(track->lifetime, spec.fps);
-  imageLayer->transform = Transform2D::MakeDefault().release();
-  imageLayer->transform->anchorPoint->value.set(imageWidth/2, imageHeight/2);
-  imageLayer->transform->position->value.set(spec.width*content->location.center_x, spec.height*content->location.center_y);
-  float scale_x = (float)visual_width/imageWidth;
-  float scale_y = (float)visual_height/imageHeight;
-  imageLayer->transform->scale->value.set(scale_x, scale_y);
-
-  imageLayer->timeRemap = new Property<float>(0);      //hard code
-  imageLayer->imageBytes = new ImageBytes();
-  imageLayer->imageBytes->id = UniqueID::Next();
-  imageLayer->imageBytes->width = imageWidth;
-  imageLayer->imageBytes->height = imageHeight;
-  imageLayer->imageBytes->fileBytes = ByteData::FromPath(content->localPath()).release();
-
-  //test code
-  // {
-  //     //hard code animation: scale
-  //     auto keyFrame1 = new SingleEaseKeyframe<pag::Point>();
-  //     keyFrame1->startTime = -200;
-  //     keyFrame1->endTime = imageLayer->duration;
-  //     keyFrame1->startValue = pag::Point::Make(spec.width*content->location.center_x, 2400.0);   //set by json
-  //     keyFrame1->endValue = pag::Point::Make(spec.width*content->location.center_x, 0.0f);   //set by json
-  //     keyFrame1->interpolationType = KeyframeInterpolationType::Linear;  //hard code
-  //     std::vector<Keyframe<pag::Point>*> keyframes = {};
-  //     keyframes.push_back(keyFrame1);
-  //     //release former scale property
-  //     if (imageLayer->transform->position) {
-  //       delete imageLayer->transform->position;
-  //     }
-  //     imageLayer->transform->position = new AnimatableProperty<pag::Point>(keyframes);
-  //   }
-
-  return imageLayer;
-}
 
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
     audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str(), typedTrack->type == "voice" ? AudioSourceType::Voice : AudioSourceType::Bgm); \
@@ -1537,18 +1551,18 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
     story->duration = totalDuration;
   }
 
-  //add water mark
-  auto waterMark = new movie::TitleTrack();
-  waterMark->type = "title";
-  waterMark->lifetime.begin_time = 0;
-  waterMark->lifetime.end_time = story->duration;
-  waterMark->zorder = 1000;
-  waterMark->content.text = ".";
-  waterMark->content.location.center_x = 0.1f;
-  waterMark->content.location.center_y = 0.9f;
-  waterMark->content.fontSize = 0.05f;
-  waterMark->content.textColor = "#777777";
-  story->tracks.push_back(waterMark);
+  // //add water mark
+  // auto waterMark = new movie::TitleTrack();
+  // waterMark->type = "title";
+  // waterMark->lifetime.begin_time = 0;
+  // waterMark->lifetime.end_time = story->duration;
+  // waterMark->zorder = 1000;
+  // waterMark->content.text = ".";
+  // waterMark->content.location.center_x = 0.1f;
+  // waterMark->content.location.center_y = 0.9f;
+  // waterMark->content.fontSize = 0.05f;
+  // waterMark->content.textColor = "#777777";
+  // story->tracks.push_back(waterMark);
 
   //check duration of all tracks
   for (auto& t : story->tracks) {
@@ -1762,6 +1776,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               //zzy, must set frame rate in case of null PAGFile
               pagShapeLayer->setFrameRate(movie.video.fps);
               jsonComposition->addLayer(pagShapeLayer);
+            } else if (layer->type() == LayerType::Image) {
+              auto pagImageLayer = std::make_shared<PAGImageLayer>(nullptr, (ImageLayer*)layer);
+              //zzy, must set frame rate in case of null PAGFile
+              pagImageLayer->setFrameRate(movie.video.fps); 
+              jsonComposition->addLayer(pagImageLayer);
             }
           }
         }

@@ -359,7 +359,7 @@ namespace movie {
         float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
         float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize
         std::string backgroundColor = "rgba(255,255,255,0.4)";
-        std::string backgroundImage;            //if not specified, bgc is used
+        ImageContent backgroundImage;           //if not specified, bgc is used
         static void from_json(const json& j, FPageContent& f) {
             j.at("sentences").get_to(f.sentences);
             j.at("location").get_to(f.location);
@@ -385,7 +385,7 @@ namespace movie {
                  {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing}};
             if (!f.backgroundColor.empty())
                 j["backgroundColor"] = f.backgroundColor;
-            if (!f.backgroundImage.empty())
+            if (!f.backgroundImage.path.empty())
                 j["backgroundImage"] = f.backgroundImage;
         }
 

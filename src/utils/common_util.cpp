@@ -55,4 +55,24 @@ bool starts_with(const std::string& str, const std::string& prefix) {
     return str.compare(0, prefix.size(), prefix) == 0;
 }
 
+// 判断字符是否是标点符号（包括中文和英文）
+bool isPunctuationOrNewline(wchar_t ch) {
+    // 标准 C++ iswpunct 适用于英文标点
+    if (std::iswpunct(ch)) return true;
+
+    // 中文标点符号的 Unicode 范围
+    if ((ch >= 0x3000 && ch <= 0x303F) ||  // CJK 符号和标点
+        (ch >= 0xFF00 && ch <= 0xFFEF) ||  // 全角标点
+        (ch >= 0x2010 && ch <= 0x2027)) {  // 特殊标点
+        return true;
+    }
+
+    // 过滤回车（\r）和换行（\n）
+    return ch == L'\n' || ch == L'\r';
+}
+
+void removePunctuation(std::wstring &str) {
+    str.erase(std::remove_if(str.begin(), str.end(), isPunctuationOrNewline), str.end());
+}
+
 }   // namespace pag
