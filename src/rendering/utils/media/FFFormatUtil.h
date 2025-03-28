@@ -5,6 +5,12 @@
 #include "base/utils/UniqueID.h"
 #include "pag/pag.h"
 
+extern "C" {
+    #include <libavcodec/avcodec.h>
+    #include <libavformat/avformat.h>
+    #include <libswscale/swscale.h>
+}
+
 namespace pag {
 
 class PAG_API FFFormatUtil {
@@ -17,7 +23,11 @@ public:
     int fps() { return _fps; }
     int durationMS() { return std::floor(_duration * 1000); }
 
+    int writeVideoThumbnail(const std::string filePath);
+
 private:
+    AVFormatContext* _fmt_ctx;
+    int _video_stream_index = -1;
     int _width = 0;
     int _height = 0;
     int _fps = 0;
