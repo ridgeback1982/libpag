@@ -148,7 +148,7 @@ int curlDownload(const std::string& url, const std::string& localPath, bool just
         if (needRetry) {
             int retryCount = 2;
             while (retryCount > 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(30000));  //sleep for 30 sec
+                std::this_thread::sleep_for(std::chrono::milliseconds(10000));  //sleep for 10 sec
                 std::cout << "Retry downloading " << url << ", retryCount: " << retryCount << "..." << std::endl;
                 if (curlDownload(url, localPath, true) == 0) {
                     ret = 0;
