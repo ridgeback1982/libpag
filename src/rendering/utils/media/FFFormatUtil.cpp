@@ -125,7 +125,7 @@ void save_frame_as_png(AVFrame *frame, const char *filename) {
     avcodec_free_context(&codecCtx);
 }
 
-int FFFormatUtil::writeVideoThumbnail(const std::string filePath) {
+int FFFormatUtil::writeVideoThumbnail(int width, int height, const std::string filePath) {
     if (_video_stream_index == -1) {
       return -1;
     }
@@ -157,18 +157,18 @@ int FFFormatUtil::writeVideoThumbnail(const std::string filePath) {
         std::cerr << "Could not allocate frame memory" << std::endl;
         return -1;
     }
-    pFrameRGB->width = pCodecCtx->width;
-    pFrameRGB->height = pCodecCtx->height;
+    pFrameRGB->width = width;
+    pFrameRGB->height = height;
     pFrameRGB->format = AV_PIX_FMT_RGB24;
 
     // Allocate buffer for RGB image
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height, 1);
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, width, height, 1);
     uint8_t *buffer = (uint8_t *)av_malloc(numBytes);
-    av_image_fill_arrays(pFrameRGB->data, pFrameRGB->linesize, buffer, AV_PIX_FMT_RGB24, pCodecCtx->width, pCodecCtx->height, 1);
+    av_image_fill_arrays(pFrameRGB->data, pFrameRGB->linesize, buffer, AV_PIX_FMT_RGB24, width, height, 1);
 
     // Convert YUV to RGB
     struct SwsContext *sws_ctx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,
-                                                pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_RGB24,
+                                                width, height, AV_PIX_FMT_RGB24,
                                                 SWS_BILINEAR, nullptr, nullptr, nullptr);
 
     // Read frames

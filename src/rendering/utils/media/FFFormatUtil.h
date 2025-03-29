@@ -23,7 +23,7 @@ public:
     int fps() { return _fps; }
     int durationMS() { return std::floor(_duration * 1000); }
 
-    int writeVideoThumbnail(const std::string filePath);
+    int writeVideoThumbnail(int width, int height, const std::string filePath);
 
 private:
     AVFormatContext* _fmt_ctx;
