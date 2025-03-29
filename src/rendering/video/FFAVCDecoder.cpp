@@ -78,7 +78,7 @@ bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::stri
     return true;
 }
 
-int parseNalType(uint8_t* bitstream, int length) {
+static int parseNalType(uint8_t* bitstream, int length) {
     int pos = 0;
     uint8_t nalType = 0;
     while (pos < length) {

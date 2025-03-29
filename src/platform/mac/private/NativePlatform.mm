@@ -38,11 +38,11 @@ void NativePlatform::setNALUType(NALUType type) const {
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
 
-  return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
-          VideoDecoderFactory::SoftwareAVCDecoderFactory(), VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
-  // //zzy, test
-  // return {VideoDecoderFactory::SoftwareAVCDecoderFactory(),
-  //         VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
+  // return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
+  //         VideoDecoderFactory::SoftwareAVCDecoderFactory(), VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
+  // //zzy, test, use sw decoder for better 兼容性
+  return {VideoDecoderFactory::SoftwareAVCDecoderFactory(),
+          VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
