@@ -86,15 +86,15 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
     if (format.mimeType == "video/avc") {
 #ifdef PAG_USE_LIBAVC
       videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
-      if (videoDecoder != nullptr) {
-        LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
-      }
+      // if (videoDecoder != nullptr) {
+      //   LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+      // }
 #elif PAG_USE_FFAVC2
       //zzy, use FFAvcDecoder instead
       videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<FFAVCDecoder>(), format);
-      if (videoDecoder != nullptr) {
-        LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");
-      }
+      // if (videoDecoder != nullptr) {
+      //   LOGI("All other video decoders are not available, fallback to FFAVCDecoder!");
+      // }
 #else
       USE(format);
 #endif
