@@ -709,11 +709,16 @@ movie::RGBA translateColor(const std::string& color_string) {
 
 static std::vector<std::string> splitStringByNewline(const std::string& input) {
     std::vector<std::string> result;
-    std::stringstream ss(input);
-    std::string line;
-    while (std::getline(ss, line, '\n')) {
-        result.push_back(line);
+    std::regex re("\r\n|\r|\n");  // 处理所有换行符
+    std::sregex_token_iterator it(input.begin(), input.end(), re, -1);
+    std::sregex_token_iterator end;
+
+    while (it != end) {
+        // std::cout << "Line: " << *it << std::endl;
+        result.push_back(*it);
+        ++it;
     }
+
     return result;
 }
 
