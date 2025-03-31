@@ -25,8 +25,8 @@ FFAVCDecoder::~FFAVCDecoder() {
   }
 }
 
-bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::string mime, int width, int height) {
-    printf("FFAVCDecoder::onConfigure, mime:%s, width:%d, height:%d \n", mime.c_str(), width, height);
+bool FFAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, [[maybe_unused]]std::string mime, int width, int height) {
+    // printf("FFAVCDecoder::onConfigure, mime:%s, width:%d, height:%d \n", mime.c_str(), width, height);
     const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
     if (!codec) {
         fprintf(stderr, "H.264 decoder not found\n");

@@ -85,6 +85,7 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
     std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
     if (format.mimeType == "video/avc") {
 #ifdef PAG_USE_LIBAVC
+      //zzy, libavc在解码部分视频的时候有轻微的很小的马赛克，慎用
       videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
       // if (videoDecoder != nullptr) {
       //   LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");

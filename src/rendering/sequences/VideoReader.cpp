@@ -63,6 +63,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     success = decodeFrame(sampleTime);
     if (!success) {
       // fallback to software decoder.
+      LOGE("fallback to software decoder\n");
       destroyVideoDecoder();
       factoryIndex++;
       if (checkVideoDecoder()) {
@@ -71,7 +72,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     }
   }
   if (!success) {
-    LOGE("VideoDecoder: Error on decoding frame.\n");
+    // LOGE("VideoDecoder: Error on decoding frame.\n");
     return nullptr;
   }
   if (!outputEndOfStream) {
@@ -208,7 +209,7 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
     }
     factoryIndex++;
   }
-  LOGE("VideoReader::makeVideoDecoder failure, reset factoryIndex");
+  // LOGE("VideoReader::makeVideoDecoder failure, reset factoryIndex");
   factoryIndex = 0;
   return nullptr;
 }
