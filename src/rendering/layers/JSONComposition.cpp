@@ -162,6 +162,43 @@ int curlDownload(const std::string& url, const std::string& localPath, bool just
     return ret;
 }
 
+int pickCenterColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, uint8_t* b) {
+  pag::FFImageReader imgReeader(image_path);
+  int width = imgReeader.width();
+  int height = imgReeader.height();
+  if (width <= 0 || height <= 0) {
+    return -1;
+  }
+  float offsetRatio = 0.1f;
+  int samples[][2] = {
+      {(int)std::round(width * offsetRatio * 4.5),             (int)std::round(height * offsetRatio * 4.5)},
+      {width - (int)std::round(width * offsetRatio * 4.5),     (int)std::round(height * offsetRatio * 4.5)},
+      {(int)std::round(width * offsetRatio * 4.5),             height - (int)std::round(height * offsetRatio * 4.5)},
+      {width - (int)std::round(width * offsetRatio * 4.5),     height - (int)std::round(height * offsetRatio * 4.5)}
+  };
+  int rows = sizeof(samples) / sizeof(samples[0]);
+  int tr = 0, tg = 0, tb = 0;
+  for (int row = 0; row < rows; row++) {
+      int x = samples[row][0];
+      int y = samples[row][1];
+      uint8_t r, g, b;
+      if (imgReeader.getColor(x, y, &r, &g, &b) < 0) {
+          std::cerr << "Failed to get color at (" << x << ", " << y << ")" << std::endl;
+          tr = 0;
+          tg = 0;
+          tb = 0;
+          break;
+      }
+      tr += r;
+      tg += g;
+      tb += b;
+  }
+  *r = tr / rows;
+  *g = tg / rows;
+  *b = tb / rows;
+  return 0;
+}
+
 int pickColorFromImage(const std::string& image_path, uint8_t* r, uint8_t* g, uint8_t* b) {
     pag::FFImageReader imgReeader(image_path);
     int width = imgReeader.width();
@@ -460,6 +497,22 @@ int ArticleContent::init(const std::string& tmpDir) {
         printf("ArticleContent::init, make bgc totally transparent\n");
       }
   #endif
+      if (textColor == "auto") {
+        uint8_t r, g, b;
+        if (pickCenterColorFromImage(bgcLocalPath, &r, &g, &b) == 0) {
+          RGB rgb = {(double)r, (double)g, (double)b};
+          // https://www.jyshare.com/front-end/868/   在线调整颜色
+          HSV hsv = rgbToHsv(rgb);    //色相不变
+          if (hsv.v < 0.4) {
+            //black back ground image
+            textColor = "rgba(255,255,255,1.0)";    //use white font color
+            backgroundColor = "rgba(255,255,255,0.0)";  //set bgc to transparent
+          } else {
+            textColor = "rgba(0,0,0,1.0)";          //use black font color
+          }
+          printf("ArticleContent::init, pick text color:%s\n", textColor.c_str());
+        }
+      }
     }
   }
   //final protection
@@ -1083,7 +1136,9 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   //step 2: create text layers
   int frame = 0;
   int spaceInP = std::round(content->paragraphSpacing * fontSize);    //vertial space in pixels
+  int index = 0;
   for (auto& p : content->paragraphs) {
+    index ++;
     // get paragraph height in pixels
     auto heightInP = p.heightInP;
     // step 1: create text data
@@ -1094,8 +1149,12 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
       textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
-      auto c = translateColor(content->textColor);
-      textData->fillColor = Color{c.r, c.g, c.b};
+      if (index == 1) {
+        textData->fillColor = Color{255, 77, 13};      //first paragraph's color is orange
+      } else {
+        auto c = translateColor(content->textColor);
+        textData->fillColor = Color{c.r, c.g, c.b};
+      }
     }
     if (!content->stroke.empty()) {
       textData->applyStroke = true;
