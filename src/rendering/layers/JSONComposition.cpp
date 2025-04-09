@@ -171,6 +171,11 @@ int pickCenterColorFromImage(const std::string& image_path, uint8_t* r, uint8_t*
   }
   float offsetRatio = 0.1f;
   int samples[][2] = {
+      {(int)std::round(width * offsetRatio * 4),             (int)std::round(height * offsetRatio * 4)},
+      {width - (int)std::round(width * offsetRatio * 4),     (int)std::round(height * offsetRatio * 4)},
+      {(int)std::round(width * offsetRatio * 4),             height - (int)std::round(height * offsetRatio * 4)},
+      {width - (int)std::round(width * offsetRatio * 4),     height - (int)std::round(height * offsetRatio * 4)},
+
       {(int)std::round(width * offsetRatio * 4.5),             (int)std::round(height * offsetRatio * 4.5)},
       {width - (int)std::round(width * offsetRatio * 4.5),     (int)std::round(height * offsetRatio * 4.5)},
       {(int)std::round(width * offsetRatio * 4.5),             height - (int)std::round(height * offsetRatio * 4.5)},
@@ -503,8 +508,8 @@ int ArticleContent::init(const std::string& tmpDir) {
           RGB rgb = {(double)r, (double)g, (double)b};
           // https://www.jyshare.com/front-end/868/   在线调整颜色
           HSV hsv = rgbToHsv(rgb);    //色相不变
-          if (hsv.v < 0.4) {
-            //black back ground image
+          if (hsv.v < 0.42) {
+            //dark image
             textColor = "rgba(255,255,255,1.0)";    //use white font color
             backgroundColor = "rgba(255,255,255,0.0)";  //set bgc to transparent
           } else {
@@ -520,6 +525,36 @@ int ArticleContent::init(const std::string& tmpDir) {
     backgroundColor = "rgba(255,255,255,0.5)";
     printf("ArticleContent::init, bgc final protection\n");
   }
+  
+// //test code: traverse a folder to find out dart image
+//  std::string path = "/Users/oddshorizon/Downloads/test_dark";
+//  try {
+//    for (const auto& entry : fs::directory_iterator(path)) {
+//        if (entry.is_regular_file()) {
+//            std::cout << "File: " << entry.path() << '\n';
+//        } else if (entry.is_directory()) {
+//            std::cout << "Directory: " << entry.path() << '\n';
+//        }
+//
+//        uint8_t r, g, b;
+//        if (pickCenterColorFromImage(entry.path().string(), &r, &g, &b) == 0) {
+//          RGB rgb = {(double)r, (double)g, (double)b};
+//          // https://www.jyshare.com/front-end/868/   在线调整颜色
+//          HSV hsv = rgbToHsv(rgb);    //色相不变
+//          if (hsv.v < 0.48) {
+//            std::cout << "dark:" << std::endl;
+//          } else {
+//            std::cout << "light:" << std::endl;
+//          }
+//        }
+//    }
+//  } catch (const fs::filesystem_error& e) {
+//      std::cerr << "Filesystem error: " << e.what() << '\n';
+//  } catch (const std::exception& e) {
+//      std::cerr << "General error: " << e.what() << '\n';
+//  }
+
+
   return 0;
 }
 
@@ -1150,7 +1185,8 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     }
     if (!content->textColor.empty()) {
       if (index == 1) {
-        textData->fillColor = Color{255, 77, 13};      //first paragraph's color is orange
+        textData->fillColor = Color{255, 61, 3};      //first paragraph's color is orange
+        //textData->fillColor = Color{255, 248, 8};   //lime
       } else {
         auto c = translateColor(content->textColor);
         textData->fillColor = Color{c.r, c.g, c.b};
