@@ -84,7 +84,7 @@ namespace fs = std::filesystem;
 namespace movie {
 
 
-std::string getFileNameFromUrl(const std::string& url) {
+static std::string getFileNameFromUrl(const std::string& url) {
     size_t pos1 = url.find_last_of('/');
     if (pos1 != std::string::npos && pos1 + 1 < url.size()) {
         size_t pos2 = url.find_last_of('?');
