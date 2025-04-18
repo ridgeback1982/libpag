@@ -43,6 +43,17 @@ std::string getSysTime() {
      return oss.str();  // Return the formatted string
  }
 
+ void printSysTime() {
+    // 获取当前系统时间
+    auto now = std::chrono::system_clock::now();
+    
+    // 转换为 time_t 类型
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    
+    // 使用 std::put_time 来格式化输出
+    std::cout << "当前时间是: " << std::put_time(std::localtime(&now_time), "%Y-%m-%d %H:%M:%S") << std::endl;
+ }
+
  void stringReplace(std::string& str, const std::string& old_value, const std::string& new_value) {
     size_t pos = 0;
     while ((pos = str.find(old_value, pos)) != std::string::npos) {
