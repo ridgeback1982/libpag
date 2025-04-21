@@ -572,7 +572,7 @@ namespace pag {
 
 // 定义一些常量
 #define MAX_CHARS_PER_LINE 14
-#define FIT_CHARS_PER_LINE 11   //must less than MAX_CHARS_PER_LINE
+#define FIT_CHARS_PER_LINE 12   //must less than MAX_CHARS_PER_LINE
 
 int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
@@ -967,7 +967,11 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
             }
           } else {
             //insert "\n"
-            int firstLineLength = charCount * 0.666;
+            int firstLineLength = charCount * 0.7;
+            if (charCount >= FIT_CHARS_PER_LINE + 3) {
+              //保持第一行长度，但是第二行需要大于3个字符。否则依旧在70%处插入回车
+              firstLineLength = FIT_CHARS_PER_LINE;
+            }
             unicodeStr.insert(firstLineLength, 1, U'\n');
             std::string utf8Str = converter.to_bytes(unicodeStr);
             auto textLayer = createTextLayer(utf8Str, content, lifetime, spec);
