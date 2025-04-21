@@ -572,7 +572,7 @@ namespace pag {
 
 // 定义一些常量
 #define MAX_CHARS_PER_LINE 14
-#define FIT_CHARS_PER_LINE 10   //must less than MAX_CHARS_PER_LINE
+#define FIT_CHARS_PER_LINE 11   //must less than MAX_CHARS_PER_LINE
 
 int TimeToFrame(int time, float fps) {
     return (int)std::floor(time / 1000.0f * fps);
@@ -948,19 +948,29 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         std::u32string unicodeStr = converter.from_bytes(sentence.text);
         int charCount = (int)unicodeStr.length();
         if (charCount >= MAX_CHARS_PER_LINE) {
-          int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
-          int charPerLine = (int)std::round((float)charCount / lineCount);
-          int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
-          // std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
-          for (int i=0; i<lineCount; i++) {
-            movie::LifeTime lineLifetime;
-            lineLifetime.begin_time = lifetime.begin_time + i * durPerLine;
-            lineLifetime.end_time = std::min(lineLifetime.begin_time + durPerLine, lifetime.end_time);
+          if (charCount >= FIT_CHARS_PER_LINE * 2) {
+            //seperate text into multiple lines
+            int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
+            int charPerLine = (int)std::round((float)charCount / lineCount);
+            int durPerLine = (int)std::round((float)(lifetime.end_time - lifetime.begin_time) / lineCount);
+            // std::cout << "sentence text too long, text:" << sentence.text << ", length:" << charCount << ", lineCount:" << lineCount << ", charPerLine:" << charPerLine << ", durPerLine:" << durPerLine << std::endl;
+            for (int i=0; i<lineCount; i++) {
+              movie::LifeTime lineLifetime;
+              lineLifetime.begin_time = lifetime.begin_time + i * durPerLine;
+              lineLifetime.end_time = std::min(lineLifetime.begin_time + durPerLine, lifetime.end_time);
 
-            std::u32string subUnicodeText = (i == lineCount - 1) ? unicodeStr.substr(i*charPerLine) : unicodeStr.substr(i*charPerLine, charPerLine);
-            std::string utf8SubText = converter.to_bytes(subUnicodeText);
+              std::u32string subUnicodeText = (i == lineCount - 1) ? unicodeStr.substr(i*charPerLine) : unicodeStr.substr(i*charPerLine, charPerLine);
+              std::string utf8SubText = converter.to_bytes(subUnicodeText);
 
-            auto textLayer = createTextLayer(utf8SubText, content, lineLifetime, spec);
+              auto textLayer = createTextLayer(utf8SubText, content, lineLifetime, spec);
+              textLayers.push_back(textLayer);
+            }
+          } else {
+            //insert "\n"
+            int firstLineLength = charCount * 0.666;
+            unicodeStr.insert(firstLineLength, 1, U'\n');
+            std::string utf8Str = converter.to_bytes(unicodeStr);
+            auto textLayer = createTextLayer(utf8Str, content, lifetime, spec);
             textLayers.push_back(textLayer);
           }
         } else {
@@ -1648,6 +1658,15 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
       prepareArticleTrack(story, articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
       printf("article duration:%d\n", articleDuration);
+    } else if (track->type == "subtitle") {
+      //align timestamp, ensure no gap between two sentences
+      movie::SubtitleTrack* subtitleTrack = static_cast<movie::SubtitleTrack*>(track);
+      std::vector<movie::Sentence>& sentences = subtitleTrack->content.sentences;
+      for (int i=0; i<(int)sentences.size(); i++) {
+        if (i < (int)sentences.size()-1) {
+          sentences[i].end_time = sentences[i+1].begin_time;
+        }
+      }
     }
   }
   //modify lifetime and duration, if article exists
