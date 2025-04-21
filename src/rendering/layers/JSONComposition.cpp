@@ -947,7 +947,7 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
         std::u32string unicodeStr = converter.from_bytes(sentence.text);
         int charCount = (int)unicodeStr.length();
-        if (charCount > FIT_CHARS_PER_LINE) {
+        if (charCount >= MAX_CHARS_PER_LINE) {
           if (charCount >= FIT_CHARS_PER_LINE * 2) {
             //seperate text into multiple lines
             int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
@@ -965,16 +965,12 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
               auto textLayer = createTextLayer(utf8SubText, content, lineLifetime, spec);
               textLayers.push_back(textLayer);
             }
-          } else if (charCount >= MAX_CHARS_PER_LINE) {
+          } else {
             //insert "\n"
             unicodeStr.insert(FIT_CHARS_PER_LINE, 1, U'\n');
             std::string utf8Str = converter.to_bytes(unicodeStr);
             auto textLayer = createTextLayer(utf8Str, content, lifetime, spec);
             textLayers.push_back(textLayer);
-          } else {
-            //just push the whole line
-            auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
-            textLayers.push_back(textLayer); 
           }
         } else {
           auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
