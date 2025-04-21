@@ -571,7 +571,7 @@ namespace pag {
 #define TEST_IMAGE_HEIGHT 512
 
 // 定义一些常量
-#define MAX_CHARS_PER_LINE 14
+#define MAX_CHARS_PER_LINE 16
 #define FIT_CHARS_PER_LINE 12   //must less than MAX_CHARS_PER_LINE
 
 int TimeToFrame(int time, float fps) {
@@ -947,7 +947,7 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
         std::u32string unicodeStr = converter.from_bytes(sentence.text);
         int charCount = (int)unicodeStr.length();
-        if (charCount >= MAX_CHARS_PER_LINE) {
+        if (charCount > FIT_CHARS_PER_LINE) {
           if (charCount >= FIT_CHARS_PER_LINE * 2) {
             //seperate text into multiple lines
             int lineCount = (int)std::ceil((float)charCount / FIT_CHARS_PER_LINE);
@@ -965,17 +965,16 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
               auto textLayer = createTextLayer(utf8SubText, content, lineLifetime, spec);
               textLayers.push_back(textLayer);
             }
-          } else {
+          } else if (charCount >= MAX_CHARS_PER_LINE) {
             //insert "\n"
-            int firstLineLength = charCount * 0.7;
-            if (charCount >= FIT_CHARS_PER_LINE + 3) {
-              //保持第一行长度，但是第二行需要大于3个字符。否则依旧在70%处插入回车
-              firstLineLength = FIT_CHARS_PER_LINE;
-            }
-            unicodeStr.insert(firstLineLength, 1, U'\n');
+            unicodeStr.insert(FIT_CHARS_PER_LINE, 1, U'\n');
             std::string utf8Str = converter.to_bytes(unicodeStr);
             auto textLayer = createTextLayer(utf8Str, content, lifetime, spec);
             textLayers.push_back(textLayer);
+          } else {
+            //just push the whole line
+            auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
+            textLayers.push_back(textLayer); 
           }
         } else {
           auto textLayer = createTextLayer(sentence.text, content, lifetime, spec);
