@@ -59,7 +59,6 @@ extern "C" {
 #include <locale>
 #include <codecvt>
 #include <algorithm>
-#include <unordered_set>
 #include <utility>
 #include <random>
 #include <thread>
@@ -82,22 +81,6 @@ namespace fs = std::filesystem;
 //zzy, work alone
 
 namespace movie {
-
-
-static std::string getFileNameFromUrl(const std::string& url) {
-    size_t pos1 = url.find_last_of('/');
-    if (pos1 != std::string::npos && pos1 + 1 < url.size()) {
-        size_t pos2 = url.find_last_of('?');
-        if (pos2 != std::string::npos && pos1 < pos2) {
-            //zzy, must drop words after "?" e.g. 1e491415e4c9.webp?time=1734489926920
-            //because it will cause file auto deleted by sysmtem on windows
-            return url.substr(pos1 + 1, pos2 - pos1 - 1);
-        } else {
-            return url.substr(pos1 + 1);
-        }
-    }
-    return ""; // 没有后缀名时返回空字符串
-}
 
 size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     std::ofstream* out = static_cast<std::ofstream*>(userp);
@@ -261,7 +244,7 @@ int VideoContent::init(const std::string& tmpDir) {
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
-      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
 
       if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
@@ -297,7 +280,7 @@ int AudioContent::init(const std::string& tmpDir) {
   // printf("AudioContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
-      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
 
       if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
@@ -324,7 +307,7 @@ int ImageContent::init(const std::string& tmpDir) {
   // printf("VideoContent::init, remote:%d\n", remote);
   if (remote) {
       //create local path
-      _localPath = tmpDir + "/" + getFileNameFromUrl(path);
+      _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
 
       if (pag::runOnServer()) {
           //replace oss url with internal url, if needed
@@ -459,7 +442,7 @@ int ArticleContent::init(const std::string& tmpDir) {
     bool remote = pag::starts_with(_bgcImageUrl, "http://") || pag::starts_with(_bgcImageUrl, "https://");
     if (remote) {
         //create local path
-        bgcLocalPath = tmpDir + "/" + getFileNameFromUrl(_bgcImageUrl);
+        bgcLocalPath = tmpDir + "/" + pag::getFileNameFromUrl(_bgcImageUrl);
         
         //download to local path
         printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
@@ -813,12 +796,6 @@ static std::vector<std::string> splitStringByNewline(const std::string& input) {
     return result;
 }
 
-static std::string getFileNameWithoutExtension(const std::string& filePath) {
-    // 使用 std::filesystem 提取文件名
-    std::filesystem::path path(filePath);
-    return path.stem().string(); // stem() 返回不带扩展名的文件名
-}
-
 //static bool isLineBreak(char32_t unicode) {
 //    return unicode == U'\n' ||   // Line Feed
 //           unicode == U'\r' ||   // Carriage Return
@@ -859,34 +836,6 @@ static std::string getFileNameWithoutExtension(const std::string& filePath) {
 //    return chinesePunctuationSet.find(ch) != chinesePunctuationSet.end();
 //}
 
-static bool isEndLinePunctuation(char32_t ch) {
-   static const std::unordered_set<char32_t> endlinePunctuationSet = {
-       U'。', U'？', U'！', U'；',
-       U'.', U'?', U'!',  U';',
-   };
-   return endlinePunctuationSet.find(ch) != endlinePunctuationSet.end();
-}
-
-static bool isEnglishChar(char32_t ch) {
-    return (ch >= 0x0041 && ch <= 0x005A) ||  // A-Z
-           (ch >= 0x0061 && ch <= 0x007A);   // a-z
-}
-
-static bool isChineseChar(char32_t ch) {
-    return (ch >= 0x4E00 && ch <= 0x9FFF) ||  // 基本汉字
-           (ch >= 0x3400 && ch <= 0x4DBF) ||  // 扩展A
-           (ch >= 0x20000 && ch <= 0x2A6DF) || // 扩展B
-           (ch >= 0x2A700 && ch <= 0x2B73F) || // 扩展C
-           (ch >= 0x2B740 && ch <= 0x2B81F) || // 扩展D
-           (ch >= 0x2B820 && ch <= 0x2CEAF) || // 扩展E
-           (ch >= 0x2CEB0 && ch <= 0x2EBEF) || // 扩展F
-           (ch >= 0x30000 && ch <= 0x3134F);   // 扩展G
-}
-
-static bool isRealChar(char32_t ch) {
-  return isEnglishChar(ch) || isChineseChar(ch);
-}
-
 TextLayer* createTextLayer(const std::string& text, movie::TitileContent* content, const movie::LifeTime& lifetime, const movie::MovieSpec& spec) {
   int visual_width = std::min(spec.width, spec.height) * content->fontSize;
   int visual_height = visual_width;
@@ -905,7 +854,7 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   // textData->fontStyle = "bold"; //hardcode, SHOULD NOT BE USED if the font family does not support the style
   textData->text = text;
   if (!content->fontFamilyName.empty()) {
-    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+    textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(content->fontFamilyName));     //set by json
   }
   if (!content->textColor.empty()) {
     auto c = translateColor(content->textColor);
@@ -994,7 +943,7 @@ int testTheTextLines(const std::string& fontFamilyName, const std::string& text,
   textData->fontSize = fontSize;
   textData->text = text;
   if (!fontFamilyName.empty()) {
-    textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(fontFamilyName));     //set by json
+    textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(fontFamilyName));     //set by json
   }
   textData->justification = pag::ParagraphJustification::LeftJustify;   //hard code
   textData->leading = leading;
@@ -1193,7 +1142,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     textData->fontSize = fontSize;
     textData->text = p.text;
     if (!content->fontFamilyName.empty()) {
-      textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+      textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
       if (index == 1) {
@@ -1409,7 +1358,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     textData->fontSize = fontSize;
     textData->text = sentence.text;
     if (!content->fontFamilyName.empty()) {
-      textData->fontFamily = findEnglishFontName(getFileNameWithoutExtension(content->fontFamilyName));     //set by json
+      textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
       auto c = translateColor(content->textColor);
@@ -1551,12 +1500,12 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
       int lastPos = 0;
       // std::cout << "preProcessArticleText, text too long" << std::endl;
       while (pos < (int)unicodeStr.length()) {
-        if (isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
+        if (pag::isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
           //protect: 后面还有文字（中文或英文）
           bool insertEndLine = false;
           int nextPos = pos + 1;
           while (nextPos < (int)unicodeStr.length()) {
-            if (isRealChar(unicodeStr[nextPos])) {
+            if (pag::isRealChar(unicodeStr[nextPos])) {
               //if there is real char after that, we can insert EndLine
               insertEndLine = true;
               break;
@@ -1586,13 +1535,6 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
   return texts;
 }
 #pragma clang diagnostic pop
-
-static int get_random_int(int min, int max) {
-    static std::random_device rd;  // 用于生成随机种子
-    static std::mt19937 gen(rd()); // 使用 Mersenne Twister 伪随机数生成器
-    std::uniform_int_distribution<int> dist(min, max); // 均匀分布
-    return dist(gen);
-}
 
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
@@ -1644,7 +1586,7 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
 
   //step 4: do some random things
   float speedThred = articleTrack->content.speed * 0.1;
-  float speedOffset = (get_random_int(-100, 100) / 100.0f) * speedThred;
+  float speedOffset = (pag::get_random_int(-100, 100) / 100.0f) * speedThred;
   articleTrack->content.speed += speedOffset;
   std::cout << "prepareArticleTrack, speed offset:" << speedOffset << std::endl;
 }

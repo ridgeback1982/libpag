@@ -20,6 +20,12 @@ void PAG_API writeStringToFile(const std::string& str, const fs::path& filePath,
 
 fs::path PAG_API create_temp_directory(const std::string& prefix = "tmp_");
 
+std::string PAG_API getFileNameWithoutExtension(const std::string& filePath);
+
+std::string PAG_API getFileNameFromUrl(const std::string& url);
+
+bool PAG_API remove_directory(const std::string& directory_path);
+
 bool PAG_API runOnServer();
 
 }  // namespace pag

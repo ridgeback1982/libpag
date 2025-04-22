@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <ctime>
 #include <random>
+#include <set>
+#include <unordered_set>
 
 namespace pag {
 
@@ -94,5 +96,40 @@ void eraseLeadingPunctuation(std::string& s) {
         }
     }
 }
+
+int get_random_int(int min, int max) {
+    static std::random_device rd;  // 用于生成随机种子
+    static std::mt19937 gen(rd()); // 使用 Mersenne Twister 伪随机数生成器
+    std::uniform_int_distribution<int> dist(min, max); // 均匀分布
+    return dist(gen);
+}
+
+bool isEndLinePunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> endlinePunctuationSet = {
+        U'。', U'？', U'！', U'；',
+        U'.', U'?', U'!',  U';',
+    };
+    return endlinePunctuationSet.find(ch) != endlinePunctuationSet.end();
+ }
+ 
+ bool isEnglishChar(char32_t ch) {
+     return (ch >= 0x0041 && ch <= 0x005A) ||  // A-Z
+            (ch >= 0x0061 && ch <= 0x007A);   // a-z
+ }
+ 
+bool isChineseChar(char32_t ch) {
+     return (ch >= 0x4E00 && ch <= 0x9FFF) ||  // 基本汉字
+            (ch >= 0x3400 && ch <= 0x4DBF) ||  // 扩展A
+            (ch >= 0x20000 && ch <= 0x2A6DF) || // 扩展B
+            (ch >= 0x2A700 && ch <= 0x2B73F) || // 扩展C
+            (ch >= 0x2B740 && ch <= 0x2B81F) || // 扩展D
+            (ch >= 0x2B820 && ch <= 0x2CEAF) || // 扩展E
+            (ch >= 0x2CEB0 && ch <= 0x2EBEF) || // 扩展F
+            (ch >= 0x30000 && ch <= 0x3134F);   // 扩展G
+ }
+ 
+ bool isRealChar(char32_t ch) {
+   return isEnglishChar(ch) || isChineseChar(ch);
+ }
 
 }   // namespace pag

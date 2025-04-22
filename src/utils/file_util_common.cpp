@@ -46,4 +46,41 @@ fs::path create_temp_directory(const std::string& prefix) {
    return new_temp_dir;
 }
 
+std::string getFileNameWithoutExtension(const std::string& filePath) {
+  // 使用 std::filesystem 提取文件名
+  std::filesystem::path path(filePath);
+  return path.stem().string(); // stem() 返回不带扩展名的文件名
+}
+
+std::string getFileNameFromUrl(const std::string& url) {
+  size_t pos1 = url.find_last_of('/');
+  if (pos1 != std::string::npos && pos1 + 1 < url.size()) {
+      size_t pos2 = url.find_last_of('?');
+      if (pos2 != std::string::npos && pos1 < pos2) {
+          //zzy, must drop words after "?" e.g. 1e491415e4c9.webp?time=1734489926920
+          //because it will cause file auto deleted by sysmtem on windows
+          return url.substr(pos1 + 1, pos2 - pos1 - 1);
+      } else {
+          return url.substr(pos1 + 1);
+      }
+  }
+  return ""; // 没有后缀名时返回空字符串
+}
+
+bool remove_directory(const std::string& directory_path) {
+  std::error_code ec;
+  
+  // 删除目录及其所有内容
+  uintmax_t num_removed = fs::remove_all(directory_path, ec);
+  
+  if (ec) {
+      std::cerr << "Error deleting directory: " << ec.message() << std::endl;
+      return false;
+  }
+  
+  // std::cout << "Successfully removed directory: " << directory_path << std::endl;
+  std::cout << "Number of files/directories removed: " << num_removed << std::endl;
+  return true;
+}
+
 } // namespace pag
