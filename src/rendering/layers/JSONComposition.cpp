@@ -803,7 +803,10 @@ static std::vector<std::string> splitStringByNewline(const std::string& input) {
 
     while (it != end) {
         // std::cout << "Line: " << *it << std::endl;
-        result.push_back(*it);
+        std::string line = *it;
+        //erase the very first perticular punctuation (中英文逗号，句号)
+        eraseLeadingPunctuation(line);
+        result.push_back(line);
         ++it;
     }
 
@@ -1653,14 +1656,14 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       //check if article track exists
-      movie::ArticleTrack* articleTrack = static_cast<movie::ArticleTrack*>(track);
+      auto articleTrack = static_cast<movie::ArticleTrack*>(track);
       prepareArticleTrack(story, articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
       printf("article duration:%d\n", articleDuration);
     } else if (track->type == "subtitle") {
       //align timestamp, ensure no gap between two sentences
-      movie::SubtitleTrack* subtitleTrack = static_cast<movie::SubtitleTrack*>(track);
-      std::vector<movie::Sentence>& sentences = subtitleTrack->content.sentences;
+      auto subtitleTrack = static_cast<movie::SubtitleTrack*>(track);
+      auto& sentences = subtitleTrack->content.sentences;
       for (int i=0; i<(int)sentences.size(); i++) {
         if (i < (int)sentences.size()-1) {
           sentences[i].end_time = sentences[i+1].begin_time;

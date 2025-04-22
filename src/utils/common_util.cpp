@@ -86,4 +86,13 @@ void removePunctuation(std::wstring &str) {
     str.erase(std::remove_if(str.begin(), str.end(), isPunctuationOrNewline), str.end());
 }
 
+void eraseLeadingPunctuation(std::string& s) {
+    const std::string puncts[] = {",", "，", "。", "."};
+    for (const auto& p : puncts) {
+        if (s.compare(0, p.size(), p) == 0) {
+            s.erase(0, p.size());
+        }
+    }
+}
+
 }   // namespace pag
