@@ -139,4 +139,11 @@ bool isChineseChar(char32_t ch) {
     return closingPunctuationSet.find(ch) != closingPunctuationSet.end();
  }
 
+ bool isOpeningPunctuation(char32_t ch) {
+    static const std::unordered_set<char32_t> openingPunctuationSet = {
+        U'“', U'‘', U'{', U'「', U'[', U'【', U'<', U'《', U'(', U'（'
+    };
+    return openingPunctuationSet.find(ch) != openingPunctuationSet.end();
+ }
+
 }   // namespace pag

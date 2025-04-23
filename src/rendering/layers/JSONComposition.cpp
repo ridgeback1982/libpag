@@ -995,7 +995,7 @@ int getArticleDuration(movie::ArticleTrack* articleTrack, int width, int height)
   }
   articleHeight -= spaceInP;  //minus the last space
 
-  articleHeight -= (fontSize + spaceInP);  //workround: minus one line height to make it look better when the last line stops
+  articleHeight -= 3*(fontSize + spaceInP);  //workround: minus some lines height to make it look better when the last line stops
 
   int duration = std::round((float)articleHeight * 1000 / speedInP);
   duration += articleTrack->content.freezeBeginTime;
@@ -1514,8 +1514,10 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
                 bool closingQuoteFollowed = false;
                 int nextNextPos = nextPos + 1;
                 while (nextNextPos < (int)unicodeStr.length()) {
-                  //是后引号，后书名号，后大小括号
-                  if (pag::isClosingPunctuation(unicodeStr[nextNextPos])) {
+                  if (pag::isOpeningPunctuation(unicodeStr[nextNextPos])) {
+                    closingQuoteFollowed = false;
+                    break;
+                  } else if (pag::isClosingPunctuation(unicodeStr[nextNextPos])) {
                     closingQuoteFollowed = true;
                     break;
                   }
