@@ -18,5 +18,6 @@ bool PAG_API isEndLinePunctuation(char32_t ch);
 bool PAG_API isEnglishChar(char32_t ch);
 bool PAG_API isChineseChar(char32_t ch);
 bool PAG_API isRealChar(char32_t ch);
+bool PAG_API isClosingPunctuation(char32_t ch);
 
 }  // namespace pag

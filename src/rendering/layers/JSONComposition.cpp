@@ -1483,55 +1483,72 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
   //删除英文空格
   new_text.erase(std::remove(new_text.begin(), new_text.end(), ' '), new_text.end());
 
-  //如果一个段落长度过长，插入换行符
+  //根据换行拆分
   auto texts = splitStringByNewline(new_text);
-  const int charCapacityOfLine = std::ceil(boxWidth / (fontSize + tracking));
-  const int maxLinesPerParagraph = 2;
-  auto ite = texts.begin();
-  while (ite != texts.end()) {
-    auto text = *ite;
-    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-    std::u32string unicodeStr = converter.from_bytes(text);
-    // std::cout << "preProcessArticleText, text:" << text << std::endl;
-    if ((int)unicodeStr.length() > charCapacityOfLine * maxLinesPerParagraph) {
-      ite = texts.erase(ite);   //erase the current and get iterator of the next to it
-      //insert "end-line" to the text, and call splitStringByNewline
-      int pos = 0;
-      int lastPos = 0;
-      // std::cout << "preProcessArticleText, text too long" << std::endl;
-      while (pos < (int)unicodeStr.length()) {
-        if (pag::isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
-          //protect: 后面还有文字（中文或英文）
-          bool insertEndLine = false;
-          int nextPos = pos + 1;
-          while (nextPos < (int)unicodeStr.length()) {
-            if (pag::isRealChar(unicodeStr[nextPos])) {
-              //if there is real char after that, we can insert EndLine
-              insertEndLine = true;
-              break;
+
+  //如果一个段落长度过长，插入换行符
+  bool supportAutoChangeLine = true;
+  if (supportAutoChangeLine) {
+    const int charCapacityOfLine = std::ceil(boxWidth / (fontSize + tracking));
+    const int maxLinesPerParagraph = 3;
+    auto ite = texts.begin();
+    while (ite != texts.end()) {
+      auto text = *ite;
+      std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+      std::u32string unicodeStr = converter.from_bytes(text);
+      // std::cout << "preProcessArticleText, text:" << text << std::endl;
+      if ((int)unicodeStr.length() > charCapacityOfLine * maxLinesPerParagraph) {
+        ite = texts.erase(ite);   //erase the current and get iterator of the next to it
+        //insert "end-line" to the text, and call splitStringByNewline
+        int pos = 0;
+        int lastPos = 0;
+        // std::cout << "preProcessArticleText, text too long" << std::endl;
+        while (pos < (int)unicodeStr.length()) {
+          if (pag::isEndLinePunctuation(unicodeStr[pos]) && pos - lastPos >= charCapacityOfLine * maxLinesPerParagraph) {
+            //protect: 后面还有文字（中文或英文）
+            bool insertEndLine = false;
+            int nextPos = pos + 1;
+            while (nextPos < (int)unicodeStr.length()) {
+              if (pag::isRealChar(unicodeStr[nextPos])) {
+                //检测后面还有没有“后引号，后书名号，后大小括号”等等
+                bool closingQuoteFollowed = false;
+                int nextNextPos = nextPos + 1;
+                while (nextNextPos < (int)unicodeStr.length()) {
+                  //是后引号，后书名号，后大小括号
+                  if (pag::isClosingPunctuation(unicodeStr[nextNextPos])) {
+                    closingQuoteFollowed = true;
+                    break;
+                  }
+                  nextNextPos ++;
+                }
+                //if there is real char after that and no closing quote followed, we can insert EndLine
+                if (closingQuoteFollowed == false) {
+                  insertEndLine = true;
+                }
+                break;  //OK to break, no need to search more
+              }
+              nextPos++;
             }
-            nextPos++;
+            if (insertEndLine) {
+              pos = nextPos;
+              unicodeStr.insert(pos, 1, U'\n');
+              lastPos = pos;
+              std::cout << "preProcessArticleText, insert end-line at pos:" << pos << " of text:" << text << std::endl;
+            }
           }
-          if (insertEndLine) {
-            pos ++;
-            unicodeStr.insert(pos, 1, U'\n');
-            lastPos = pos;
-            std::cout << "preProcessArticleText, insert end-line at pos:" << pos << " of text:" << text << std::endl;
-          } else {
-            break;  //no need to detect the rest
-          }
+          pos ++;
         }
-        pos ++;
+        auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
+        // std::cout << "preProcessArticleText, insert split texts, size:" << sp_texts.size() << std::endl;
+        ite = texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
+        for (int i=0; i<(int)sp_texts.size()-1; i++) {
+          ite++;
+        }
       }
-      auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
-      // std::cout << "preProcessArticleText, insert split texts, size:" << sp_texts.size() << std::endl;
-      ite = texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
-      for (int i=0; i<(int)sp_texts.size()-1; i++) {
-        ite++;
-      }
+      ite ++;
     }
-    ite ++;
   }
+  
   return texts;
 }
 #pragma clang diagnostic pop
