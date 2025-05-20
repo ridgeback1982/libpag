@@ -400,6 +400,16 @@ static HSV rgbToHsv(const RGB& rgb) {
     return hsv;
 }
 
+static bool isReddish(float h, float s, [[maybe_unused]]float v, float satThresh = 0.2f) {
+  if (s < satThresh) {
+      // 饱和度太低，不算偏红
+      return false;
+  }
+  //比较宽泛的红色
+  return (h >= 0 && h <= 60) || (h >= 280 && h <= 360);
+  //https://zh.rakko.tools/tools/30/
+}
+
 // HSV 转 RGB
 static RGB hsvToRgb(const HSV& hsv) {
     double h = hsv.h;
@@ -496,6 +506,10 @@ int ArticleContent::init(const std::string& tmpDir) {
             textColor = "rgba(255,255,255,1.0)";    //use white font color
             backgroundColor = "rgba(255,255,255,0.0)";  //set bgc to transparent
           } else {
+            //just set red font color as highlight, so if bgi is red, avoid highlight
+            if (isReddish(hsv.h, hsv.s, hsv.v)) {
+              enableHighLight = false;
+            }
             textColor = "rgba(0,0,0,1.0)";          //use black font color
           }
           printf("ArticleContent::init, pick text color:%s\n", textColor.c_str());
@@ -1146,8 +1160,10 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
     }
     if (!content->textColor.empty()) {
       if (index == 1) {
-        textData->fillColor = Color{255, 61, 3};      //first paragraph's color is orange
-        //textData->fillColor = Color{255, 248, 8};   //lime
+        if (content->enableHighLight) {
+          textData->fillColor = Color{230, 59, 0};      //first paragraph's color is orange
+          //textData->fillColor = Color{255, 248, 8};   //lime
+        }
       } else {
         auto c = translateColor(content->textColor);
         textData->fillColor = Color{c.r, c.g, c.b};

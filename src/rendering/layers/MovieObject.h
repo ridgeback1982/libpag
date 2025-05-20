@@ -289,6 +289,7 @@ namespace movie {
         std::string stroke;
         std::string backgroundColor;            //if not specified, bgc is transparent
         std::string backgroundShape = "rectangle";  //rectangle, round-rectangle, hexagon
+        bool enableHighLight = true;
         static void from_json(const json& j, ArticleContent& a) {
             j.at("text").get_to(a.text);
             if (j.contains("verticalVisibleScope"))
