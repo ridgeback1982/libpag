@@ -186,6 +186,63 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 //zzy
+int64_t precise_seek(AVFormatContext *fmt_ctx, AVCodecContext *dec_ctx,
+                 int stream_index, double target_time_seconds) {
+    // 计算目标PTS
+    AVStream *stream = fmt_ctx->streams[stream_index];
+    int64_t target_pts = av_rescale_q(target_time_seconds * AV_TIME_BASE, 
+                                     AV_TIME_BASE_Q, stream->time_base);
+    
+    // 向后seek到关键帧
+    int ret = av_seek_frame(fmt_ctx, stream_index, target_pts, AVSEEK_FLAG_BACKWARD);
+    if (ret < 0) return ret;
+    
+    avcodec_flush_buffers(dec_ctx);
+    
+    AVPacket pkt;
+    AVFrame *frame = av_frame_alloc();
+    int64_t best_pts = -1;
+    
+    // 解码寻找最接近目标时间的帧
+    while (av_read_frame(fmt_ctx, &pkt) >= 0) {
+        if (pkt.stream_index == stream_index) {
+            bool isKeyframe = (pkt.flags & AV_PKT_FLAG_KEY) != 0;
+            if (isKeyframe) {
+              std::cout << "precise_seek, read one key frame" << std::endl;
+            }
+            ret = avcodec_send_packet(dec_ctx, &pkt);
+            if (ret < 0) {
+                av_packet_unref(&pkt);
+                continue;
+            }
+            
+            while (avcodec_receive_frame(dec_ctx, frame) >= 0) {
+                int64_t frame_pts = frame->best_effort_timestamp;
+                if (frame_pts == AV_NOPTS_VALUE) {
+                    frame_pts = frame->pts;
+                }
+                
+                // 保存当前最佳帧
+                if (best_pts == -1 || 
+                    llabs(frame_pts - target_pts) < llabs(best_pts - target_pts)) {
+                    best_pts = frame_pts;
+                }
+                
+                // 如果已经超过目标时间一定范围，停止搜索
+                if (frame_pts > target_pts + av_rescale_q(1, AV_TIME_BASE_Q, stream->time_base)) {
+                    goto found;
+                }
+            }
+        }
+        av_packet_unref(&pkt);
+    }
+    
+found:
+    av_frame_free(&frame);
+    std::cout << "precise_seek to " << target_time_seconds << " sec with pts:" << best_pts << std::endl;
+    return best_pts;
+}
+
 VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const int targetFrames) {
   printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d, targetFrames:%d\n", filePath.c_str(), cutFrom, cutTo, targetFrames);
   AVFormatContext *fmt_ctx = NULL;
@@ -282,8 +339,12 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     frame_interval = (video_stream->duration / video_stream->nb_frames);
   }
 
-  //seek to start frame and flush frames before
   float seekTarget = cutFrom/sequence->frameRate;
+
+  //use precise seek to get the start pts
+  startPTS = cutFrom == 0 ? -1 : precise_seek(fmt_ctx, codec_ctx, video_stream_index, seekTarget);
+
+  //seek to start frame and flush frames before
 //  int64_t seekTargetStreamTime = av_rescale_q(seekTarget * AV_TIME_BASE, AV_TIME_BASE_Q, video_stream->time_base);
 //  if (av_seek_frame(fmt_ctx, video_stream_index, seekTargetStreamTime, AVSEEK_FLAG_BACKWARD) < 0) {
 //    printf("Seeking failed\n");
@@ -293,7 +354,6 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     std::cerr << "Seeking failed" << std::endl;
     return nullptr;
   }
-  startPTS = -1;
   //avcodec_flush_buffers(codec_ctx);
 
   // 分配 AVPacket
@@ -337,9 +397,14 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     }
     if (pkt->stream_index == video_stream_index) {
       if (startPTS == -1) {
-        startPTS = pkt->pts;
+        startPTS = pkt->pts;    //the first frame's pts, usually it is a key frame
       }
-      accuSrcFrames ++;
+
+      //if pts is lower(means the pkt is time earlier, due to seeking to a non-key frame), we will not count the the frame.
+      //this is a loose judge, may bring more frames than needed
+      if (pkt->pts >= startPTS) {
+        accuSrcFrames ++;
+      }
 
       // 分析 NAL 单元
       // printf("NAL Unit, flags:%d, size:%d, dts:%lld, pts:%lld\n", pkt->flags, pkt->size, pkt->dts, pkt->pts);

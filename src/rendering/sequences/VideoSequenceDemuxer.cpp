@@ -101,7 +101,8 @@ void VideoSequenceDemuxer::seekTo(int64_t targetTime) {
     }
   }
   // DTS == PTS when the frame is key frame.
-  maxPTSFrame = sampleIndex = keyframes[start];
+  //zzy, if keyframes[start] is a negative value, we need to make it right
+  maxPTSFrame = sampleIndex = keyframes[start] - keyframes[0];
 }
 
 void VideoSequenceDemuxer::reset() {
