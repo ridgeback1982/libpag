@@ -97,6 +97,20 @@ void eraseLeadingPunctuation(std::string& s) {
     }
 }
 
+std::vector<std::string> splitStringBy(const std::string &s, char delimiter) {
+  std::vector<std::string> tokens;
+  std::string token;
+  std::stringstream ss(s);
+
+  // Split the string by the given delimiter
+  while (std::getline(ss, token, delimiter)) {
+    if (!token.empty()) {
+      tokens.push_back(token);
+    }
+  }
+  return tokens;
+}
+
 int get_random_int(int min, int max) {
     static std::random_device rd;  // 用于生成随机种子
     static std::mt19937 gen(rd()); // 使用 Mersenne Twister 伪随机数生成器

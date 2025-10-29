@@ -1925,26 +1925,12 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     return jsonComposition;
 }
 
-std::vector<std::string> splitStringBy(const std::string &s, char delimiter) {
-  std::vector<std::string> tokens;
-  std::string token;
-  std::stringstream ss(s);
-
-  // Split the string by the given delimiter
-  while (std::getline(ss, token, delimiter)) {
-    if (!token.empty()) {
-      tokens.push_back(token);
-    }
-  }
-  return tokens;
-}
-
 std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& json) {
   //pass the process of parsing json file
   printf("JSONComposition::LoadTest, json:%s", json.c_str());
 
   
-  const std::vector<std::string> tokens = splitStringBy(json, ';');
+  const std::vector<std::string> tokens = pag::splitStringBy(json, ';');
 //  FFAudioReader::test(tokens[0], tokens[3]);
 
  
