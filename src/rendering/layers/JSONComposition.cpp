@@ -681,6 +681,16 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     int visual_height = spec.height * track->content.location.h;
     volatile int video_width = track->content.width();
     volatile int video_height = track->content.height();
+
+    //letter box mode as default
+    if (visual_width * video_height < visual_height * video_width) {
+      //fat video, keep visual width
+      visual_height = visual_width * video_height / video_width;
+    } else {
+      //thin video, keep visual height
+      visual_width = visual_height * video_width / video_height;
+    }
+
     int video_fps = track->content.fps();
     auto vidComposition = new VideoComposition();
     vidComposition->id = UniqueID::Next();
