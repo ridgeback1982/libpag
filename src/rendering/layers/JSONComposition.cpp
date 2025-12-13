@@ -743,6 +743,19 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     vidPreComposeLayer->timeRemap = new Property<float>(0);      //hard code
     vidPreComposeLayer->composition = vidComposition;
 
+
+    //zzy, add effect for “查重”
+    if (track->content.effect == "anti-duplicate") {
+      CornerPinEffect* effect = new CornerPinEffect();
+      int random_height_offset = pag::get_random_int(20, 50);
+      effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0 - random_height_offset)); 
+      effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0));
+      effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset));
+      effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+
+      vidPreComposeLayer->effects.push_back(effect);
+    }
+
     return vidPreComposeLayer;
 }
 

@@ -46,6 +46,7 @@ namespace movie {
         float speed = 1.0f;
         int cutFrom = 0;
         int cutTo = -1;
+        std::string effect;
         static void from_json(const json& j, VideoContent& v) {
             j.at("path").get_to(v.path);
             j.at("location").get_to(v.location);
@@ -61,11 +62,15 @@ namespace movie {
                 j.at("cutFrom").get_to(v.cutFrom);
             if (j.contains("cutTo") && j.at("cutTo").is_number())
                 j.at("cutTo").get_to(v.cutTo);
+            if (j.contains("effect"))
+                j.at("effect").get_to(v.effect);
         }
         static void to_json(json& j, const VideoContent& v) {
             j = {{"path", v.path}, {"location", v.location}, {"mixVolume", v.mixVolume}, {"removeGreen", v.removeGreen}, {"loop", v.loop}, {"speed", v.speed}, {"cutFrom", v.cutFrom}};
             if (v.cutTo >= 0)
                 j["cutTo"] = v.cutTo;
+            if (!v.effect.empty())
+                j["effect"] = v.effect;
         }
 
         int init(const std::string& tmpDir);
