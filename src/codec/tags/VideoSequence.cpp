@@ -165,7 +165,7 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         uint16_t numNalus = (extradata[pos] << 8) | extradata[pos + 1];
         pos += 2;
 
-        std::cout << "NAL Unit Type:" << nal_unit_type << ", Number of NALUs:" << numNalus << std::endl;
+        std::cout << "NAL Unit Type:" << (int)nal_unit_type << ", Number of NALUs:" << numNalus << std::endl;
 
         for (uint16_t j = 0; j < numNalus; ++j) {
             uint16_t nal_unit_size = (extradata[pos] << 8) | extradata[pos + 1];
