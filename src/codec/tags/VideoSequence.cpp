@@ -243,8 +243,8 @@ found:
     return best_pts;
 }
 
-VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const int targetFrames) {
-  printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d, targetFrames:%d\n", filePath.c_str(), cutFrom, cutTo, targetFrames);
+VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo) {
+  //printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d\n", filePath.c_str(), cutFrom, cutTo);
   AVFormatContext *fmt_ctx = NULL;
   AVCodecContext *codec_ctx = NULL;
   const AVCodec *codec = NULL;

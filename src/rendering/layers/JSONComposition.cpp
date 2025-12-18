@@ -252,14 +252,14 @@ int VideoContent::init(const std::string& tmpDir) {
       }
       
       //download to local path
-      printf("VideoContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      printf("VideoContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           printf("VideoContent::init, download failed\n");
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("VideoContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
+      printf("VideoContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
   } else {
     _localPath = path;
   }
@@ -288,14 +288,14 @@ int AudioContent::init(const std::string& tmpDir) {
       }
       
       //download to local path
-      printf("AudioContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      printf("AudioContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           printf("AudioContent::init, download failed\n");
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("AudioContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
+      printf("AudioContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
   } else {
     _localPath = path;
   }
@@ -315,14 +315,14 @@ int ImageContent::init(const std::string& tmpDir) {
       }
       
       //download to local path
-      printf("ImageContent::init, will download %s to %s\n", path.c_str(), _localPath.c_str());
+      printf("ImageContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
       if (curlDownload(path, _localPath) < 0) {
           printf("ImageContent::init, download failed\n");
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("ImageContent::init, download done, cost: %d s\n", (int)(tick2-tick1).count()/1000);
+      printf("ImageContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
   } else {
     _localPath = path;
   }
@@ -455,14 +455,14 @@ int ArticleContent::init(const std::string& tmpDir) {
         bgcLocalPath = tmpDir + "/" + pag::getFileNameFromUrl(_bgcImageUrl);
         
         //download to local path
-        printf("ArticleContent::init, will download %s to %s\n", _bgcImageUrl.c_str(), bgcLocalPath.c_str());
+        printf("ArticleContent::init, will download %s\n", _bgcImageUrl.c_str());
         auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         if (curlDownload(_bgcImageUrl, bgcLocalPath) < 0) {
             printf("ArticleContent::init, download failed\n");
             return -1;
         }
         auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-        printf("ArticleContent::init, download done, cost: %ds\n", (int)(tick2-tick1).count()/1000);
+        printf("ArticleContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
     }
   }
 
@@ -701,8 +701,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
     auto videoSequence = ReadVideoSequenceFromFile(track->content.localPath(), 
       TimeToFrame(ogCutFrom, video_fps),
-      TimeToFrame(ogCutFrom + ogDuration, video_fps),
-      (int)vidComposition->duration);
+      TimeToFrame(ogCutFrom + ogDuration, video_fps));
     if (videoSequence == nullptr) {
         std::cerr << "Error reading video file" << std::endl;
         return nullptr;
@@ -1778,7 +1777,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               std::cerr << "Error initializing video track, path:" << track->content.path << std::endl;
               return nullptr;
             }
-            printf("video track, path:%s\n", track->content.path.c_str());
+            //printf("video track, path:%s\n", track->content.path.c_str());
             auto vidPreComposeLayer = createVideoLayer(track, movie.video);
             if (vidPreComposeLayer != nullptr) {
               vecComposition->layers.push_back(vidPreComposeLayer);
@@ -1799,15 +1798,15 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               return nullptr;
             }
         } else if (t->type == "gif") {
-            auto track = static_cast<movie::GifTrack*>(t);
-            printf("gif track, path:%s\n", track->content.path.c_str());
+            //auto track = static_cast<movie::GifTrack*>(t);
+            //printf("gif track, path:%s\n", track->content.path.c_str());
         } else if (t->type == "voice") {
             auto track = static_cast<movie::VoiceTrack*>(t);
             if (track->content.init(tmpDir) < 0) {
               std::cerr << "Error initializing voice track, path:" << track->content.path << std::endl;
               return nullptr;
             }
-            printf("voice track, path:%s\n", track->content.path.c_str());
+            //printf("voice track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
               auto audioSource = createAudioSource(t->type, track , movie.video);
@@ -1819,7 +1818,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               std::cerr << "Error initializing music track, path:" << track->content.path << std::endl;
               return nullptr;
             }
-            printf("music track, path:%s\n", track->content.path.c_str());
+            //printf("music track, path:%s\n", track->content.path.c_str());
             //add audio source
             if (track->content.mixVolume > MIN_VOLUME) {
               auto audioSource = createAudioSource(t->type, track , movie.video);
@@ -1831,7 +1830,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               std::cerr << "Error initializing image track, path:" << track->content.path << std::endl;
               return nullptr;
             }
-            printf("image track, path:%s\n", track->content.path.c_str());
+            //printf("image track, path:%s\n", track->content.path.c_str());
             fitLocation(track->content.location, track->content.width(), track->content.height(), movie.video.width, movie.video.height);
             auto layer = createImageLayer(track, movie.video);
             vecComposition->layers.push_back(layer);
@@ -1841,7 +1840,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             jsonComposition->addLayer(pagImageLayer);
         } else if (t->type == "title") {
             auto track = static_cast<movie::TitleTrack*>(t);
-            printf("title track, text:%s\n", track->content.text.c_str());
+            //printf("title track, text:%s\n", track->content.text.c_str());
             auto textLayers = createTextLayers(track, movie.video);
             for (auto layer : textLayers) {
               vecComposition->layers.push_back(layer);
@@ -1852,7 +1851,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
         } else if (t->type == "subtitle") {
             auto track = static_cast<movie::SubtitleTrack*>(t);
-            printf("subtitle track, count:%zu\n", track->content.sentences.size());
+            //printf("subtitle track, count:%zu\n", track->content.sentences.size());
             auto textLayers = createTextLayers(track, movie.video);
             for (auto layer : textLayers) {
               vecComposition->layers.push_back(layer);
@@ -1867,7 +1866,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               std::cerr << "Error initializing article track" << std::endl;
               return nullptr;
             }
-            printf("article track, paragraph count:%zu\n", track->content.paragraphs.size());
+            //printf("article track, paragraph count:%zu\n", track->content.paragraphs.size());
             auto layers = createArticleRelatedLayers(track, movie.video);
             for (auto layer : layers) {
               vecComposition->layers.push_back(layer);
@@ -2073,7 +2072,7 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   vidComposition->duration = TEST_DURATION;       //set by json
   vidComposition->frameRate = TEST_FPS;           //set by json
   vidComposition->backgroundColor = {0, 0, 0};     //hard code
-  auto videoSequence = ReadVideoSequenceFromFile(tokens[2], 0, TEST_DURATION, TEST_DURATION);
+  auto videoSequence = ReadVideoSequenceFromFile(tokens[2], 0, TEST_DURATION);
   // TimeRange range = {0, TEST_DURATION - 1};      //set by json, the range is probably not same as video composition
   // videoSequence->staticTimeRanges.push_back(range);
   videoSequence->composition = vidComposition;
