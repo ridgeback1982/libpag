@@ -165,7 +165,7 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
         uint16_t numNalus = (extradata[pos] << 8) | extradata[pos + 1];
         pos += 2;
 
-        std::cout << "NAL Unit Type:" << (int)nal_unit_type << ", Number of NALUs:" << numNalus << std::endl;
+        // std::cout << "NAL Unit Type:" << (int)nal_unit_type << ", Number of NALUs:" << numNalus << std::endl;
 
         for (uint16_t j = 0; j < numNalus; ++j) {
             uint16_t nal_unit_size = (extradata[pos] << 8) | extradata[pos + 1];
@@ -377,6 +377,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     sequence->codecType = VideoCodecType::AVC;
     parse_h264_extradata(extradata, extradata_size, sequence);
   } else if (is_hevc) {
+    std::cout << "h265 codec" << std::endl;
     sequence->codecType = VideoCodecType::HEVC;
     parse_h265_extradata(extradata, extradata_size, sequence);
   } else {

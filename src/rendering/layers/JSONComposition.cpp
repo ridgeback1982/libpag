@@ -1796,6 +1796,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               }
             } else {
               std::cerr << "Error creating video layer, maybe codec not support" << std::endl;
+              return nullptr;
             }
         } else if (t->type == "gif") {
             auto track = static_cast<movie::GifTrack*>(t);
