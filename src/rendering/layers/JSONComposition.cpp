@@ -124,6 +124,11 @@ int curlDownload(const std::string& url, const std::string& localPath, bool just
             if (http_code != 200) {
                 fs::remove(localPath);
                 std::cerr << "HTTP error: " << http_code << " - Download failed!" << std::endl;
+                if (http_code == 0) {
+                  if (justOnce == false) {
+                      needRetry = true;
+                  }
+                }
                 ret = -1;
             }
         }
