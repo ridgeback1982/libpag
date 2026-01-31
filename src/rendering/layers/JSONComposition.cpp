@@ -750,14 +750,26 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
     //zzy, add effect for “查重”
     if (track->content.effect == "anti-duplicate") {
-      CornerPinEffect* effect = new CornerPinEffect();
-      int random_height_offset = pag::get_random_int(15, 30);
-      effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0 - random_height_offset)); 
-      effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0));
-      effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset));
-      effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+      //线性变换
+      CornerPinEffect* cp_effect = new CornerPinEffect();
+      int random_seed = pag::get_random_int(0, 100);
+      int random_height_offset_1 = pag::get_random_int(15, 30);
+      int random_height_offset_2 = pag::get_random_int(15, 30);
+      if (random_seed < 50) {
+        cp_effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0 - random_height_offset_1)); 
+        cp_effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0));
+        cp_effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
+        cp_effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+      } else {
+        cp_effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0)); 
+        cp_effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0 - random_height_offset_1));
+        cp_effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
+        cp_effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
+      }
+      vidPreComposeLayer->effects.push_back(cp_effect);
 
-      vidPreComposeLayer->effects.push_back(effect);
+      //todo: add 非线形变换
+
     }
 
     return vidPreComposeLayer;
@@ -1648,7 +1660,7 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
 
   //step 4: do some random things
   float speedThred = articleTrack->content.speed * 0.1;
-  float speedOffset = (pag::get_random_int(-100, 100) / 100.0f) * speedThred;
+  float speedOffset = (pag::get_random_int(50, 100) / 100.0f) * speedThred;
   articleTrack->content.speed += speedOffset;
   std::cout << "prepareArticleTrack, speed offset:" << speedOffset << std::endl;
 }
