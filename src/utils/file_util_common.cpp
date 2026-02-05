@@ -38,7 +38,7 @@ fs::path create_temp_directory(const std::string& prefix) {
    fs::path new_temp_dir = temp_dir / (prefix + random_suffix);
 
    if (fs::create_directory(new_temp_dir)) {
-     std::cout << "Temporary directory created: " << new_temp_dir << std::endl;
+    //  std::cout << "Temporary directory created: " << new_temp_dir << std::endl;
    } else {
      std::cerr << "Failed to create temporary directory." << std::endl;
    }
