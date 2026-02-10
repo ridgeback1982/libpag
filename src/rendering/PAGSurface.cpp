@@ -191,6 +191,22 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   return result;
 }
 
+bool PAGSurface::makeHardwareBufferSnapshot(void** dstPixels) {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  auto surface = drawable->getSurface(context, true);
+  if (surface == nullptr) {
+    unlockContext();
+    return false;
+  }
+  *dstPixels = surface->makeHardwareBufferSnapshot();
+  unlockContext();
+  return true;
+}
+
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
   auto context = lockContext();
