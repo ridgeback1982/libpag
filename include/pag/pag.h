@@ -1104,6 +1104,7 @@ public:
   static std::shared_ptr<JSONComposition> Load(const std::string& json, std::string tmp_dir="", const std::function<void(int)>& progressCB = nullptr);
 
   int videoEncodeBitrateKPBS() const;
+  int isSingleComposition() const;  //zzy, used to judge deep copy case
   ~JSONComposition() override;
 protected:
   JSONComposition(PreComposeLayer* layer);

@@ -2183,6 +2183,9 @@ int JSONComposition::videoEncodeBitrateKPBS() const {
   return _videoEncodeBitrateKPBS;
 }
 
+int JSONComposition::isSingleComposition() const {
+  return _vectorComposition->layers.size() == 1;
+}
 
 }  // namespace pag
 
