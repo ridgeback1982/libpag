@@ -147,6 +147,7 @@ enum class TagCode {
   ImageScaleModes = 94,
 
   // add new tags here...
+  RippleEffect = 95,
 
   Count
 };
@@ -432,6 +433,7 @@ enum class EffectType {
   LevelsIndividual,
   CornerPin,
   Bulge,
+  Ripple,
   FastBlur,
   Glow,
   DisplacementMap,
@@ -621,6 +623,34 @@ class PAG_API BulgeEffect : public Effect {
   Property<float>* bulgeHeight = nullptr;
   Property<float>* taperRadius = nullptr;
   Property<bool>* pinning = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API RippleEffect : public Effect {
+ public:
+  ~RippleEffect() override;
+
+  EffectType type() const override {
+    return EffectType::Ripple;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Point>* rippleCenter = nullptr;  // spatial
+  Property<float>* radius = nullptr;
+  Property<float>* amplitude = nullptr;
+  Property<float>* wavelength = nullptr;
+  Property<float>* phase = nullptr;
+  Property<bool>* pinning = nullptr;
+  Property<bool>* useFalloff = nullptr;
 
   RTTR_ENABLE(Effect)
 };

@@ -28,6 +28,7 @@
 #include "effects/MosaicEffect.h"
 #include "effects/MotionTileEffect.h"
 #include "effects/RadialBlurEffect.h"
+#include "effects/RippleEffect.h"
 
 namespace pag {
 bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
@@ -44,6 +45,9 @@ bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
       break;
     case TagCode::BulgeEffect:
       effect = ReadTagBlock(stream, BulgeEffectTag);
+      break;
+    case TagCode::RippleEffect:
+      effect = ReadTagBlock(stream, RippleEffectTag);
       break;
     case TagCode::FastBlurEffect:
       effect = ReadTagBlock(stream, FastBlurEffectTag);
@@ -90,6 +94,9 @@ void WriteEffects(EncodeStream* stream, const std::vector<Effect*>& effects) {
         break;
       case EffectType::Bulge:
         WriteTagBlock(stream, static_cast<BulgeEffect*>(effect), BulgeEffectTag);
+        break;
+      case EffectType::Ripple:
+        WriteTagBlock(stream, static_cast<RippleEffect*>(effect), RippleEffectTag);
         break;
       case EffectType::FastBlur:
         WriteTagBlock(stream, static_cast<FastBlurEffect*>(effect), FastBlurEffectTag);

@@ -264,7 +264,7 @@ int VideoContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("VideoContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
+      printf("VideoContent::init, download done, cost: %d ms, file size: %lld KB\n", (int)(tick2-tick1).count(), (long long)fs::file_size(_localPath)/1024);
   } else {
     _localPath = path;
   }
@@ -300,7 +300,7 @@ int AudioContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("AudioContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
+      printf("AudioContent::init, download done, cost: %d ms, file size: %lld KB\n", (int)(tick2-tick1).count(), (long long)fs::file_size(_localPath)/1024);
   } else {
     _localPath = path;
   }
@@ -327,7 +327,7 @@ int ImageContent::init(const std::string& tmpDir) {
           return -1;
       }
       auto tick2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-      printf("ImageContent::init, download done, cost: %d ms\n", (int)(tick2-tick1).count());
+      printf("ImageContent::init, download done, cost: %d ms, file size: %lld KB\n", (int)(tick2-tick1).count(), (long long)fs::file_size(_localPath)/1024);
   } else {
     _localPath = path;
   }
@@ -751,25 +751,56 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     //zzy, add effect for “查重”
     if (track->content.effect == "anti-duplicate") {
       //线性变换
-      CornerPinEffect* cp_effect = new CornerPinEffect();
+      CornerPinEffect* cornerpin = new CornerPinEffect();
       int random_seed = pag::get_random_int(0, 100);
       int random_height_offset_1 = pag::get_random_int(15, 30);
       int random_height_offset_2 = pag::get_random_int(15, 30);
+      int random_width_offset_1 = pag::get_random_int(5, 20);
+      int random_width_offset_2 = pag::get_random_int(5, 20);
       if (random_seed < 50) {
-        cp_effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0 - random_height_offset_1)); 
-        cp_effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0));
-        cp_effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
-        cp_effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
+        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
+        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
+        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
       } else {
-        cp_effect->upperLeft = new Property<Point>(pag::Point::Make(0, 0)); 
-        cp_effect->upperRight = new Property<Point>(pag::Point::Make(video_width, 0 - random_height_offset_1));
-        cp_effect->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
-        cp_effect->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
+        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_2, 0 + random_width_offset_2)); 
+        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_1, 0 - random_height_offset_1));
+        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
+        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
       }
-      vidPreComposeLayer->effects.push_back(cp_effect);
+      vidPreComposeLayer->effects.push_back(cornerpin);
+    } else if (track->content.effect == "anti-watermark") {
+      //线性变换
+      CornerPinEffect* cornerpin = new CornerPinEffect();
+      int random_seed = pag::get_random_int(0, 100);
+      int random_height_offset_1 = pag::get_random_int(15, 30);
+      int random_height_offset_2 = pag::get_random_int(15, 30);
+      int random_width_offset_1 = pag::get_random_int(5, 20);
+      int random_width_offset_2 = pag::get_random_int(5, 20);
+      if (random_seed < 50) {
+        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
+        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
+        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
+        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+      } else {
+        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_2, 0 + random_width_offset_2)); 
+        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_1, 0 - random_height_offset_1));
+        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
+        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
+      }
+      vidPreComposeLayer->effects.push_back(cornerpin);
 
-      //todo: add 非线形变换
-
+      //非线形变换
+      //1. 水波纹
+      auto ripple = new pag::RippleEffect();
+      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
+      ripple->radius = new Property<float>(700.0f);  //水波纹的作用半径，覆盖整个视频，大于640
+      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）
+      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
+      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
+      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
+      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
+      vidPreComposeLayer->effects.push_back(ripple);
     }
 
     return vidPreComposeLayer;

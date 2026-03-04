@@ -27,6 +27,7 @@
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
+#include "RippleFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/layerstyle/DropShadowFilter.h"
@@ -145,6 +146,9 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::Bulge:
       filter = new BulgeFilter(effect);
+      break;
+    case EffectType::Ripple:
+      filter = new RippleFilter(effect);
       break;
     case EffectType::MotionTile:
       filter = new MotionTileFilter(effect);
