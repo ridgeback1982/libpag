@@ -100,7 +100,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
 
         int count = (int)_source->GetAudio(input->data, _movingFrom, sampleCount);
         if (count == 0) {
-          printf("FFAudioReader::readSamples, audio source drains\n");
+          // printf("FFAudioReader::readSamples, audio source drains\n");
           if (_loop) {
             _movingFrom = _from;
             printf("FFAudioReader::readSamples, will loop\n");
@@ -137,7 +137,7 @@ int FFAudioReader::readSamples(uint8_t** data, int channels, int sampleCount) {
   } else {
     int count = (int)_source->GetAudio(data, _movingFrom, sampleCount);
     if (count == 0) {
-        printf("FFAudioReader::readSamples, audio source drains\n");
+        // printf("FFAudioReader::readSamples, audio source drains\n");
         if (_loop) {
           _movingFrom = _from;
           printf("FFAudioReader::readSamples, will loop\n");
