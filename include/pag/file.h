@@ -840,6 +840,8 @@ class PAG_API MosaicEffect : public Effect {
   Property<uint16_t>* horizontalBlocks = nullptr;
   Property<uint16_t>* verticalBlocks = nullptr;  // spatial
   Property<bool>* sharpColors = nullptr;
+  Property<Point>* center = nullptr;  // spatial
+  Property<float>* radius = nullptr;
 
   RTTR_ENABLE(Effect)
 };

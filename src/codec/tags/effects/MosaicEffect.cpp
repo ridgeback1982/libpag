@@ -27,6 +27,9 @@ std::unique_ptr<BlockConfig> MosaicEffectTag(MosaicEffect* effect) {
   AddAttribute(tagConfig, &effect->verticalBlocks, AttributeType::SimpleProperty,
                static_cast<uint16_t>(10));
   AddAttribute(tagConfig, &effect->sharpColors, AttributeType::DiscreteProperty, false);
+  AddAttribute(tagConfig, &effect->center, AttributeType::SpatialProperty,
+               Point::Make(640.0f, 360.0f));
+  AddAttribute(tagConfig, &effect->radius, AttributeType::SimpleProperty, 0.0f);
   EffectCompositingOptionTag(tagConfig, effect);
   return std::unique_ptr<BlockConfig>(tagConfig);
 }

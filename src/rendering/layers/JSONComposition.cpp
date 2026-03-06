@@ -770,13 +770,37 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       }
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
+      //非线形变换
+      //1. 水波纹
+      auto ripple = new pag::RippleEffect();
+      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
+      ripple->radius = new Property<float>(700.0f);  //水波纹的作用半径，覆盖整个视频，大于640
+      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）
+      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
+      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
+      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
+      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
+      vidPreComposeLayer->effects.push_back(ripple);
+
+      //2. 马赛克
+      auto mosaic = new pag::MosaicEffect();
+      mosaic->horizontalBlocks = new pag::Property<uint16_t>(50);
+      mosaic->verticalBlocks = new pag::Property<uint16_t>(50);
+      mosaic->sharpColors = new pag::Property<bool>(false);
+      // 设置中心点
+      mosaic->center = new pag::Property<pag::Point>(pag::Point::Make(360.0f, 1280.0f));
+      // 设置半径
+      mosaic->radius = new pag::Property<float>(200.0f);
+      mosaic->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(mosaic);
+
       //线性变换
       CornerPinEffect* cornerpin = new CornerPinEffect();
       int random_seed = pag::get_random_int(0, 100);
-      int random_height_offset_1 = pag::get_random_int(15, 30);
-      int random_height_offset_2 = pag::get_random_int(15, 30);
-      int random_width_offset_1 = pag::get_random_int(5, 20);
-      int random_width_offset_2 = pag::get_random_int(5, 20);
+      int random_height_offset_1 = pag::get_random_int(20, 40);
+      int random_height_offset_2 = pag::get_random_int(20, 40);
+      int random_width_offset_1 = pag::get_random_int(20, 30);
+      int random_width_offset_2 = pag::get_random_int(20, 30);
       if (random_seed < 50) {
         cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
         cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
@@ -789,18 +813,6 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
         cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
       }
       vidPreComposeLayer->effects.push_back(cornerpin);
-
-      //非线形变换
-      //1. 水波纹
-      auto ripple = new pag::RippleEffect();
-      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
-      ripple->radius = new Property<float>(700.0f);  //水波纹的作用半径，覆盖整个视频，大于640
-      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）
-      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
-      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
-      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
-      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
-      vidPreComposeLayer->effects.push_back(ripple);
     }
 
     return vidPreComposeLayer;
@@ -1700,6 +1712,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   printf("prepareAllTracks, duration:%d\n", story->duration);
 
   int articleDuration = 0;
+  bool anti_watermark = false;
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       //check if article track exists
@@ -1715,6 +1728,10 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
         if (i < (int)sentences.size()-1) {
           sentences[i].end_time = sentences[i+1].begin_time;
         }
+      }
+    } else if (track->type == "video") {
+      if (((movie::VideoTrack*)track)->content.effect == "anti-watermark") {
+        anti_watermark = true;
       }
     }
   }
@@ -1738,6 +1755,49 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
       }
     }
     story->duration = totalDuration;
+  }
+
+  //if anti_watermark, add an image track to the corners
+  if (anti_watermark) {
+    //add an image track into story
+    auto imageTrack1 = new movie::ImageTrack();
+    imageTrack1->type = "image";
+    imageTrack1->zorder = 3;
+    imageTrack1->lifetime.begin_time = 0;
+    imageTrack1->lifetime.end_time = story->duration;
+    imageTrack1->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+    imageTrack1->content.location.center_x = 0.9f;
+    imageTrack1->content.location.center_y = 0.1f;
+    imageTrack1->content.location.w = 0.4f;
+    imageTrack1->content.location.h = 0.4f;
+    imageTrack1->content.location.fitMode = "center-contain";
+    story->tracks.push_back(imageTrack1);
+
+    auto imageTrack2 = new movie::ImageTrack();
+    imageTrack2->type = "image";
+    imageTrack2->zorder = 3;
+    imageTrack2->lifetime.begin_time = 0;
+    imageTrack2->lifetime.end_time = story->duration;
+    imageTrack2->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+    imageTrack2->content.location.center_x = 0.1f;
+    imageTrack2->content.location.center_y = 0.1f;
+    imageTrack2->content.location.w = 0.4f;
+    imageTrack2->content.location.h = 0.4f;
+    imageTrack2->content.location.fitMode = "center-contain";
+    story->tracks.push_back(imageTrack2);
+
+    auto imageTrack3 = new movie::ImageTrack();
+    imageTrack3->type = "image";
+    imageTrack3->zorder = 3;
+    imageTrack3->lifetime.begin_time = 0;
+    imageTrack3->lifetime.end_time = story->duration;
+    imageTrack3->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+    imageTrack3->content.location.center_x = 0.1f;
+    imageTrack3->content.location.center_y = 0.9f;
+    imageTrack3->content.location.w = 0.4f;
+    imageTrack3->content.location.h = 0.4f;
+    imageTrack3->content.location.fitMode = "center-contain";
+    story->tracks.push_back(imageTrack3);
   }
 
   // //add water mark
@@ -1876,7 +1936,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             auto track = static_cast<movie::ImageTrack*>(t);
             if (track->content.init(tmpDir) < 0) {
               std::cerr << "Error initializing image track, path:" << track->content.path << std::endl;
-              return nullptr;
+              continue; //we can ignore image download fail(e.g. the anti-watermark image may not exist)
             }
             //printf("image track, path:%s\n", track->content.path.c_str());
             fitLocation(track->content.location, track->content.width(), track->content.height(), movie.video.width, movie.video.height);

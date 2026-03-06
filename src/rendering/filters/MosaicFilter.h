@@ -27,6 +27,7 @@ class MosaicFilter : public LayerFilter {
   ~MosaicFilter() override = default;
 
  protected:
+  std::string onBuildVertexShader() override;
   std::string onBuildFragmentShader() override;
 
   void onPrepareProgram(tgfx::Context* context, unsigned program) override;
@@ -39,10 +40,15 @@ class MosaicFilter : public LayerFilter {
   float horizontalBlocks = 1;
   float verticalBlocks = 1;
   bool sharpColors = false;
+  float radius = 0.0f;
+  Point center = {0.5f, 0.5f};
 
   // Handle
   int horizontalBlocksHandle = -1;
   int verticalBlocksHandle = -1;
   int sharpColorsHandle = -1;
+  int centerHandle = -1;
+  int radiusHandle = -1;
+  int contentSizeHandle = -1;
 };
 }  // namespace pag

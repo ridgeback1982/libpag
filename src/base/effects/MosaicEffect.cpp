@@ -24,6 +24,8 @@ MosaicEffect::~MosaicEffect() {
   delete horizontalBlocks;
   delete verticalBlocks;
   delete sharpColors;
+  delete center;
+  delete radius;
 }
 
 bool MosaicEffect::visibleAt(Frame) const {
@@ -38,6 +40,8 @@ void MosaicEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges)
   horizontalBlocks->excludeVaryingRanges(timeRanges);
   verticalBlocks->excludeVaryingRanges(timeRanges);
   sharpColors->excludeVaryingRanges(timeRanges);
+  center->excludeVaryingRanges(timeRanges);
+  radius->excludeVaryingRanges(timeRanges);
 }
 
 bool MosaicEffect::verify() const {
@@ -46,6 +50,6 @@ bool MosaicEffect::verify() const {
     return false;
   }
   VerifyAndReturn(horizontalBlocks != nullptr && verticalBlocks != nullptr &&
-                  sharpColors != nullptr);
+                  sharpColors != nullptr && center != nullptr && radius != nullptr);
 }
 }  // namespace pag
