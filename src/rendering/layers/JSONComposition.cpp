@@ -1798,6 +1798,19 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
     imageTrack3->content.location.h = 0.4f;
     imageTrack3->content.location.fitMode = "center-contain";
     story->tracks.push_back(imageTrack3);
+
+    auto imageTrack4 = new movie::ImageTrack();
+    imageTrack4->type = "image";
+    imageTrack4->zorder = 3;
+    imageTrack4->lifetime.begin_time = 0;
+    imageTrack4->lifetime.end_time = story->duration;
+    imageTrack4->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+    imageTrack4->content.location.center_x = 0.9f;
+    imageTrack4->content.location.center_y = 0.9f;
+    imageTrack4->content.location.w = 0.4f;
+    imageTrack4->content.location.h = 0.4f;
+    imageTrack4->content.location.fitMode = "center-contain";
+    story->tracks.push_back(imageTrack4);
   }
 
   // //add water mark
