@@ -2287,8 +2287,8 @@ int JSONComposition::videoEncodeBitrateKPBS() const {
   return _videoEncodeBitrateKPBS;
 }
 
-int JSONComposition::isSingleComposition() const {
-  return _vectorComposition->layers.size() == 1;
+int JSONComposition::isSimpleComposition() const {
+  return _vectorComposition->layers.size() < 20;
 }
 
 }  // namespace pag
