@@ -119,6 +119,7 @@ TextLayout CreateTextLayout(const TextDocument* textDocument,
   return layout;
 }
 
+//zzy
 static bool isEnglishPunctuation(char32_t ch) {
     static const std::unordered_set<char32_t> englishPunctuationSet = {
         U'.', U',', U';', U':', U'?', U'!', U'\'', U'"',
@@ -164,6 +165,7 @@ static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, si
   return index;
 }
 
+//zzy
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static float CalculateGlyphScale(const TextLayout* layout, const std::vector<GlyphInfo>& glyphInfos,
@@ -341,6 +343,7 @@ static float FindMiniAscent(const std::vector<GlyphInfo*>& line) {
   return minAscent;
 }
 
+//zzy
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(

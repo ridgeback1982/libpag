@@ -191,6 +191,7 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   return result;
 }
 
+//zzy
 bool PAGSurface::makeHardwareBufferSnapshot(void** dstPixels) {
   LockGuard autoLock(rootLocker);
   auto context = lockContext();

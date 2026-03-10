@@ -1342,7 +1342,7 @@ class PAG_API PAGSurface {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
-  bool makeHardwareBufferSnapshot(void** dstPixels);
+  bool makeHardwareBufferSnapshot(void** dstPixels);  //zzy
 
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);

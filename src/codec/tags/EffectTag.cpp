@@ -28,7 +28,7 @@
 #include "effects/MosaicEffect.h"
 #include "effects/MotionTileEffect.h"
 #include "effects/RadialBlurEffect.h"
-#include "effects/RippleEffect.h"
+#include "effects/RippleEffect.h" //zzy
 
 namespace pag {
 bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
@@ -46,7 +46,7 @@ bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
     case TagCode::BulgeEffect:
       effect = ReadTagBlock(stream, BulgeEffectTag);
       break;
-    case TagCode::RippleEffect:
+    case TagCode::RippleEffect:   //zzy
       effect = ReadTagBlock(stream, RippleEffectTag);
       break;
     case TagCode::FastBlurEffect:
@@ -95,7 +95,7 @@ void WriteEffects(EncodeStream* stream, const std::vector<Effect*>& effects) {
       case EffectType::Bulge:
         WriteTagBlock(stream, static_cast<BulgeEffect*>(effect), BulgeEffectTag);
         break;
-      case EffectType::Ripple:
+      case EffectType::Ripple:  //zzy
         WriteTagBlock(stream, static_cast<RippleEffect*>(effect), RippleEffectTag);
         break;
       case EffectType::FastBlur:

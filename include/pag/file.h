@@ -147,7 +147,7 @@ enum class TagCode {
   ImageScaleModes = 94,
 
   // add new tags here...
-  RippleEffect = 95,
+  RippleEffect = 95,  //zzy
 
   Count
 };
@@ -433,7 +433,7 @@ enum class EffectType {
   LevelsIndividual,
   CornerPin,
   Bulge,
-  Ripple,
+  Ripple, //zzy
   FastBlur,
   Glow,
   DisplacementMap,
@@ -627,6 +627,7 @@ class PAG_API BulgeEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
+//zzy
 class PAG_API RippleEffect : public Effect {
  public:
   ~RippleEffect() override;
@@ -840,7 +841,7 @@ class PAG_API MosaicEffect : public Effect {
   Property<uint16_t>* horizontalBlocks = nullptr;
   Property<uint16_t>* verticalBlocks = nullptr;  // spatial
   Property<bool>* sharpColors = nullptr;
-  Property<Point>* center = nullptr;  // spatial
+  Property<Point>* center = nullptr;  // zzy
   Property<float>* radius = nullptr;
 
   RTTR_ENABLE(Effect)
@@ -2341,6 +2342,7 @@ class PAG_API VideoFrame {
   ByteData* fileBytes = nullptr;
 };
 
+//zzy
 enum class VideoCodecType { AVC, HEVC };
 
 class PAG_API VideoSequence : public Sequence {

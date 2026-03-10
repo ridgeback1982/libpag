@@ -23,7 +23,7 @@ namespace pag {
 std::vector<const VideoDecoderFactory*> Platform::getVideoDecoderFactories() const {
   return {VideoDecoderFactory::ExternalDecoderFactory(),
           VideoDecoderFactory::SoftwareAVCDecoderFactory(),
-          VideoDecoderFactory::SoftwareHEVCDecoderFactory()};
+          VideoDecoderFactory::SoftwareHEVCDecoderFactory()};  //zzy
 }
 
 bool Platform::registerFallbackFonts() const {
