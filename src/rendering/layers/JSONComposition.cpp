@@ -528,34 +528,11 @@ int ArticleContent::init(const std::string& tmpDir) {
     printf("ArticleContent::init, bgc final protection\n");
   }
   
-// //test code: traverse a folder to find out dart image
-//  std::string path = "/Users/oddshorizon/Downloads/test_dark";
-//  try {
-//    for (const auto& entry : fs::directory_iterator(path)) {
-//        if (entry.is_regular_file()) {
-//            std::cout << "File: " << entry.path() << '\n';
-//        } else if (entry.is_directory()) {
-//            std::cout << "Directory: " << entry.path() << '\n';
-//        }
-//
-//        uint8_t r, g, b;
-//        if (pickCenterColorFromImage(entry.path().string(), &r, &g, &b) == 0) {
-//          RGB rgb = {(double)r, (double)g, (double)b};
-//          // https://www.jyshare.com/front-end/868/   在线调整颜色
-//          HSV hsv = rgbToHsv(rgb);    //色相不变
-//          if (hsv.v < 0.48) {
-//            std::cout << "dark:" << std::endl;
-//          } else {
-//            std::cout << "light:" << std::endl;
-//          }
-//        }
-//    }
-//  } catch (const fs::filesystem_error& e) {
-//      std::cerr << "Filesystem error: " << e.what() << '\n';
-//  } catch (const std::exception& e) {
-//      std::cerr << "General error: " << e.what() << '\n';
-//  }
-
+  //AB test some params
+  horizontalVisibleScope.left = 0.03;     //former 0.05
+  horizontalVisibleScope.right = 0.97;    //former 0.95
+  speed = 0.06;     //former 0.05
+  printf("ArticleContent::init, AB test some params\n");
 
   return 0;
 }
@@ -1701,11 +1678,11 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
     }
   }
 
-  //step 4: do some random things
-  float speedThred = articleTrack->content.speed * 0.1;
-  float speedOffset = (pag::get_random_int(50, 100) / 100.0f) * speedThred;
-  articleTrack->content.speed += speedOffset;
-  std::cout << "prepareArticleTrack, speed offset:" << speedOffset << std::endl;
+  // //step 4: do some random things
+  // float speedThred = articleTrack->content.speed * 0.1;
+  // float speedOffset = (pag::get_random_int(50, 100) / 100.0f) * speedThred;
+  // articleTrack->content.speed += speedOffset;
+  // std::cout << "prepareArticleTrack, speed offset:" << speedOffset << std::endl;
 }
 
 void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused]]float fps, const std::string& tmpDir) {
