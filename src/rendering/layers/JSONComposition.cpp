@@ -529,8 +529,9 @@ int ArticleContent::init(const std::string& tmpDir) {
   }
   
   //AB test some params
-  horizontalVisibleScope.left = 0.03;     //former 0.05
-  horizontalVisibleScope.right = 0.97;    //former 0.95
+  horizontalVisibleScope.left = 0.1;     //former 0.05
+  horizontalVisibleScope.right = 0.9;    //former 0.95
+  horizontalSpacing = 0.07;   //former 0.05
   speed = 0.06;     //former 0.05
   printf("ArticleContent::init, AB test some params\n");
 
@@ -1006,7 +1007,7 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
-//use "GetLines" in TextRenderer.cpp to get the exact text lines
+//use "GetLines" in TextRenderer.cpp to get the rough text lines(not very exactly)
 std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
     const TextDocument* textDocument, const TextPathOptions* pathOptions);
 
@@ -1051,7 +1052,8 @@ movie::ArticleParagraph generateParagraph(const std::string& fontFamilyName, con
   //test to get the exact text lines
   int lines = testTheTextLines(fontFamilyName, p.text, fontSize, leading, tracking, boxWidth);
   p.heightInP = lines * leading;
-  // std::cout << "generateParagraph, get one, text:" << p.text << ", height:" << p.heightInP << std::endl;
+  // std::cout << "generateParagraph, get one, text:" << p.text << ", height:" << p.heightInP << ", lines:" << lines << ", font size:" << fontSize
+  //   << ", leading:" << leading << ", tracking:" << tracking << ", box width:" << boxWidth << std::endl;
   return p;
 }
 
@@ -1085,7 +1087,7 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
   int leadingInP = std::ceil(content->verticalSpacing * fontSize) + fontSize;
   int trackingInP = std::ceil(content->horizontalSpacing * fontSize);
   int boxWidth = std::round(width * (content->horizontalVisibleScope.right - content->horizontalVisibleScope.left));
-  boxWidth -= std::round(content->horizontalVisibleScope.indent * fontSize) * 2;
+  boxWidth -= std::round(content->horizontalVisibleScope.indent * fontSize) * 1;  //zzy, ab test, former 2
   boxWidth = boxWidth - boxWidth % (fontSize+trackingInP);
   float speedInP = height * content->speed;
   float movePerFrame = speedInP / spec.fps;
