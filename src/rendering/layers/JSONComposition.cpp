@@ -755,13 +755,11 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
       //2. 马赛克
       auto mosaic = new pag::MosaicEffect();
-      mosaic->horizontalBlocks = new pag::Property<uint16_t>(50);
+      mosaic->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
       mosaic->verticalBlocks = new pag::Property<uint16_t>(50);
       mosaic->sharpColors = new pag::Property<bool>(false);
-      // 设置中心点
-      mosaic->center = new pag::Property<pag::Point>(pag::Point::Make(360.0f, 1280.0f));
-      // 设置半径
-      mosaic->radius = new pag::Property<float>(200.0f);
+      mosaic->center = new pag::Property<pag::Point>(pag::Point::Make(360.0f, 1280.0f));  // 设置中心点
+      mosaic->radius = new pag::Property<float>(200.0f);  // 设置半径
       mosaic->effectOpacity = new pag::Property<pag::Opacity>(255);
       vidPreComposeLayer->effects.push_back(mosaic);
 
@@ -1629,7 +1627,7 @@ void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack,
   //ab test some params
   articleTrack->content.horizontalVisibleScope.indent = 2.0;    //former 2.3
   articleTrack->content.horizontalSpacing = 0.08;   //former 0.05
-  articleTrack->content.speed = 0.06;     //former 0.05
+  articleTrack->content.speed = 0.07;     //former 0.05
   printf("prepareArticleTrack, AB test some params\n");
 
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
