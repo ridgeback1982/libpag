@@ -2050,7 +2050,7 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   printf("JSONComposition::LoadTest, json:%s", json.c_str());
 
   
-  const std::vector<std::string> tokens = pag::splitStringBy(json, ';');
+  const std::vector<std::string> tokens = pag::splitStringBy(json, ";");
 //  FFAudioReader::test(tokens[0], tokens[3]);
 
  

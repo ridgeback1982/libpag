@@ -97,18 +97,47 @@ void eraseLeadingPunctuation(std::string& s) {
     }
 }
 
-std::vector<std::string> splitStringBy(const std::string &s, char delimiter) {
-  std::vector<std::string> tokens;
-  std::string token;
-  std::stringstream ss(s);
-
-  // Split the string by the given delimiter
-  while (std::getline(ss, token, delimiter)) {
-    if (!token.empty()) {
-      tokens.push_back(token);
+std::vector<std::string> splitStringBy(const std::string &s, const std::string& delimiters) {
+    std::vector<std::string> tokens;
+    std::vector<std::string> delimList;
+    // 1. 解析 UTF-8 格式的分隔符集合
+    for (size_t i = 0; i < delimiters.length(); ) {
+        size_t len = 1;
+        unsigned char c = static_cast<unsigned char>(delimiters[i]);
+        if (c >= 0xf0) len = 4;
+        else if (c >= 0xe0) len = 3;
+        else if (c >= 0xc0) len = 2;
+        
+        if (i + len <= delimiters.length()) {
+            delimList.push_back(delimiters.substr(i, len));
+        }
+        i += len;
     }
-  }
-  return tokens;
+
+    // 2. 遍历字符串并按多字节字符分割
+    std::string current;
+    for (size_t i = 0; i < s.length(); ) {
+        bool matched = false;
+        for (const auto& d : delimList) {
+            if (s.compare(i, d.length(), d) == 0) {
+                if (!current.empty()) {
+                    tokens.push_back(current);
+                    current.clear();
+                }
+                i += d.length();
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            current += s[i];
+            i++;
+        }
+    }
+    if (!current.empty()) {
+        tokens.push_back(current);
+    }
+    return tokens;
 }
 
 int get_random_int(int min, int max) {

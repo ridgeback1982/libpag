@@ -17,7 +17,7 @@ void PAG_API stringReplace(std::string& str, const std::string& old_value, const
 bool PAG_API starts_with(const std::string& str, const std::string& prefix);
 void PAG_API removePunctuation(std::wstring &str);
 void PAG_API eraseLeadingPunctuation(std::string& s);
-std::vector<std::string> PAG_API splitStringBy(const std::string &s, char delimiter);
+std::vector<std::string> PAG_API splitStringBy(const std::string &s, const std::string& delimiters);
 
 //string functions
 bool PAG_API isEndLinePunctuation(char32_t ch);
