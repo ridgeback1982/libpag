@@ -1599,10 +1599,10 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
 
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
   //ab test some params
-  articleTrack->content.horizontalVisibleScope.indent = 2.0;    //former 2.3
-  articleTrack->content.horizontalSpacing = 0.08;   //former 0.05
-  articleTrack->content.speed = 0.07;     //former 0.05
-  printf("prepareArticleTrack, AB test some params\n");
+  // articleTrack->content.horizontalVisibleScope.indent = 2.0;    //former 2.3
+  // articleTrack->content.horizontalSpacing = 0.08;   //former 0.05
+  // articleTrack->content.speed = 0.07;     //former 0.05
+  // printf("prepareArticleTrack, AB test some params\n");
 
   int fontSize = std::round(std::min(width, height) * articleTrack->content.fontSize);
   int leading = std::ceil(articleTrack->content.verticalSpacing * fontSize) + fontSize;
