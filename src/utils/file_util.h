@@ -26,6 +26,6 @@ std::string PAG_API getFileNameFromUrl(const std::string& url);
 
 bool PAG_API remove_directory(const std::string& directory_path);
 
-bool PAG_API runOnServer();
+// bool PAG_API runOnServer();
 
 }  // namespace pag

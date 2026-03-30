@@ -250,12 +250,6 @@ int VideoContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
-
-      if (pag::runOnServer()) {
-          //replace oss url with internal url, if needed
-          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
-      }
-      
       //download to local path
       printf("VideoContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -286,12 +280,6 @@ int AudioContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
-
-      if (pag::runOnServer()) {
-          //replace oss url with internal url, if needed
-          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
-      }
-      
       //download to local path
       printf("AudioContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -313,12 +301,6 @@ int ImageContent::init(const std::string& tmpDir) {
   if (remote) {
       //create local path
       _localPath = tmpDir + "/" + pag::getFileNameFromUrl(path);
-
-      if (pag::runOnServer()) {
-          //replace oss url with internal url, if needed
-          pag::stringReplace(path, AliyunOssUrlPrefix, InternalUrlPrefix);
-      }
-      
       //download to local path
       printf("ImageContent::init, will download %s\n", path.c_str());
       auto tick1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
@@ -1809,7 +1791,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
 }
 
 std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_str, std::string tmp_dir, const std::function<void(int)>& progressCB) {
-    printf("JSONComposition::Load, on server:%d\n", pag::runOnServer());
+    printf("JSONComposition::Load\n");
     json nmjson = json::parse(json_str);
     movie::Movie movie = nmjson.get<movie::Movie>();
     if (movie.video.stories.size() != 1) {

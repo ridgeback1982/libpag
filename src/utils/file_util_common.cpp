@@ -2,11 +2,11 @@
 
 namespace pag {
 
-static const bool g_on_server = std::getenv("PAG_ON_SERVER") != nullptr;    //NOTE: check it always
+// static const bool g_on_server = std::getenv("PAG_ON_SERVER") != nullptr;    //NOTE: check it always
 
-bool runOnServer() {
-  return g_on_server;
-}
+// bool runOnServer() {
+//   return g_on_server;
+// }
 
 void writeStringToFile(const std::string& str, const fs::path& filePath, bool append) {
     std::ofstream outFile(filePath, append ? std::ios::app : std::ios::out);
