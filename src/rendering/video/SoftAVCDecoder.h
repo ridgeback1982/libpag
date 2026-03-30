@@ -28,7 +28,6 @@
 
 extern "C" {
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #include "ih264_typedefs.h"
 #include "ih264d.h"

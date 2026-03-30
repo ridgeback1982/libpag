@@ -840,9 +840,6 @@ movie::RGBA translateColor(const std::string& color_string) {
   return color;
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 static std::vector<std::string> splitStringByNewline(const std::string& input) {
     std::vector<std::string> result;
     std::regex re("\r\n|\r|\n");  // 处理所有换行符
@@ -1515,8 +1512,6 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   return layers;
 }
 
-#pragma clang diagnostic pop
-
 #define CREATE_AUDIO_SOURCE(typedTrack, spec) \
     audioSource = std::make_shared<PAGAudioSource>(typedTrack->content.localPath().c_str(), typedTrack->type == "voice" ? AudioSourceType::Voice : AudioSourceType::Bgm); \
     audioSource->setStartFrame(TimeToFrame(typedTrack->lifetime.begin_time, spec.fps)); \
@@ -1544,8 +1539,6 @@ std::shared_ptr<PAGAudioSource> createAudioSource(const std::string& type, movie
   return audioSource;
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack, [[maybe_unused]]int fontSize, [[maybe_unused]]int tracking, [[maybe_unused]]int boxWidth) {
   std::string new_text = articleTrack->content.text;
   //删除英文空格
@@ -1621,7 +1614,6 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
   
   return texts;
 }
-#pragma clang diagnostic pop
 
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
   //ab test some params

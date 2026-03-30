@@ -105,7 +105,6 @@ bool Baseline::compare(const Bitmap& bitmap, const std::string& key) {
 std::string DumpMD5(const void* bytes, size_t size) {
   unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   CC_MD5(bytes, static_cast<int>(size), digest);
 #pragma clang diagnostic pop
   char buffer[33];

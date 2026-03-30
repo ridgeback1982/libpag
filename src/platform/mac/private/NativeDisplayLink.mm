@@ -19,8 +19,6 @@
 #include "NativeDisplayLink.h"
 
 namespace pag {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 static CVReturn OnAnimationCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                     CVOptionFlags, CVOptionFlags*, void* userInfo) {
@@ -59,5 +57,4 @@ void NativeDisplayLink::update() {
   callback();
 }
 
-#pragma clang diagnostic pop
 }  // namespace pag

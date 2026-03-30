@@ -166,8 +166,6 @@ static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, si
 }
 
 //zzy
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static float CalculateGlyphScale(const TextLayout* layout, const std::vector<GlyphInfo>& glyphInfos,
                                  float oldFontSize, float lineTop, float lineBottom,
                                  float visibleTop, float visibleBottom, float* totalTextLines, bool avoidFirstPunctuation/*zzy*/) {
@@ -225,7 +223,6 @@ static float CalculateGlyphScale(const TextLayout* layout, const std::vector<Gly
   }
   return fontSize / oldFontSize;
 }
-#pragma clang diagnostic pop
 
 static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfos, float fontSize, bool avoidFirstPunctuation/*zzy*/) {
   auto boxYOffset = layout->firstBaseLine - layout->boxRect.top;
@@ -344,8 +341,6 @@ static float FindMiniAscent(const std::vector<GlyphInfo*>& line) {
 }
 
 //zzy
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds,
     float* firstLineMiniAscent, bool avoidFirstPunctuation/*zzy*/) {
@@ -432,7 +427,6 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
   }
   return lineList;
 }
-#pragma clang diagnostic pop
 
 static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
     const TextLayout& layout, const std::vector<std::vector<GlyphInfo*>>& glyphInfoLines,

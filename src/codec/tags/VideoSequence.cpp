@@ -182,9 +182,6 @@ void parse_h265_extradata(uint8_t *extradata, int extradata_size, VideoSequence*
     }
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 //zzy
 int64_t precise_seek(AVFormatContext *fmt_ctx, AVCodecContext *dec_ctx,
                  int stream_index, double target_time_seconds) {
@@ -448,8 +445,6 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 
   return sequence;
 }
-
-#pragma clang diagnostic pop
 
 static void WriteByteDataWithoutStartCode(EncodeStream* stream, ByteData* byteData) {
   auto length = static_cast<uint32_t>(byteData->length());
