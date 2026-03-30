@@ -1,5 +1,6 @@
 #include "FFFormatUtil.h"
 #include <iostream>
+#include <thread>
 
 extern "C" {
     #include "libavcodec/avcodec.h"
@@ -19,6 +20,7 @@ extern "C" {
 //zzy
 namespace pag {
 
+#define MAX_RETRY_TIMES 3
 
 FFFormatUtil::FFFormatUtil(const std::string& url) {
     // 初始化 FFmpeg 库
@@ -26,18 +28,28 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
     
     _fmt_ctx = avformat_alloc_context();
     std::string new_url = url;
+    // 处理 NAS 服务器的 URL
     if (starts_with(new_url, NAS_HTTP_IP) || starts_with(new_url, NAS_HTTP_HOST)) {
       std::string http = "http://";
       size_t pos = new_url.find(http);
       if (pos != std::string::npos) {
-          new_url.insert(pos + http.length(), std::string(NAS_USERNAME) + ":" + std::string(NAS_PASSWORD) + "@");
+        new_url.insert(pos + http.length(), std::string(NAS_USERNAME) + ":" + std::string(NAS_PASSWORD) + "@");
       }
     }
     // 打开输入文件
-    if (avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, NULL) < 0) {
-      std::cerr << "Could not open input file:" << new_url << std::endl;
-      avformat_free_context(_fmt_ctx);
-      return;
+    //retry 3 times if failed
+    for (int times = 0; times < MAX_RETRY_TIMES; times++) {
+      if (avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, NULL) < 0) {
+        std::cerr << "FFmpeg open input file:" << new_url << " failed, will retry" << std::endl;
+        if (times == MAX_RETRY_TIMES - 1) {
+          std::cerr << "Meet max retry limit, give up" << std::endl;
+          avformat_free_context(_fmt_ctx);
+          return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        continue;
+      }
+      break;
     }
 
     // 查找流信息
