@@ -18,6 +18,7 @@ namespace pag {
 class CVImageTool {
 public:
 #if defined(__APPLE__) && defined(__MACH__)
+    static bool hasRectFrameInside(const std::string& path);
     static bool hasApproxRectFrameInside(const std::string& path);
     static PAG_API std::vector<Rect> detectSubtitleRegions(CVPixelBufferRef pixelBuffer);
 #endif

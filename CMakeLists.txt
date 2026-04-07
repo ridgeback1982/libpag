@@ -155,6 +155,10 @@ list(APPEND PAG_FILES ${SRC_FILES})
 file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
+if (NOT APPLE)
+    list(FILTER PAG_FILES EXCLUDE REGEX "CVImageTool\\.mm$")
+endif ()
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()

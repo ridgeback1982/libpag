@@ -736,14 +736,22 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       vidPreComposeLayer->effects.push_back(ripple);
 
       //2. 马赛克
-      auto mosaic = new pag::MosaicEffect();
-      mosaic->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      mosaic->verticalBlocks = new pag::Property<uint16_t>(50);
-      mosaic->sharpColors = new pag::Property<bool>(false);
-      mosaic->center = new pag::Property<pag::Point>(pag::Point::Make(360.0f, 1280.0f));  // 设置中心点
-      mosaic->radius = new pag::Property<float>(200.0f);  // 设置半径
-      mosaic->effectOpacity = new pag::Property<pag::Opacity>(255);
-      vidPreComposeLayer->effects.push_back(mosaic);
+      auto mosaic1 = new pag::MosaicEffect();
+      mosaic1->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
+      mosaic1->verticalBlocks = new pag::Property<uint16_t>(50);
+      mosaic1->sharpColors = new pag::Property<bool>(false);
+      mosaic1->center = new pag::Property<pag::Point>(pag::Point::Make(-100.0f, 640.0f));  // 设置中心点
+      mosaic1->radius = new pag::Property<float>(200.0f);  // 设置半径
+      mosaic1->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(mosaic1);
+      auto mosaic2 = new pag::MosaicEffect();
+      mosaic2->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
+      mosaic2->verticalBlocks = new pag::Property<uint16_t>(50);
+      mosaic2->sharpColors = new pag::Property<bool>(false);
+      mosaic2->center = new pag::Property<pag::Point>(pag::Point::Make(820.0f, 640.0f));  // 设置中心点
+      mosaic2->radius = new pag::Property<float>(200.0f);  // 设置半径
+      mosaic2->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(mosaic2);
 
       //线性变换
       CornerPinEffect* cornerpin = new CornerPinEffect();
@@ -1662,7 +1670,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   printf("prepareAllTracks, duration:%d\n", story->duration);
 
   int articleDuration = 0;
-  bool anti_watermark = false;
+  // bool anti_watermark = false;
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       //check if article track exists
@@ -1681,7 +1689,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
       }
     } else if (track->type == "video") {
       if (((movie::VideoTrack*)track)->content.effect == "anti-watermark") {
-        anti_watermark = true;
+        // anti_watermark = true;
       }
     }
   }
@@ -1708,73 +1716,60 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   }
 
   //if anti_watermark, add an image track to the corners
-  if (anti_watermark) {
-    //add an image track into story
-    auto imageTrack1 = new movie::ImageTrack();
-    imageTrack1->type = "image";
-    imageTrack1->zorder = 3;
-    imageTrack1->lifetime.begin_time = 0;
-    imageTrack1->lifetime.end_time = story->duration;
-    imageTrack1->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-    imageTrack1->content.location.center_x = 0.9f;
-    imageTrack1->content.location.center_y = 0.1f;
-    imageTrack1->content.location.w = 0.4f;
-    imageTrack1->content.location.h = 0.4f;
-    imageTrack1->content.location.fitMode = "center-contain";
-    story->tracks.push_back(imageTrack1);
+  // if (anti_watermark) {
+  //   //add an image track into story
+  //   auto imageTrack1 = new movie::ImageTrack();
+  //   imageTrack1->type = "image";
+  //   imageTrack1->zorder = 3;
+  //   imageTrack1->lifetime.begin_time = 0;
+  //   imageTrack1->lifetime.end_time = story->duration;
+  //   imageTrack1->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+  //   imageTrack1->content.location.center_x = 0.9f;
+  //   imageTrack1->content.location.center_y = 0.1f;
+  //   imageTrack1->content.location.w = 0.4f;
+  //   imageTrack1->content.location.h = 0.4f;
+  //   imageTrack1->content.location.fitMode = "center-contain";
+  //   story->tracks.push_back(imageTrack1);
 
-    auto imageTrack2 = new movie::ImageTrack();
-    imageTrack2->type = "image";
-    imageTrack2->zorder = 3;
-    imageTrack2->lifetime.begin_time = 0;
-    imageTrack2->lifetime.end_time = story->duration;
-    imageTrack2->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-    imageTrack2->content.location.center_x = 0.1f;
-    imageTrack2->content.location.center_y = 0.1f;
-    imageTrack2->content.location.w = 0.4f;
-    imageTrack2->content.location.h = 0.4f;
-    imageTrack2->content.location.fitMode = "center-contain";
-    story->tracks.push_back(imageTrack2);
+  //   auto imageTrack2 = new movie::ImageTrack();
+  //   imageTrack2->type = "image";
+  //   imageTrack2->zorder = 3;
+  //   imageTrack2->lifetime.begin_time = 0;
+  //   imageTrack2->lifetime.end_time = story->duration;
+  //   imageTrack2->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+  //   imageTrack2->content.location.center_x = 0.1f;
+  //   imageTrack2->content.location.center_y = 0.1f;
+  //   imageTrack2->content.location.w = 0.4f;
+  //   imageTrack2->content.location.h = 0.4f;
+  //   imageTrack2->content.location.fitMode = "center-contain";
+  //   story->tracks.push_back(imageTrack2);
 
-    auto imageTrack3 = new movie::ImageTrack();
-    imageTrack3->type = "image";
-    imageTrack3->zorder = 3;
-    imageTrack3->lifetime.begin_time = 0;
-    imageTrack3->lifetime.end_time = story->duration;
-    imageTrack3->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-    imageTrack3->content.location.center_x = 0.1f;
-    imageTrack3->content.location.center_y = 0.9f;
-    imageTrack3->content.location.w = 0.4f;
-    imageTrack3->content.location.h = 0.4f;
-    imageTrack3->content.location.fitMode = "center-contain";
-    story->tracks.push_back(imageTrack3);
+  //   auto imageTrack3 = new movie::ImageTrack();
+  //   imageTrack3->type = "image";
+  //   imageTrack3->zorder = 3;
+  //   imageTrack3->lifetime.begin_time = 0;
+  //   imageTrack3->lifetime.end_time = story->duration;
+  //   imageTrack3->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+  //   imageTrack3->content.location.center_x = 0.1f;
+  //   imageTrack3->content.location.center_y = 0.9f;
+  //   imageTrack3->content.location.w = 0.4f;
+  //   imageTrack3->content.location.h = 0.4f;
+  //   imageTrack3->content.location.fitMode = "center-contain";
+  //   story->tracks.push_back(imageTrack3);
 
-    auto imageTrack4 = new movie::ImageTrack();
-    imageTrack4->type = "image";
-    imageTrack4->zorder = 3;
-    imageTrack4->lifetime.begin_time = 0;
-    imageTrack4->lifetime.end_time = story->duration;
-    imageTrack4->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-    imageTrack4->content.location.center_x = 0.9f;
-    imageTrack4->content.location.center_y = 0.9f;
-    imageTrack4->content.location.w = 0.4f;
-    imageTrack4->content.location.h = 0.4f;
-    imageTrack4->content.location.fitMode = "center-contain";
-    story->tracks.push_back(imageTrack4);
-  }
-
-  // //add water mark
-  // auto waterMark = new movie::TitleTrack();
-  // waterMark->type = "title";
-  // waterMark->lifetime.begin_time = 0;
-  // waterMark->lifetime.end_time = story->duration;
-  // waterMark->zorder = 1000;
-  // waterMark->content.text = ".";
-  // waterMark->content.location.center_x = 0.1f;
-  // waterMark->content.location.center_y = 0.9f;
-  // waterMark->content.fontSize = 0.05f;
-  // waterMark->content.textColor = "#777777";
-  // story->tracks.push_back(waterMark);
+  //   auto imageTrack4 = new movie::ImageTrack();
+  //   imageTrack4->type = "image";
+  //   imageTrack4->zorder = 3;
+  //   imageTrack4->lifetime.begin_time = 0;
+  //   imageTrack4->lifetime.end_time = story->duration;
+  //   imageTrack4->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
+  //   imageTrack4->content.location.center_x = 0.9f;
+  //   imageTrack4->content.location.center_y = 0.9f;
+  //   imageTrack4->content.location.w = 0.4f;
+  //   imageTrack4->content.location.h = 0.4f;
+  //   imageTrack4->content.location.fitMode = "center-contain";
+  //   story->tracks.push_back(imageTrack4);
+  // }
 
   //check duration of all tracks
   for (auto& t : story->tracks) {

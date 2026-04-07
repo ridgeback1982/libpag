@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <vector>
 
 #include "opencv2/opencv.hpp"
 
@@ -21,46 +22,37 @@ static float rectArea(const Rect& r) {
     return std::max(0.0f, r.right - r.left) * std::max(0.0f, r.bottom - r.top);
 }
 
-static float rectCenterY(const Rect& r) {
-    return 0.5f * (r.top + r.bottom);
-}
-
-static std::vector<Rect> mergeSubtitleLines(const std::vector<Rect>& rects) {
-    if (rects.empty()) {
-        return {};
+bool CVImageTool::hasRectFrameInside(const std::string& path) {
+    cv::Mat img = cv::imread(path);
+    if (img.empty()) {
+        std::cerr << "Failed to load image!" << std::endl;
+        return false;
     }
-    std::vector<Rect> sorted = rects;
-    std::sort(sorted.begin(), sorted.end(),
-              [](const Rect& a, const Rect& b) { return rectCenterY(a) < rectCenterY(b); });
 
-    std::vector<Rect> lines;
-    lines.reserve(sorted.size());
-    for (const auto& r : sorted) {
-        const float cy = rectCenterY(r);
-        bool merged = false;
-        for (auto& line : lines) {
-            const float lcy = rectCenterY(line);
-            const float dy = std::fabs(cy - lcy);
-            const float tol = std::max(8.0f, 0.6f * std::min(r.bottom - r.top, line.bottom - line.top));
-            if (dy <= tol) {
-                line = unionRect(line, r);
-                merged = true;
-                break;
+    cv::Mat gray;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+
+    cv::Mat edges;
+    cv::Canny(gray, edges, 50, 150);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    for (const auto& contour : contours) {
+        std::vector<cv::Point> approx;
+        cv::approxPolyDP(contour, approx, 0.05 * cv::arcLength(contour, true), true);
+        if (approx.size() == 4 && cv::isContourConvex(approx)) {
+            cv::Rect boundingRect = cv::boundingRect(approx);
+            cv::Point imageCenter(img.cols / 2, img.rows / 2);
+            if (boundingRect.contains(imageCenter)) {
+                if (boundingRect.width > img.cols / 2 && boundingRect.height > img.rows / 2) {
+                    return true;
+                }
             }
         }
-        if (!merged) {
-            lines.push_back(r);
-        }
     }
 
-    std::sort(lines.begin(), lines.end(),
-              [](const Rect& a, const Rect& b) { return rectArea(a) > rectArea(b); });
-    if (lines.size() > 2) {
-        lines.resize(2);
-    }
-    std::sort(lines.begin(), lines.end(),
-              [](const Rect& a, const Rect& b) { return rectCenterY(a) < rectCenterY(b); });
-    return lines;
+    return false;
 }
 
 static std::vector<cv::Point> arrangeRectanglePoints(const std::vector<cv::Point>& points) {
@@ -263,18 +255,10 @@ bool CVImageTool::hasApproxRectFrameInside(const std::string& path) {
     return false;
 }
 
-std::vector<Rect> CVImageTool::detectSubtitleRegions(CVPixelBufferRef pixelBuffer) {
-    if (pixelBuffer == nullptr) {
-        return {};
-    }
-    const int width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
-    const int height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
-    if (width <= 0 || height <= 0) {
-        return {};
-    }
-
-    __block std::vector<Rect> candidates;
-
+static std::vector<Rect> runRecognizeText(CVPixelBufferRef pixelBuffer, int width, int height,
+                                         CGRect regionOfInterest, float minConfidence,
+                                         float minTextHeight, VNRequestTextRecognitionLevel level) {
+    __block std::vector<Rect> rects;
     @autoreleasepool {
         VNRecognizeTextRequest* request = [[VNRecognizeTextRequest alloc]
             initWithCompletionHandler:^(VNRequest* req, NSError* error) {
@@ -291,10 +275,10 @@ std::vector<Rect> CVImageTool::detectSubtitleRegions(CVPixelBufferRef pixelBuffe
                     if (top == nil) {
                         continue;
                     }
-                    if (top.confidence < 0.25f) {
+                    if (top.string.length == 0) {
                         continue;
                     }
-                    if (top.string.length == 0) {
+                    if (top.confidence < minConfidence) {
                         continue;
                     }
 
@@ -304,40 +288,79 @@ std::vector<Rect> CVImageTool::detectSubtitleRegions(CVPixelBufferRef pixelBuffe
                                     height;
                     const float w = static_cast<float>(bb.size.width) * width;
                     const float h = static_cast<float>(bb.size.height) * height;
-
-                    const float cx = x + 0.5f * w;
-                    const float cy = y + 0.5f * h;
-                    const float widthRatio = w / static_cast<float>(width);
-                    const float heightRatio = h / static_cast<float>(height);
-
-                    if (cy < 0.55f * static_cast<float>(height)) {
-                        continue;
-                    }
-                    if (widthRatio < 0.08f) {
-                        continue;
-                    }
-                    if (heightRatio > 0.28f) {
-                        continue;
-                    }
-                    if (cx < 0.05f * static_cast<float>(width) || cx > 0.95f * static_cast<float>(width)) {
-                        continue;
-                    }
-
-                    candidates.push_back(Rect::MakeLTRB(x, y, x + w, y + h));
+                    std::cout << "VNRecognizedText, x: " << x << ", y: " << y << ", w: " << w << ", h: " << h << ", confidence: " << top.confidence << std::endl;
+                    rects.push_back(Rect::MakeLTRB(x, y, x + w, y + h));
                 }
             }];
-        request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
+        request.recognitionLevel = level;
         request.usesLanguageCorrection = NO;
         request.recognitionLanguages = @[@"zh-Hans", @"en-US"];
+        request.regionOfInterest = regionOfInterest;
+        if (@available(macOS 13.0, iOS 16.0, *)) {
+            request.minimumTextHeight = minTextHeight;
+        }
 
         VNImageRequestHandler* handler = [[VNImageRequestHandler alloc] initWithCVPixelBuffer:pixelBuffer
                                                                                       options:@{}];
         NSError* err = nil;
         [handler performRequests:@[request] error:&err];
     }
+    return rects;
+}
 
-    auto lines = mergeSubtitleLines(candidates);
-    return lines;
+static float iouOf(const Rect& a, const Rect& b) {
+    const float left = std::max(a.left, b.left);
+    const float top = std::max(a.top, b.top);
+    const float right = std::min(a.right, b.right);
+    const float bottom = std::min(a.bottom, b.bottom);
+    const float w = std::max(0.0f, right - left);
+    const float h = std::max(0.0f, bottom - top);
+    const float inter = w * h;
+    const float areaA = rectArea(a);
+    const float areaB = rectArea(b);
+    const float denom = areaA + areaB - inter + 1e-6f;
+    return inter / denom;
+}
+
+static std::vector<Rect> mergeOverlappingRects(std::vector<Rect> rects, float iouThreshold) {
+    if (rects.size() <= 1) {
+        return rects;
+    }
+    std::sort(rects.begin(), rects.end(),
+              [](const Rect& a, const Rect& b) { return rectArea(a) > rectArea(b); });
+
+    std::vector<Rect> merged;
+    merged.reserve(rects.size());
+    for (const auto& r : rects) {
+        bool didMerge = false;
+        for (auto& m : merged) {
+            if (iouOf(r, m) >= iouThreshold) {
+                m = unionRect(m, r);
+                didMerge = true;
+                break;
+            }
+        }
+        if (!didMerge) {
+            merged.push_back(r);
+        }
+    }
+    return merged;
+}
+
+std::vector<Rect> CVImageTool::detectSubtitleRegions(CVPixelBufferRef pixelBuffer) {
+    if (pixelBuffer == nullptr) {
+        return {};
+    }
+    const int width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
+    const int height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+    if (width <= 0 || height <= 0) {
+        return {};
+    }
+
+    auto candidates = runRecognizeText(pixelBuffer, width, height, CGRectMake(0, 0, 1, 1), 0.1f, 0.004f,
+                                       VNRequestTextRecognitionLevelAccurate);
+    candidates = mergeOverlappingRects(std::move(candidates), 0.35f);
+    return candidates;
 }
 
 }  // namespace pag
