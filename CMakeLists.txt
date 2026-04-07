@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAG)
 
+if (APPLE)
+    enable_language(OBJCXX)
+endif ()
+
 # Uncomment the next 4 lines to build libpag for Intel cpus on Apple Silicon devices.
 #if (APPLE AND NOT IOS)
 #    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
@@ -268,6 +272,8 @@ elseif (IOS)
     list(APPEND PAG_SHARED_LIBS ${CORE_VIDEO})
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND PAG_SHARED_LIBS ${ICONV_LIBRARIES})
+    find_library(VISION_LIBS Vision REQUIRED)
+    list(APPEND PAG_SHARED_LIBS ${VISION_LIBS})
 
     if (USE_NATIVE_PLATFORM)
         if (PAG_USE_OPENGL)
@@ -307,6 +313,8 @@ elseif (MACOS)
     list(APPEND PAG_SHARED_LIBS ${VIDEOTOOLBOX})
     find_library(CORE_MEDIA CoreMedia)
     list(APPEND PAG_SHARED_LIBS ${CORE_MEDIA})
+    find_library(VISION Vision REQUIRED)
+    list(APPEND PAG_SHARED_LIBS ${VISION})
 
     #zzy
     file(GLOB UTILS_FILES_COMMON src/utils/file_util_common.cpp 
