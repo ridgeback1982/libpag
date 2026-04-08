@@ -100,23 +100,47 @@ void eraseLeadingPunctuation(std::string& s) {
 std::vector<std::string> splitStringBy(const std::string &s, const std::string& delimiters) {
     std::vector<std::string> tokens;
     std::vector<std::string> delimList;
-    // 1. 解析 UTF-8 格式的分隔符集合
-    for (size_t i = 0; i < delimiters.length(); ) {
-        size_t len = 1;
-        unsigned char c = static_cast<unsigned char>(delimiters[i]);
-        if (c >= 0xf0) len = 4;
-        else if (c >= 0xe0) len = 3;
-        else if (c >= 0xc0) len = 2;
-        
+    auto utf8CharLen = [](unsigned char c) -> size_t {
+        if (c >= 0xf0) return 4;
+        if (c >= 0xe0) return 3;
+        if (c >= 0xc0) return 2;
+        return 1;
+    };
+
+    for (size_t i = 0; i < delimiters.length();) {
+        size_t len = utf8CharLen(static_cast<unsigned char>(delimiters[i]));
         if (i + len <= delimiters.length()) {
             delimList.push_back(delimiters.substr(i, len));
         }
         i += len;
     }
 
-    // 2. 遍历字符串并按多字节字符分割
     std::string current;
-    for (size_t i = 0; i < s.length(); ) {
+    for (size_t i = 0; i < s.length();) {
+        //处理中文省略号
+        if (s.compare(i, 3, "...") == 0) {
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+            while (i < s.length() && s[i] == '.') {
+                i++;
+            }
+            continue;
+        }
+
+        //处理英文省略号
+        if (s.compare(i, 3, u8"…") == 0) {
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+            while (i + 3 <= s.length() && s.compare(i, 3, u8"…") == 0) {
+                i += 3;
+            }
+            continue;
+        }
+
         bool matched = false;
         for (const auto& d : delimList) {
             if (s.compare(i, d.length(), d) == 0) {
@@ -130,8 +154,12 @@ std::vector<std::string> splitStringBy(const std::string &s, const std::string& 
             }
         }
         if (!matched) {
-            current += s[i];
-            i++;
+            size_t len = utf8CharLen(static_cast<unsigned char>(s[i]));
+            if (i + len > s.length()) {
+                len = 1;
+            }
+            current.append(s, i, len);
+            i += len;
         }
     }
     if (!current.empty()) {
