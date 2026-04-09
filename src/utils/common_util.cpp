@@ -98,73 +98,151 @@ void eraseLeadingPunctuation(std::string& s) {
 }
 
 std::vector<std::string> splitStringBy(const std::string &s, const std::string& delimiters) {
-    std::vector<std::string> tokens;
-    std::vector<std::string> delimList;
-    auto utf8CharLen = [](unsigned char c) -> size_t {
-        if (c >= 0xf0) return 4;
-        if (c >= 0xe0) return 3;
-        if (c >= 0xc0) return 2;
-        return 1;
+    auto decodeOne = [](const std::string& str, size_t& index, size_t& byteLen) -> char32_t {
+        byteLen = 0;
+        if (index >= str.size()) {
+            return 0;
+        }
+        unsigned char c0 = static_cast<unsigned char>(str[index]);
+        if ((c0 & 0x80) == 0) {
+            byteLen = 1;
+            return static_cast<char32_t>(c0);
+        }
+        if ((c0 & 0xE0) == 0xC0 && index + 1 < str.size()) {
+            unsigned char c1 = static_cast<unsigned char>(str[index + 1]);
+            if ((c1 & 0xC0) == 0x80) {
+                byteLen = 2;
+                return (static_cast<char32_t>(c0 & 0x1F) << 6) | static_cast<char32_t>(c1 & 0x3F);
+            }
+        }
+        if ((c0 & 0xF0) == 0xE0 && index + 2 < str.size()) {
+            unsigned char c1 = static_cast<unsigned char>(str[index + 1]);
+            unsigned char c2 = static_cast<unsigned char>(str[index + 2]);
+            if (((c1 & 0xC0) == 0x80) && ((c2 & 0xC0) == 0x80)) {
+                byteLen = 3;
+                return (static_cast<char32_t>(c0 & 0x0F) << 12) |
+                       (static_cast<char32_t>(c1 & 0x3F) << 6) |
+                       static_cast<char32_t>(c2 & 0x3F);
+            }
+        }
+        if ((c0 & 0xF8) == 0xF0 && index + 3 < str.size()) {
+            unsigned char c1 = static_cast<unsigned char>(str[index + 1]);
+            unsigned char c2 = static_cast<unsigned char>(str[index + 2]);
+            unsigned char c3 = static_cast<unsigned char>(str[index + 3]);
+            if (((c1 & 0xC0) == 0x80) && ((c2 & 0xC0) == 0x80) && ((c3 & 0xC0) == 0x80)) {
+                byteLen = 4;
+                return (static_cast<char32_t>(c0 & 0x07) << 18) |
+                       (static_cast<char32_t>(c1 & 0x3F) << 12) |
+                       (static_cast<char32_t>(c2 & 0x3F) << 6) |
+                       static_cast<char32_t>(c3 & 0x3F);
+            }
+        }
+        byteLen = 1;
+        return static_cast<char32_t>(c0);
     };
 
-    for (size_t i = 0; i < delimiters.length();) {
-        size_t len = utf8CharLen(static_cast<unsigned char>(delimiters[i]));
-        if (i + len <= delimiters.length()) {
-            delimList.push_back(delimiters.substr(i, len));
+    std::unordered_set<char32_t> delimSet;
+    for (size_t i = 0; i < delimiters.size();) {
+        size_t len = 0;
+        size_t idx = i;
+        char32_t cp = decodeOne(delimiters, idx, len);
+        if (len == 0) {
+            break;
         }
+        delimSet.insert(cp);
         i += len;
     }
 
-    std::string current;
-    for (size_t i = 0; i < s.length();) {
-        //处理中文省略号
-        if (s.compare(i, 3, "...") == 0) {
-            if (!current.empty()) {
-                tokens.push_back(current);
-                current.clear();
-            }
-            while (i < s.length() && s[i] == '.') {
-                i++;
-            }
-            continue;
-        }
+    auto isDelimiterCp = [&](char32_t cp) -> bool { return delimSet.find(cp) != delimSet.end(); };
 
-        //处理英文省略号
-        if (s.compare(i, 3, u8"…") == 0) {
-            if (!current.empty()) {
-                tokens.push_back(current);
-                current.clear();
-            }
-            while (i + 3 <= s.length() && s.compare(i, 3, u8"…") == 0) {
-                i += 3;
-            }
-            continue;
+    auto flushCurrent = [&](std::vector<std::string>& out, std::string& cur) {
+        if (!cur.empty()) {
+            out.push_back(cur);
+            cur.clear();
         }
+    };
 
-        bool matched = false;
-        for (const auto& d : delimList) {
-            if (s.compare(i, d.length(), d) == 0) {
-                if (!current.empty()) {
-                    tokens.push_back(current);
-                    current.clear();
+    auto consumeEllipsisOrDelimiterRun = [&](size_t& i) {
+        for (;;) {
+            if (i >= s.size()) {
+                return;
+            }
+
+            if (s[i] == '.') {
+                size_t j = i;
+                while (j < s.size() && s[j] == '.') {
+                    j++;
                 }
-                i += d.length();
-                matched = true;
-                break;
+                if (j - i >= 3 || isDelimiterCp(U'.')) {
+                    i = j;
+                    continue;
+                }
+                return;
+            }
+
+            size_t len = 0;
+            size_t idx = i;
+            char32_t cp = decodeOne(s, idx, len);
+            if (len == 0) {
+                return;
+            }
+
+            if (cp == U'\u2026') {
+                while (i < s.size()) {
+                    size_t l2 = 0;
+                    size_t i2 = i;
+                    char32_t cp2 = decodeOne(s, i2, l2);
+                    if (l2 == 0 || cp2 != U'\u2026') {
+                        break;
+                    }
+                    i += l2;
+                }
+                continue;
+            }
+
+            if (isDelimiterCp(cp)) {
+                i += len;
+                continue;
+            }
+
+            return;
+        }
+    };
+
+    std::vector<std::string> tokens;
+    std::string current;
+    for (size_t i = 0; i < s.size();) {
+        if (s[i] == '.') {
+            size_t j = i;
+            while (j < s.size() && s[j] == '.') {
+                j++;
+            }
+            if (j - i >= 3 || isDelimiterCp(U'.')) {
+                flushCurrent(tokens, current);
+                i = j;
+                consumeEllipsisOrDelimiterRun(i);
+                continue;
             }
         }
-        if (!matched) {
-            size_t len = utf8CharLen(static_cast<unsigned char>(s[i]));
-            if (i + len > s.length()) {
-                len = 1;
-            }
-            current.append(s, i, len);
+
+        size_t len = 0;
+        size_t idx = i;
+        char32_t cp = decodeOne(s, idx, len);
+        if (len == 0) {
+            break;
+        }
+
+        if (cp == U'\u2026' || isDelimiterCp(cp)) {
+            flushCurrent(tokens, current);
             i += len;
+            consumeEllipsisOrDelimiterRun(i);
+            continue;
         }
+
+        current.append(s, i, len);
+        i += len;
     }
-    if (!current.empty()) {
-        tokens.push_back(current);
-    }
+    flushCurrent(tokens, current);
     return tokens;
 }
 
