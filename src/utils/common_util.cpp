@@ -246,6 +246,62 @@ std::vector<std::string> splitStringBy(const std::string &s, const std::string& 
     return tokens;
 }
 
+bool endsWithPunctuationOrEllipsis(const std::string& s) {
+    if (s.empty()) {
+        return false;
+    }
+    size_t end = s.size();
+    while (end > 0) {
+        unsigned char c = static_cast<unsigned char>(s[end - 1]);
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            end--;
+            continue;
+        }
+        break;
+    }
+    if (end == 0) {
+        return false;
+    }
+
+    size_t i = end;
+    int dotCount = 0;
+    while (i > 0 && s[i - 1] == '.') {
+        dotCount++;
+        i--;
+    }
+    if (dotCount >= 3) {
+        return true;
+    }
+
+    const auto matchesUtf8At = [&](size_t pos, const char* lit) -> bool {
+        const size_t n = std::strlen(lit);
+        return pos + n <= end && s.compare(pos, n, lit) == 0;
+    };
+
+    int ellipsisCount = 0;
+    while (i >= 3 && matchesUtf8At(i - 3, u8"…")) {
+        ellipsisCount++;
+        i -= 3;
+    }
+    if (ellipsisCount > 0) {
+        return true;
+    }
+
+    unsigned char last = static_cast<unsigned char>(s[end - 1]);
+    if (last == ',' || last == '.' || last == '?' || last == '!' || last == ';' || last == ':' ||
+        last == ')') {
+        return true;
+    }
+    if (end >= 3) {
+        const std::string last3 = s.substr(end - 3, 3);
+        if (last3 == u8"，" || last3 == u8"。" || last3 == u8"？" || last3 == u8"！" ||
+            last3 == u8"；" || last3 == u8"：" || last3 == u8"、" || last3 == u8"）") {
+            return true;
+        }
+    }
+    return false;
+}
+
 int get_random_int(int min, int max) {
     static std::random_device rd;  // 用于生成随机种子
     static std::mt19937 gen(rd()); // 使用 Mersenne Twister 伪随机数生成器

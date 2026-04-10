@@ -26,5 +26,6 @@ bool PAG_API isChineseChar(char32_t ch);
 bool PAG_API isRealChar(char32_t ch);
 bool PAG_API isClosingPunctuation(char32_t ch);
 bool PAG_API isOpeningPunctuation(char32_t ch);
+bool PAG_API endsWithPunctuationOrEllipsis(const std::string& s);
 
 }  // namespace pag
