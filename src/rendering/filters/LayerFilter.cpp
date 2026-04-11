@@ -21,6 +21,8 @@
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
+#include "EllipseHazeFilter.h"
+#include "FrostedGlassFilter.h"
 #include "GradientOverlayFilter.h"
 #include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"
@@ -28,6 +30,8 @@
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
 #include "RippleFilter.h"
+#include "WhiteNoiseFilter.h"
+#include "WhiteVeilFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/layerstyle/DropShadowFilter.h"
@@ -149,6 +153,18 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::Ripple:
       filter = new RippleFilter(effect);
+      break;
+    case EffectType::WhiteNoise:
+      filter = new WhiteNoiseFilter(effect);
+      break;
+    case EffectType::EllipseHaze:
+      filter = new EllipseHazeFilter(effect);
+      break;
+    case EffectType::WhiteVeil:
+      filter = new WhiteVeilFilter(effect);
+      break;
+    case EffectType::FrostedGlass:
+      filter = new FrostedGlassFilter(effect);
       break;
     case EffectType::MotionTile:
       filter = new MotionTileFilter(effect);

@@ -724,54 +724,115 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
       //非线形变换
-      //1. 水波纹
-      auto ripple = new pag::RippleEffect();
-      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
-      ripple->radius = new Property<float>(700.0f);  //水波纹的作用半径，覆盖整个视频，大于640
-      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）
-      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
-      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
-      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
-      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
-      vidPreComposeLayer->effects.push_back(ripple);
+      // //1. 水波纹
+      // auto ripple = new pag::RippleEffect();
+      // ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
+      // ripple->radius = new Property<float>(700.0f);  //水波纹的作用半径，覆盖整个视频，大于640
+      // ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）
+      // ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
+      // ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
+      // ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
+      // ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
+      // vidPreComposeLayer->effects.push_back(ripple);
 
-      //2. 马赛克
-      auto mosaic1 = new pag::MosaicEffect();
-      mosaic1->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      mosaic1->verticalBlocks = new pag::Property<uint16_t>(50);
-      mosaic1->sharpColors = new pag::Property<bool>(false);
-      mosaic1->center = new pag::Property<pag::Point>(pag::Point::Make(-100.0f, 640.0f));  // 设置中心点
-      mosaic1->radius = new pag::Property<float>(200.0f);  // 设置半径
-      mosaic1->effectOpacity = new pag::Property<pag::Opacity>(255);
-      vidPreComposeLayer->effects.push_back(mosaic1);
-      auto mosaic2 = new pag::MosaicEffect();
-      mosaic2->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      mosaic2->verticalBlocks = new pag::Property<uint16_t>(50);
-      mosaic2->sharpColors = new pag::Property<bool>(false);
-      mosaic2->center = new pag::Property<pag::Point>(pag::Point::Make(820.0f, 640.0f));  // 设置中心点
-      mosaic2->radius = new pag::Property<float>(200.0f);  // 设置半径
-      mosaic2->effectOpacity = new pag::Property<pag::Opacity>(255);
-      vidPreComposeLayer->effects.push_back(mosaic2);
+      // //2. 马赛克
+      // auto mosaic1 = new pag::MosaicEffect();
+      // mosaic1->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
+      // mosaic1->verticalBlocks = new pag::Property<uint16_t>(50);
+      // mosaic1->sharpColors = new pag::Property<bool>(false);
+      // mosaic1->center = new pag::Property<pag::Point>(pag::Point::Make(-100.0f, 640.0f));  // 设置中心点
+      // mosaic1->radius = new pag::Property<float>(200.0f);  // 设置半径
+      // mosaic1->effectOpacity = new pag::Property<pag::Opacity>(255);
+      // vidPreComposeLayer->effects.push_back(mosaic1);
+      // auto mosaic2 = new pag::MosaicEffect();
+      // mosaic2->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
+      // mosaic2->verticalBlocks = new pag::Property<uint16_t>(50);
+      // mosaic2->sharpColors = new pag::Property<bool>(false);
+      // mosaic2->center = new pag::Property<pag::Point>(pag::Point::Make(820.0f, 640.0f));  // 设置中心点
+      // mosaic2->radius = new pag::Property<float>(200.0f);  // 设置半径
+      // mosaic2->effectOpacity = new pag::Property<pag::Opacity>(255);
+      // vidPreComposeLayer->effects.push_back(mosaic2);
+
+      //白噪声
+      // auto noise = new pag::WhiteNoiseEffect();
+      // float intensity = 0.6;
+      // float opacity = 0.5;
+      // intensity = std::max(0.0f, std::min(1.0f, intensity));
+      // opacity = std::max(0.0f, std::min(1.0f, opacity));
+      // noise->noiseIntensity = new pag::Property<float>(intensity);
+      // noise->effectOpacity = new pag::Property<pag::Opacity>(
+      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
+      // vidPreComposeLayer->effects.push_back(noise);
+
+      //朦胧雾化
+      // auto haze = new pag::EllipseHazeEffect();
+      // float innerBlur = 1.0f;
+      // float outerBlur = 2.0f;
+      // float opacity = 1.0f;
+      // float radiusX = 0.33f;
+      // float radiusY = 0.33f;
+      // float feather = 1.0f;
+      // innerBlur = std::max(0.0f, std::min(64.0f, innerBlur));
+      // outerBlur = std::max(0.0f, std::min(64.0f, outerBlur));
+      // opacity = std::max(0.0f, std::min(1.0f, opacity));
+      // radiusX = std::max(0.02f, std::min(1.0f, radiusX));
+      // radiusY = std::max(0.02f, std::min(1.0f, radiusY));
+      // feather = std::max(0.0f, std::min(1.0f, feather));
+      // haze->center = new pag::Property<pag::Point>(pag::Point::Make(0.5f, 0.5f));
+      // haze->radius = new pag::Property<pag::Point>(pag::Point::Make(radiusX, radiusY));
+      // haze->innerBlur = new pag::Property<float>(innerBlur);
+      // haze->outerBlur = new pag::Property<float>(outerBlur);
+      // haze->feather = new pag::Property<float>(feather);
+      // haze->effectOpacity = new pag::Property<pag::Opacity>(
+      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
+      // vidPreComposeLayer->effects.push_back(haze);
+
+      //白纱
+      // float strength = 1.0f;   //白纱“厚度/发白程度”
+      // float opacity = 0.60f;    //混合透明度（最终叠加强度）
+      // bool uniform = false;    //色块均匀
+      // strength = std::max(0.0f, std::min(1.0f, strength));
+      // opacity = std::max(0.0f, std::min(1.0f, opacity));
+      // auto veil = new pag::WhiteVeilEffect();
+      // veil->strength = new pag::Property<float>(strength);
+      // veil->uniform = new pag::Property<bool>(uniform);
+      // veil->effectOpacity = new pag::Property<pag::Opacity>(
+      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
+      // vidPreComposeLayer->effects.push_back(veil);
+
+      //毛玻璃
+      float translucency = 0.25f;
+      float colorBleed = 0.15f;
+      float blurRadius = 12.0f;
+      translucency = std::max(0.0f, std::min(1.0f, translucency));
+      colorBleed = std::max(0.0f, std::min(1.0f, colorBleed));
+      blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
+      auto frosted = new pag::FrostedGlassEffect();
+      frosted->blurRadius = new pag::Property<float>(blurRadius);
+      frosted->translucency = new pag::Property<float>(translucency);
+      frosted->colorBleed = new pag::Property<float>(colorBleed);
+      frosted->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(frosted);
 
       //线性变换
-      CornerPinEffect* cornerpin = new CornerPinEffect();
-      int random_seed = pag::get_random_int(0, 100);
-      int random_height_offset_1 = pag::get_random_int(20, 40);
-      int random_height_offset_2 = pag::get_random_int(20, 40);
-      int random_width_offset_1 = pag::get_random_int(20, 30);
-      int random_width_offset_2 = pag::get_random_int(20, 30);
-      if (random_seed < 50) {
-        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
-        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
-        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
-        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
-      } else {
-        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_2, 0 + random_width_offset_2)); 
-        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_1, 0 - random_height_offset_1));
-        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
-        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
-      }
-      vidPreComposeLayer->effects.push_back(cornerpin);
+      // CornerPinEffect* cornerpin = new CornerPinEffect();
+      // int random_seed = pag::get_random_int(0, 100);
+      // int random_height_offset_1 = pag::get_random_int(20, 40);
+      // int random_height_offset_2 = pag::get_random_int(20, 40);
+      // int random_width_offset_1 = pag::get_random_int(20, 30);
+      // int random_width_offset_2 = pag::get_random_int(20, 30);
+      // if (random_seed < 50) {
+      //   cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
+      //   cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
+      //   cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
+      //   cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
+      // } else {
+      //   cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_2, 0 + random_width_offset_2)); 
+      //   cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_1, 0 - random_height_offset_1));
+      //   cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
+      //   cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
+      // }
+      // vidPreComposeLayer->effects.push_back(cornerpin);
     }
 
     return vidPreComposeLayer;
@@ -2237,6 +2298,3 @@ int JSONComposition::isSimpleComposition() const {
 }
 
 }  // namespace pag
-
-
-

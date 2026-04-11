@@ -434,6 +434,10 @@ enum class EffectType {
   CornerPin,
   Bulge,
   Ripple, //zzy
+  WhiteNoise, //zzy
+  EllipseHaze,
+  WhiteVeil,
+  FrostedGlass,
   FastBlur,
   Glow,
   DisplacementMap,
@@ -652,6 +656,89 @@ class PAG_API RippleEffect : public Effect {
   Property<float>* phase = nullptr;
   Property<bool>* pinning = nullptr;
   Property<bool>* useFalloff = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API WhiteNoiseEffect : public Effect {
+ public:
+  ~WhiteNoiseEffect() override;
+
+  EffectType type() const override {
+    return EffectType::WhiteNoise;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* noiseIntensity = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API EllipseHazeEffect : public Effect {
+ public:
+  ~EllipseHazeEffect() override;
+
+  EffectType type() const override {
+    return EffectType::EllipseHaze;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Point>* center = nullptr;
+  Property<Point>* radius = nullptr;
+  Property<float>* innerBlur = nullptr;
+  Property<float>* outerBlur = nullptr;
+  Property<float>* feather = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API WhiteVeilEffect : public Effect {
+ public:
+  ~WhiteVeilEffect() override;
+
+  EffectType type() const override {
+    return EffectType::WhiteVeil;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* strength = nullptr;
+  Property<bool>* uniform = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API FrostedGlassEffect : public Effect {
+ public:
+  ~FrostedGlassEffect() override;
+
+  EffectType type() const override {
+    return EffectType::FrostedGlass;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* blurRadius = nullptr;
+  Property<float>* translucency = nullptr;
+  Property<float>* colorBleed = nullptr;
 
   RTTR_ENABLE(Effect)
 };
