@@ -1,104 +1,87 @@
 #include "EllipseHazeFilter.h"
 
 #include "base/utils/TGFXCast.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
-
-static const char FRAGMENT_SHADER[] = R"(
-        #version 100
-        precision highp float;
-        varying vec2 vertexColor;
-        uniform sampler2D sTexture;
-
-        uniform vec2 uCenter;
-        uniform vec2 uRadius;
-        uniform vec2 uBlur;
-        uniform float uFeather;
-        uniform vec2 uTexelSize;
-        uniform float uEffectOpacity;
-
-        float ellipseDistance(vec2 uv, vec2 center, vec2 radius) {
-            vec2 d = (uv - center) / max(radius, vec2(1e-6));
-            return length(d);
-        }
-
-        vec4 blur9(vec2 uv, float blurRadiusPx) {
-            vec2 o = uTexelSize * blurRadiusPx;
-            vec4 c = texture2D(sTexture, uv) * 0.28;
-            c += texture2D(sTexture, uv + vec2( o.x, 0.0)) * 0.10;
-            c += texture2D(sTexture, uv + vec2(-o.x, 0.0)) * 0.10;
-            c += texture2D(sTexture, uv + vec2(0.0,  o.y)) * 0.10;
-            c += texture2D(sTexture, uv + vec2(0.0, -o.y)) * 0.10;
-            c += texture2D(sTexture, uv + vec2( o.x,  o.y)) * 0.08;
-            c += texture2D(sTexture, uv + vec2(-o.x,  o.y)) * 0.08;
-            c += texture2D(sTexture, uv + vec2( o.x, -o.y)) * 0.08;
-            c += texture2D(sTexture, uv + vec2(-o.x, -o.y)) * 0.08;
-            return c;
-        }
-
-        void main() {
-            vec4 src = texture2D(sTexture, vertexColor);
-            float a = max(src.a, 1e-6);
-            vec3 base = src.rgb / a;
-
-            float d = ellipseDistance(vertexColor, uCenter, uRadius);
-            float feather = clamp(uFeather, 0.0, 1.0);
-            float inner = 1.0 - feather;
-            float w = smoothstep(inner, 1.0, d);
-
-            float blurPx = mix(uBlur.x, uBlur.y, w);
-            blurPx = clamp(blurPx, 0.0, 64.0);
-
-            vec4 blurred = blur9(vertexColor, blurPx);
-            vec3 blurredRGB = blurred.rgb / max(blurred.a, 1e-6);
-
-            vec3 hazed = mix(base, blurredRGB, clamp(uEffectOpacity, 0.0, 1.0));
-            gl_FragColor = vec4(hazed * src.a, src.a);
-        }
-    )";
 
 EllipseHazeFilter::EllipseHazeFilter(Effect* effect) : effect(effect) {
 }
 
-std::string EllipseHazeFilter::onBuildFragmentShader() {
-  return FRAGMENT_SHADER;
+bool EllipseHazeFilter::initialize(tgfx::Context*) {
+  return true;
 }
 
-void EllipseHazeFilter::onPrepareProgram(tgfx::Context* context, unsigned program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  centerHandle = gl->getUniformLocation(program, "uCenter");
-  radiusHandle = gl->getUniformLocation(program, "uRadius");
-  blurHandle = gl->getUniformLocation(program, "uBlur");
-  featherHandle = gl->getUniformLocation(program, "uFeather");
-  texelSizeHandle = gl->getUniformLocation(program, "uTexelSize");
-  effectOpacityHandle = gl->getUniformLocation(program, "uEffectOpacity");
-}
+void EllipseHazeFilter::draw(tgfx::Context* context, const FilterSource* source,
+                             const FilterTarget* target) {
+  if (context == nullptr || source == nullptr || target == nullptr) {
+    LOGE("EllipseHazeFilter::draw() can not draw filter");
+    return;
+  }
+  auto* haze = reinterpret_cast<const EllipseHazeEffect*>(effect);
+  float blurRadius = haze->blurRadius ? haze->blurRadius->getValueAt(layerFrame) : 0.0f;
+  float bloom = haze->bloom ? haze->bloom->getValueAt(layerFrame) : 0.0f;
+  float whiten = haze->whiten ? haze->whiten->getValueAt(layerFrame) : 0.0f;
+  float opacity = haze->effectOpacity ? ToAlpha(haze->effectOpacity->getValueAt(layerFrame)) : 1.0f;
 
-void EllipseHazeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                      const tgfx::Point& filterScale) {
-  auto* hazeEffect = reinterpret_cast<const EllipseHazeEffect*>(effect);
+  blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
+  bloom = std::max(0.0f, std::min(1.0f, bloom));
+  whiten = std::max(0.0f, std::min(1.0f, whiten));
+  opacity = std::max(0.0f, std::min(1.0f, opacity));
 
-  auto center = hazeEffect->center->getValueAt(layerFrame);
-  auto radius = hazeEffect->radius->getValueAt(layerFrame);
-  float innerBlur = hazeEffect->innerBlur->getValueAt(layerFrame);
-  float outerBlur = hazeEffect->outerBlur->getValueAt(layerFrame);
-  float feather = hazeEffect->feather->getValueAt(layerFrame);
-  float opacity = ToAlpha(hazeEffect->effectOpacity->getValueAt(layerFrame));
+  float sigmaX = blurRadius * filterScale.x * source->scale.x;
+  float sigmaY = blurRadius * filterScale.y * source->scale.y;
+  sigmaX = std::max(0.0f, std::min(64.0f, sigmaX));
+  sigmaY = std::max(0.0f, std::min(64.0f, sigmaY));
 
-  innerBlur *= 0.5f * (filterScale.x + filterScale.y);
-  outerBlur *= 0.5f * (filterScale.x + filterScale.y);
+  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
+  auto canvas = targetSurface->getCanvas();
 
-  float texelX = 1.0f / std::max(1.0f, contentBounds.width());
-  float texelY = 1.0f / std::max(1.0f, contentBounds.height());
+  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
+  auto image = tgfx::Image::MakeFrom(context, backendTexture);
+  if (image == nullptr) {
+    LOGE("EllipseHazeFilter::draw() failed to create an Image from the backend texture!");
+    return;
+  }
 
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform2f(centerHandle, center.x, center.y);
-  gl->uniform2f(radiusHandle, radius.x, radius.y);
-  gl->uniform2f(blurHandle, innerBlur, outerBlur);
-  gl->uniform1f(featherHandle, feather);
-  gl->uniform2f(texelSizeHandle, texelX, texelY);
-  gl->uniform1f(effectOpacityHandle, opacity);
+  canvas->save();
+  canvas->setMatrix(ToMatrix(target));
+  canvas->drawImage(image, 0, 0);
+
+  if (opacity > 0.0f && (sigmaX > 0.0f || sigmaY > 0.0f) && (bloom > 0.0f || whiten > 0.0f)) {
+    auto blurFilter = tgfx::ImageFilter::Blur(sigmaX, sigmaY, tgfx::TileMode::Clamp);
+    tgfx::Point offset = tgfx::Point::Zero();
+    auto blurred = image->makeWithFilter(std::move(blurFilter), &offset);
+    if (blurred != nullptr) {
+      blurred = blurred->makeSubset(tgfx::Rect::MakeXYWH(-offset.x, -offset.y,
+                                                        static_cast<float>(source->width),
+                                                        static_cast<float>(source->height)));
+
+      if (bloom > 0.0f) {
+        tgfx::Paint p;
+        p.setAlpha(opacity * (0.30f + 0.70f * bloom));
+        p.setBlendMode(tgfx::BlendMode::Screen);
+        canvas->drawImage(blurred, 0, 0, &p);
+      }
+      if (whiten > 0.0f) {
+        tgfx::Paint veil;
+        auto white = tgfx::Color::White();
+        white.alpha = opacity * whiten * 0.60f;
+        veil.setColor(white);
+        veil.setBlendMode(tgfx::BlendMode::Screen);
+        canvas->drawRect(tgfx::Rect::MakeWH(static_cast<float>(source->width),
+                                            static_cast<float>(source->height)),
+                         veil);
+      }
+    }
+  }
+  canvas->restore();
+  targetSurface->flush();
 }
 
 }  // namespace pag
-

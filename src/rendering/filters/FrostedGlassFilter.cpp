@@ -30,12 +30,12 @@ void FrostedGlassFilter::draw(tgfx::Context* context, const FilterSource* source
       frosted->effectOpacity ? ToAlpha(frosted->effectOpacity->getValueAt(layerFrame)) : 1.0f;
 
   translucency = std::max(0.0f, std::min(1.0f, translucency));
-  colorBleed = std::max(0.0f, std::min(1.0f, colorBleed));
+  colorBleed = std::max(0.0f, std::min(2.0f, colorBleed));
   opacity = std::max(0.0f, std::min(1.0f, opacity));
 
   float sigmaX = blurRadius * filterScale.x * source->scale.x;
   float sigmaY = blurRadius * filterScale.y * source->scale.y;
-  float bleedFactor = 1.0f + 1.6f * colorBleed;
+  float bleedFactor = 1.0f + 1.6f * colorBleed + 3.0f * colorBleed * colorBleed;
   sigmaX = std::max(0.0f, std::min(64.0f, sigmaX * bleedFactor));
   sigmaY = std::max(0.0f, std::min(64.0f, sigmaY * bleedFactor));
 

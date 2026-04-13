@@ -8,22 +8,12 @@ class EllipseHazeFilter : public LayerFilter {
   explicit EllipseHazeFilter(Effect* effect);
   ~EllipseHazeFilter() override = default;
 
- protected:
-  std::string onBuildFragmentShader() override;
+  bool initialize(tgfx::Context* context) override;
 
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
+  void draw(tgfx::Context* context, const FilterSource* source,
+            const FilterTarget* target) override;
 
  private:
   Effect* effect = nullptr;
-  int centerHandle = -1;
-  int radiusHandle = -1;
-  int blurHandle = -1;
-  int featherHandle = -1;
-  int texelSizeHandle = -1;
-  int effectOpacityHandle = -1;
 };
 }  // namespace pag
-

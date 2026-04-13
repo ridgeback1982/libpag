@@ -693,11 +693,9 @@ class PAG_API EllipseHazeEffect : public Effect {
 
   bool verify() const override;
 
-  Property<Point>* center = nullptr;
-  Property<Point>* radius = nullptr;
-  Property<float>* innerBlur = nullptr;
-  Property<float>* outerBlur = nullptr;
-  Property<float>* feather = nullptr;
+  Property<float>* blurRadius = nullptr;
+  Property<float>* bloom = nullptr;
+  Property<float>* whiten = nullptr;
 
   RTTR_ENABLE(Effect)
 };
