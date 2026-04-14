@@ -26,6 +26,7 @@
 #include "GradientOverlayFilter.h"
 #include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"
+#include "LowFreqBleedFilter.h"
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
@@ -165,6 +166,9 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::FrostedGlass:
       filter = new FrostedGlassFilter(effect);
+      break;
+    case EffectType::LowFreqBleed:
+      filter = new LowFreqBleedFilter(effect);
       break;
     case EffectType::MotionTile:
       filter = new MotionTileFilter(effect);

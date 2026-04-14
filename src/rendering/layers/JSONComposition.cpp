@@ -735,7 +735,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
       vidPreComposeLayer->effects.push_back(ripple);
 
-      // //2. 马赛克
+      //2. 马赛克
       auto mosaic1 = new pag::MosaicEffect();
       mosaic1->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
       mosaic1->verticalBlocks = new pag::Property<uint16_t>(50);
@@ -753,6 +753,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       mosaic2->effectOpacity = new pag::Property<pag::Opacity>(255);
       vidPreComposeLayer->effects.push_back(mosaic2);
 
+#if 0
       //白噪声
       // auto noise = new pag::WhiteNoiseEffect();
       // float intensity = 0.6;
@@ -796,8 +797,8 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
       //毛玻璃
       // float translucency = 0.25f;
-      // float colorBleed = 0.75f;
-      // float blurRadius = 1.0f;
+      // float colorBleed = 0.75f;  //颜色外溢
+      // float blurRadius = 1.0f;   //模糊半径，像素
       // translucency = std::max(0.0f, std::min(1.0f, translucency));
       // colorBleed = std::max(0.0f, std::min(2.0f, colorBleed));
       // blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
@@ -808,7 +809,19 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       // frosted->effectOpacity = new pag::Property<pag::Opacity>(255);
       // vidPreComposeLayer->effects.push_back(frosted);
 
-      //线性变换
+      //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了
+      // auto bleed = new pag::LowFreqBleedEffect();
+      // float radius = 400.0f;
+      // float strength = 0.7f;
+      // radius = std::max(0.0f, std::min(400.0f, radius));
+      // strength = std::max(0.0f, std::min(1.0f, strength));
+      // bleed->radius = new pag::Property<float>(radius);
+      // bleed->strength = new pag::Property<float>(strength);
+      // bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
+      // vidPreComposeLayer->effects.push_back(bleed);
+#endif
+
+      //位置变换
       CornerPinEffect* cornerpin = new CornerPinEffect();
       int random_seed = pag::get_random_int(0, 100);
       int random_height_offset_1 = pag::get_random_int(20, 40);

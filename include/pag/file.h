@@ -438,6 +438,7 @@ enum class EffectType {
   EllipseHaze,
   WhiteVeil,
   FrostedGlass,
+  LowFreqBleed,
   FastBlur,
   Glow,
   DisplacementMap,
@@ -737,6 +738,26 @@ class PAG_API FrostedGlassEffect : public Effect {
   Property<float>* blurRadius = nullptr;
   Property<float>* translucency = nullptr;
   Property<float>* colorBleed = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API LowFreqBleedEffect : public Effect {
+ public:
+  ~LowFreqBleedEffect() override;
+
+  EffectType type() const override {
+    return EffectType::LowFreqBleed;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* radius = nullptr;
+  Property<float>* strength = nullptr;
 
   RTTR_ENABLE(Effect)
 };
