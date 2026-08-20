@@ -98,6 +98,7 @@ int curlDownload(const std::string& url, const std::string& localPath, bool just
     int ret = 0;
     bool needRetry = false;
     std::string userpwd = std::string(NAS_USERNAME) + ":" + NAS_PASSWORD;
+    curl_global_init(CURL_GLOBAL_DEFAULT);
     CURL* curl = curl_easy_init();
     if (curl) {
         std::ofstream file(localPath, std::ios::binary);
@@ -706,10 +707,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       //线性变换
       CornerPinEffect* cornerpin = new CornerPinEffect();
       int random_seed = pag::get_random_int(0, 100);
-      int random_height_offset_1 = pag::get_random_int(15, 30);
-      int random_height_offset_2 = pag::get_random_int(15, 30);
-      int random_width_offset_1 = pag::get_random_int(5, 20);
-      int random_width_offset_2 = pag::get_random_int(5, 20);
+      int random_height_offset_1 = pag::get_random_int(5, 15);
+      int random_height_offset_2 = pag::get_random_int(5, 15);
+      int random_width_offset_1 = pag::get_random_int(5, 15);
+      int random_width_offset_2 = pag::get_random_int(5, 15);
       if (random_seed < 50) {
         cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
         cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
@@ -1675,7 +1676,10 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
 
 void prepareArticleTrack(movie::Story* story, movie::ArticleTrack* articleTrack, int width, int height) {
   //ab test some params
-  // articleTrack->content.horizontalVisibleScope.indent = 2.0;    //former 2.3
+  // articleTrack->content.verticalVisibleScope.top = 0.05;
+  // articleTrack->content.verticalVisibleScope.bottom = 0.95;
+  // articleTrack->content.verticalVisibleScope.indent = 1.0;
+  // articleTrack->content.horizontalVisibleScope.indent = 0.6;    //former 2.3
   // articleTrack->content.horizontalSpacing = 0.08;   //former 0.05
   // articleTrack->content.speed = 0.07;     //former 0.05
   // printf("prepareArticleTrack, AB test some params\n");
@@ -1901,6 +1905,14 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story->duration : 0;   //set by json
     
+    //check if article track exists
+    for (auto& t : story->tracks) {
+        if (t->type == "article") {
+            jsonComposition->_isArticleType = true;
+            break;
+        }
+    }
+
     //add track to PAGLayer one by one
     int tCount = 0;
     for (auto& t : story->tracks) {
@@ -2302,6 +2314,10 @@ int JSONComposition::videoEncodeBitrateKPBS() const {
 
 int JSONComposition::isSimpleComposition() const {
   return _vectorComposition->layers.size() < 20;
+}
+
+bool JSONComposition::isArticleType() const {
+  return _isArticleType;
 }
 
 }  // namespace pag
