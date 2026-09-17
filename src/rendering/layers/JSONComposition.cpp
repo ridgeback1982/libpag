@@ -1749,6 +1749,10 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
       auto articleTrack = static_cast<movie::ArticleTrack*>(track);
       prepareArticleTrack(story, articleTrack, width, height);
       articleDuration = getArticleDuration(articleTrack, width, height);
+      if (story->duration > 0) {
+        //this is the case of preview, cut the article duration to preview duration
+        articleDuration = std::min(articleDuration, story->duration);
+      }
       printf("article duration:%d\n", articleDuration);
     } else if (track->type == "subtitle") {
       //align timestamp, ensure no gap between two sentences
