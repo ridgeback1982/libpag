@@ -706,22 +706,15 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     if (track->content.effect == "anti-duplicate") {
       //线性变换
       CornerPinEffect* cornerpin = new CornerPinEffect();
-      int random_seed = pag::get_random_int(0, 100);
-      int random_height_offset_1 = pag::get_random_int(5, 15);
-      int random_height_offset_2 = pag::get_random_int(5, 15);
-      int random_width_offset_1 = pag::get_random_int(5, 15);
-      int random_width_offset_2 = pag::get_random_int(5, 15);
-      if (random_seed < 50) {
-        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
-        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
-        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height + random_height_offset_2));
-        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height));
-      } else {
-        cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_2, 0 + random_width_offset_2)); 
-        cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_1, 0 - random_height_offset_1));
-        cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0, video_height));
-        cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
-      }
+      const int scope = 10;
+      int random_offset_1 = pag::get_random_int(-scope, scope);
+      int random_offset_2 = pag::get_random_int(-scope, scope);
+      int random_offset_3 = pag::get_random_int(-scope, scope);
+      cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_offset_1, 0 - random_offset_1));
+      cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width, 0));     //the right corner is not changed because of a novel logo
+      cornerpin->lowerLeft = new Property<Point>(pag::Point::Make(0 - random_offset_2, video_height + random_offset_2));
+      cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width + random_offset_3, video_height + random_offset_3));
+
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
       //非线形变换
