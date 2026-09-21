@@ -89,62 +89,124 @@ size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
     return totalSize;
 }
 
+int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& localPath,
+                     const std::string& userpwd, long& out_http_code,
+                     CURLcode& out_res, std::string& out_errmsg) {
+    std::ofstream file(localPath, std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) {
+        out_errmsg = "Failed to open local file for writing: " + localPath;
+        return -1;
+    }
+
+    curl_easy_reset(curl);
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 30000L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 0L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 30L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 10L);
+    curl_easy_setopt(curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 500L);
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
+    headers = curl_slist_append(headers, "Accept: */*");
+    headers = curl_slist_append(headers, "Accept-Language: zh-CN,zh;q=0.9");
+    headers = curl_slist_append(headers, "Connection: keep-alive");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    out_res = curl_easy_perform(curl);
+
+    file.flush();
+    file.close();
+
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    out_http_code = http_code;
+
+    if (out_res != CURLE_OK) {
+        out_errmsg = curl_easy_strerror(out_res);
+    }
+
+    curl_slist_free_all(headers);
+
+    if (out_res == CURLE_OK && http_code == 200) {
+        return 0;
+    }
+    return -1;
+}
+
 int curlDownload(const std::string& url, const std::string& localPath, bool justOnce = false) {
-    // Check if file already exists
     if (fs::exists(localPath) && fs::file_size(localPath) > 0) {
         std::cout << "curlDownload, localPath already exists: " << localPath << std::endl;
         return 0;
     }
-    int ret = 0;
-    bool needRetry = false;
+
     std::string userpwd = std::string(NAS_USERNAME) + ":" + NAS_PASSWORD;
+
     curl_global_init(CURL_GLOBAL_DEFAULT);
     CURL* curl = curl_easy_init();
-    if (curl) {
-        std::ofstream file(localPath, std::ios::binary);
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd.c_str());
-        //curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L); // Timeout after 120 seconds
-        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 10000L); // Timeout after 10 seconds for connection
-        CURLcode res = curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
-        file.close();
-        if (res != CURLE_OK) {
-            fs::remove(localPath);
-            printf("curl_easy_perform failed: %s\n", curl_easy_strerror(res));
-            if (justOnce == false) {
-                needRetry = true;
-            }
-            ret = -1;
-        } else {
-            long http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-            if (http_code != 200) {
-                fs::remove(localPath);
-                std::cerr << "HTTP error: " << http_code << " - Download failed!" << std::endl;
-                if (http_code == 0) {
-                  if (justOnce == false) {
-                      needRetry = true;
-                  }
-                }
-                ret = -1;
-            }
+    if (!curl) {
+        std::cerr << "curl_easy_init failed" << std::endl;
+        return -1;
+    }
+
+    int ret = -1;
+    const int maxTries = justOnce ? 1 : 3;
+    long last_http_code = 0;
+    CURLcode last_res = CURLE_OK;
+    std::string last_err;
+
+    for (int attempt = 1; attempt <= maxTries; attempt++) {
+        long http_code = 0;
+        CURLcode res = CURLE_OK;
+        std::string errmsg;
+
+        int rc = curlDownloadOnce(curl, url, localPath, userpwd, http_code, res, errmsg);
+
+        last_http_code = http_code;
+        last_res = res;
+        last_err = errmsg;
+
+        if (rc == 0) {
+            ret = 0;
+            break;
         }
-        // printf("Download %s to %s success.\n", url.c_str(), localPath.c_str());
-        if (needRetry) {
-            int retryCount = 2;
-            while (retryCount > 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10000));  //sleep for 10 sec
-                std::cout << "Retry downloading " << url << ", retryCount: " << retryCount << "..." << std::endl;
-                if (curlDownload(url, localPath, true) == 0) {
-                    ret = 0;
-                    break;
-                }
-                retryCount--;
-            }
+
+        if (res != CURLE_OK) {
+            std::cerr << "curlDownload attempt " << attempt << "/" << maxTries
+                      << " curl_easy_perform failed (" << res << "): " << errmsg << std::endl;
+        } else if (http_code != 200) {
+            std::cerr << "curlDownload attempt " << attempt << "/" << maxTries
+                      << " HTTP error: " << http_code << std::endl;
+        }
+
+        if (attempt >= maxTries) {
+            fs::remove(localPath);
+            break;
+        }
+
+        int backoff_ms = (attempt == 1) ? 200 : (attempt == 2 ? 1000 : 5000);
+        std::cerr << "  retry after " << backoff_ms << "ms ..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+    }
+
+    curl_easy_cleanup(curl);
+
+    if (ret != 0) {
+        fs::remove(localPath);
+        if (last_res != CURLE_OK) {
+            std::cerr << "curlDownload finally failed: curl error (" << last_res
+                      << ") " << last_err << std::endl;
+        } else {
+            std::cerr << "curlDownload finally failed: HTTP code " << last_http_code << std::endl;
         }
     }
 
