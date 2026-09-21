@@ -1,6 +1,5 @@
 #include "FFFormatUtil.h"
 #include <iostream>
-#include <thread>
 
 extern "C" {
     #include "libavcodec/avcodec.h"
@@ -21,8 +20,6 @@ extern "C" {
 //zzy
 namespace pag {
 
-#define MAX_RETRY_TIMES 1
-
 FFFormatUtil::FFFormatUtil(const std::string& url) {
     // 初始化 FFmpeg 库
     avformat_network_init();
@@ -40,45 +37,54 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
 
     bool is_remote = starts_with(url, "http://") || starts_with(url, "https://");
 
-    auto try_open = [&](bool use_full, int attempts, int backoff_ms) -> bool {
-        for (int i = 0; i < attempts; i++) {
-            if (_fmt_ctx) {
-                avformat_close_input(&_fmt_ctx);
-                avformat_free_context(_fmt_ctx);
-                _fmt_ctx = avformat_alloc_context();
-            }
-            AVDictionary* opts = NULL;
-            if (is_remote) {
-                if (use_full) {
-                    auth_headers::buildFullFFmpegOptions(url, &opts);
-                } else {
-                    auth_headers::buildLightFFmpegOptions(&opts);
-                }
-            }
-            int rc = avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, &opts);
-            av_dict_free(&opts);
-            if (rc >= 0) {
-                return true;
-            }
-            if (i < attempts - 1) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+    auto try_open_once = [&](bool use_full) -> std::pair<bool, bool> {
+        if (_fmt_ctx) {
+            avformat_close_input(&_fmt_ctx);
+            avformat_free_context(_fmt_ctx);
+            _fmt_ctx = avformat_alloc_context();
+        }
+        AVDictionary* opts = NULL;
+        if (is_remote) {
+            if (use_full) {
+                auth_headers::buildFullFFmpegOptions(url, &opts);
+            } else {
+                auth_headers::buildLightFFmpegOptions(&opts);
             }
         }
-        return false;
+        char errbuf[AV_ERROR_MAX_STRING_SIZE] = {0};
+        int rc = avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, &opts);
+        if (rc < 0) {
+            av_strerror(rc, errbuf, sizeof(errbuf));
+        }
+        av_dict_free(&opts);
+        if (rc >= 0) {
+            return {true, false};
+        }
+        std::string emsg(errbuf);
+        bool hit_403 = (emsg.find("403") != std::string::npos);
+        return {false, hit_403};
     };
 
     bool opened = false;
-    if (try_open(false, MAX_RETRY_TIMES, 1000)) {
+    auto [light_ok, light_403] = try_open_once(false);
+    if (light_ok) {
         opened = true;
     } else if (is_remote) {
-        std::cerr << "FFFormatUtil Light mode failed, retry with full headers + cookies ..." << std::endl;
-        if (try_open(true, MAX_RETRY_TIMES, 1000)) {
-            opened = true;
+        if (!light_403) {
+            std::cerr << "FFFormatUtil Light mode failed (non-403), no way to fallback."
+                      << std::endl;
+        } else {
+            std::cerr << "FFFormatUtil Light mode HTTP 403, upgrade to full headers + cookies."
+                      << std::endl;
+            auto [full_ok, _] = try_open_once(true);
+            if (full_ok) {
+                opened = true;
+            }
         }
     }
 
     if (!opened) {
-        std::cerr << "FFFormatUtil open url failed (light + full retries): " << url << std::endl;
+        std::cerr << "FFFormatUtil open url finally failed: " << url << std::endl;
         avformat_free_context(_fmt_ctx);
         _fmt_ctx = nullptr;
         return;
