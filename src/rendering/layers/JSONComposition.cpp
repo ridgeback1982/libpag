@@ -48,6 +48,7 @@ extern "C" {
 #include "utils/file_util.h"
 #include "utils/common_util.h"
 #include "nas_config.h"
+#include "utils/auth_http_headers.h"
 #include <set>
 #include <cmath>
 #include <iostream>
@@ -89,9 +90,9 @@ size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
     return totalSize;
 }
 
-int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& localPath,
-                     const std::string& userpwd, long& out_http_code,
-                     CURLcode& out_res, std::string& out_errmsg) {
+int curlDownloadOnceInternal(CURL* curl, const std::string& url, const std::string& localPath,
+                            const std::string& userpwd, bool useFullMode,
+                            long& out_http_code, CURLcode& out_res, std::string& out_errmsg) {
     std::ofstream file(localPath, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
         out_errmsg = "Failed to open local file for writing: " + localPath;
@@ -105,7 +106,7 @@ int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& loca
     curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &file);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 120000L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 300000L);    //5 min
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 30000L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
@@ -116,10 +117,14 @@ int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& loca
     curl_easy_setopt(curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 500L);
 
     struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
-    headers = curl_slist_append(headers, "Accept: */*");
-    headers = curl_slist_append(headers, "Accept-Language: zh-CN,zh;q=0.9");
-    headers = curl_slist_append(headers, "Connection: keep-alive");
+    if (useFullMode) {
+        headers = pag::auth_headers::buildFullHttpHeadersCurl(url);
+        static std::string cookieStr = pag::auth_headers::getFullCookieString();
+        curl_easy_setopt(curl, CURLOPT_COOKIE, cookieStr.c_str());
+    } else {
+        headers = pag::auth_headers::buildLightHttpHeadersCurl();
+        curl_easy_setopt(curl, CURLOPT_COOKIE, "");
+    }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     out_res = curl_easy_perform(curl);
@@ -137,10 +142,23 @@ int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& loca
 
     curl_slist_free_all(headers);
 
-    if (out_res == CURLE_OK && http_code == 200) {
+    if (out_res == CURLE_OK && (http_code == 200 || http_code == 206)) {
         return 0;
     }
     return -1;
+}
+
+int curlDownloadOnce(CURL* curl, const std::string& url, const std::string& localPath,
+                     const std::string& userpwd, long& out_http_code,
+                     CURLcode& out_res, std::string& out_errmsg) {
+    int rc = curlDownloadOnceInternal(curl, url, localPath, userpwd, false, out_http_code, out_res, out_errmsg);
+
+    if (rc != 0 && out_http_code == 403) {
+        std::cerr << "curlDownloadOnce Light mode got 403, retry with full headers + cookies ..." << std::endl;
+        rc = curlDownloadOnceInternal(curl, url, localPath, userpwd, true, out_http_code, out_res, out_errmsg);
+    }
+
+    return rc;
 }
 
 int curlDownload(const std::string& url, const std::string& localPath, bool justOnce = false) {

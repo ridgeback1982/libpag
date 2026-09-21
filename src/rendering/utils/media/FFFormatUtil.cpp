@@ -16,16 +16,17 @@ extern "C" {
 #include "nas_config.h"
 #include "utils/common_util.h"
 #include "utils/nas_config.h"
+#include "utils/auth_http_headers.h"
 
 //zzy
 namespace pag {
 
-#define MAX_RETRY_TIMES 3
+#define MAX_RETRY_TIMES 1
 
 FFFormatUtil::FFFormatUtil(const std::string& url) {
     // 初始化 FFmpeg 库
     avformat_network_init();
-    
+
     _fmt_ctx = avformat_alloc_context();
     std::string new_url = url;
     // 处理 NAS 服务器的 URL
@@ -36,20 +37,51 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
         new_url.insert(pos + http.length(), std::string(NAS_USERNAME) + ":" + std::string(NAS_PASSWORD) + "@");
       }
     }
-    // 打开输入文件
-    //retry 3 times if failed
-    for (int times = 0; times < MAX_RETRY_TIMES; times++) {
-      if (avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, NULL) < 0) {
-        std::cerr << "FFmpeg open input file:" << new_url << " failed, will retry" << std::endl;
-        if (times == MAX_RETRY_TIMES - 1) {
-          std::cerr << "Meet max retry limit, give up" << std::endl;
-          avformat_free_context(_fmt_ctx);
-          return;
+
+    bool is_remote = starts_with(url, "http://") || starts_with(url, "https://");
+
+    auto try_open = [&](bool use_full, int attempts, int backoff_ms) -> bool {
+        for (int i = 0; i < attempts; i++) {
+            if (_fmt_ctx) {
+                avformat_close_input(&_fmt_ctx);
+                avformat_free_context(_fmt_ctx);
+                _fmt_ctx = avformat_alloc_context();
+            }
+            AVDictionary* opts = NULL;
+            if (is_remote) {
+                if (use_full) {
+                    auth_headers::buildFullFFmpegOptions(url, &opts);
+                } else {
+                    auth_headers::buildLightFFmpegOptions(&opts);
+                }
+            }
+            int rc = avformat_open_input(&_fmt_ctx, new_url.c_str(), NULL, &opts);
+            av_dict_free(&opts);
+            if (rc >= 0) {
+                return true;
+            }
+            if (i < attempts - 1) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+            }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        continue;
-      }
-      break;
+        return false;
+    };
+
+    bool opened = false;
+    if (try_open(false, MAX_RETRY_TIMES, 1000)) {
+        opened = true;
+    } else if (is_remote) {
+        std::cerr << "FFFormatUtil Light mode failed, retry with full headers + cookies ..." << std::endl;
+        if (try_open(true, MAX_RETRY_TIMES, 1000)) {
+            opened = true;
+        }
+    }
+
+    if (!opened) {
+        std::cerr << "FFFormatUtil open url failed (light + full retries): " << url << std::endl;
+        avformat_free_context(_fmt_ctx);
+        _fmt_ctx = nullptr;
+        return;
     }
 
     // 查找流信息
