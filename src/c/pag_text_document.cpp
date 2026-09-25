@@ -166,6 +166,20 @@ void pag_text_document_set_fill_color(pag_text_document* document, pag_color fil
   document->p->fillColor.blue = fillColor.blue;
 }
 
+uint8_t pag_text_document_get_fill_alpha(pag_text_document* document) {
+  if (document == nullptr) {
+    return 255;
+  }
+  return document->p->fillAlpha;
+}
+
+void pag_text_document_set_fill_alpha(pag_text_document* document, uint8_t fillAlpha) {
+  if (document == nullptr) {
+    return;
+  }
+  document->p->fillAlpha = fillAlpha;
+}
+
 const char* pag_text_document_get_font_family(pag_text_document* document) {
   if (document == nullptr) {
     return nullptr;
@@ -223,6 +237,20 @@ void pag_text_document_set_stroke_color(pag_text_document* document, pag_color s
   document->p->strokeColor.red = strokeColor.red;
   document->p->strokeColor.green = strokeColor.green;
   document->p->strokeColor.blue = strokeColor.blue;
+}
+
+uint8_t pag_text_document_get_stroke_alpha(pag_text_document* document) {
+  if (document == nullptr) {
+    return 255;
+  }
+  return document->p->strokeAlpha;
+}
+
+void pag_text_document_set_stroke_alpha(pag_text_document* document, uint8_t strokeAlpha) {
+  if (document == nullptr) {
+    return;
+  }
+  document->p->strokeAlpha = strokeAlpha;
 }
 
 bool pag_text_document_get_stroke_over_fill(pag_text_document* document) {

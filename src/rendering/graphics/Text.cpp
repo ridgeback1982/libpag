@@ -32,7 +32,9 @@ static std::unique_ptr<tgfx::Paint> CreateFillPaint(const Glyph* glyph) {
   auto fillPaint = new tgfx::Paint();
   fillPaint->setStyle(tgfx::PaintStyle::Fill);
   fillPaint->setColor(ToTGFX(glyph->getFillColor()));
-  fillPaint->setAlpha(glyph->getAlpha());
+  // Fill alpha: combine the legacy per-glyph alpha (used by TextAnimatorRenderer)
+  // with the fill-specific alpha (from TextDocument::fillAlpha).
+  fillPaint->setAlpha(glyph->getAlpha() * glyph->getFillAlpha());
   return std::unique_ptr<tgfx::Paint>(fillPaint);
 }
 
@@ -43,7 +45,9 @@ static std::unique_ptr<tgfx::Paint> CreateStrokePaint(const Glyph* glyph) {
   auto strokePaint = new tgfx::Paint();
   strokePaint->setStyle(tgfx::PaintStyle::Stroke);
   strokePaint->setColor(ToTGFX(glyph->getStrokeColor()));
-  strokePaint->setAlpha(glyph->getAlpha());
+  // Stroke alpha: combine the legacy per-glyph alpha (used by TextAnimatorRenderer)
+  // with the stroke-specific alpha (from TextDocument::strokeAlpha).
+  strokePaint->setAlpha(glyph->getAlpha() * glyph->getStrokeAlpha());
   strokePaint->setStrokeWidth(glyph->getStrokeWidth());
   return std::unique_ptr<tgfx::Paint>(strokePaint);
 }
@@ -126,7 +130,9 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
     if (strokeWidth > maxStrokeWidth) {
       maxStrokeWidth = strokeWidth;
     }
-    if (glyphList[0]->getAlpha() != 1.0f) {
+    if (glyphList[0]->getAlpha() != 1.0f ||
+        glyphList[0]->getFillAlpha() != 1.0f ||
+        glyphList[0]->getStrokeAlpha() != 1.0f) {
       hasAlpha = true;
     }
     auto textRun = MakeTextRun(glyphList).release();
@@ -330,14 +336,18 @@ void Text::draw(Canvas* canvas, const TextAtlas* textAtlas) const {
       parameters.rects.emplace_back(locator.location);
       if (glyph->getFont().hasColor()) {
         auto alpha = canvas->getAlpha();
-        canvas->setAlpha(alpha * glyph->getAlpha());
+        // Color glyph (emoji/baked texture): apply both generic glyph alpha (animator)
+        // and fill-specific alpha (document alpha). Stroke-specific alpha does not
+        // apply to color-glyph textures.
+        canvas->setAlpha(alpha * glyph->getAlpha() * glyph->getFillAlpha());
         Draw(canvas, textAtlas, parameters);
         parameters = {};
         canvas->setAlpha(alpha);
       } else {
         auto color =
             ToTGFX(style == TextStyle::Stroke ? glyph->getStrokeColor() : glyph->getFillColor());
-        color.alpha *= glyph->getAlpha();
+        float docAlpha = (style == TextStyle::Stroke) ? glyph->getStrokeAlpha() : glyph->getFillAlpha();
+        color.alpha *= glyph->getAlpha() * docAlpha;
         parameters.colors.emplace_back(color);
       }
     }

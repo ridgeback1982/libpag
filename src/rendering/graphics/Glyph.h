@@ -177,9 +177,32 @@ class Glyph {
 
   /**
    * Replaces alpha of the color used when stroking and filling, leaving RGB unchanged.
+   * Prefer setFillAlpha/setStrokeAlpha when you only want to affect one of fill/stroke.
    */
   void setAlpha(float newAlpha) {
     alpha = newAlpha;
+  }
+
+  /**
+   * Alpha used for fill paint only. Default is 1.0.
+   */
+  float getFillAlpha() const {
+    return fillAlpha;
+  }
+
+  void setFillAlpha(float a) {
+    fillAlpha = a;
+  }
+
+  /**
+   * Alpha used for stroke paint only. Default is 1.0.
+   */
+  float getStrokeAlpha() const {
+    return strokeAlpha;
+  }
+
+  void setStrokeAlpha(float a) {
+    strokeAlpha = a;
   }
 
   /**
@@ -260,6 +283,8 @@ class Glyph {
   TextStyle textStyle = TextStyle::Fill;
   float scale = 1.0f;
   float alpha = 1.0f;
+  float fillAlpha = 1.0f;
+  float strokeAlpha = 1.0f;
   Color fillColor = Black;
   Color strokeColor = Black;
   float strokeWidth = 0;

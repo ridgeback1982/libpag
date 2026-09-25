@@ -1507,6 +1507,12 @@ class PAG_API TextDocument {
   Color fillColor = Black;
 
   /**
+   * The text layer’s fill alpha. 0 = 100% transparent, 255 = 100% opaque.
+   * Defaults to 255 (fully opaque fill).
+   */
+  uint8_t fillAlpha = 255;
+
+  /**
    * A string with the name of the font family.
    **/
   std::string fontFamily = "";
@@ -1525,6 +1531,12 @@ class PAG_API TextDocument {
    * The text layer’s stroke color.
    */
   Color strokeColor = Black;
+
+  /**
+   * The text layer’s stroke alpha. 0 = 100% transparent, 255 = 100% opaque.
+   * Defaults to 255 (fully opaque stroke).
+   */
+  uint8_t strokeAlpha = 255;
 
   /**
    * Indicates the rendering order for the fill and stroke of a text layer.

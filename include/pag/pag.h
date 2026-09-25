@@ -600,6 +600,16 @@ class PAG_API PAGTextLayer : public PAGLayer {
   void setFillColor(const Color& value);
 
   /**
+   * Returns the text layer's fill alpha. 0 = fully transparent, 255 = fully opaque.
+   */
+  uint8_t fillAlpha() const;
+
+  /**
+   * Set the text layer's fill alpha.
+   */
+  void setFillAlpha(uint8_t value);
+
+  /**
    * Returns the text layer's font.
    */
   PAGFont font() const;
@@ -628,6 +638,16 @@ class PAG_API PAGTextLayer : public PAGLayer {
    * Set the text layer's stroke color.
    */
   void setStrokeColor(const Color& color);
+
+  /**
+   * Returns the text layer's stroke alpha. 0 = fully transparent, 255 = fully opaque.
+   */
+  uint8_t strokeAlpha() const;
+
+  /**
+   * Set the text layer's stroke alpha.
+   */
+  void setStrokeAlpha(uint8_t value);
 
   /**
    * Returns the text layer's text.

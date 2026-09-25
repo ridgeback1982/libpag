@@ -106,10 +106,12 @@ void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
   styleKey->write(m.getSkewY());
   styleKey->write(m.getScaleY());
   uint8_t fillValues[] = {fillColor.red, fillColor.green, fillColor.blue,
-                          static_cast<uint8_t>(alpha * 255)};
+                          static_cast<uint8_t>(alpha * 255),
+                          static_cast<uint8_t>(fillAlpha * 255)};
   styleKey->write(fillValues);
   uint8_t strokeValues[] = {strokeColor.red, strokeColor.green, strokeColor.blue,
-                            static_cast<uint8_t>(textStyle)};
+                            static_cast<uint8_t>(textStyle),
+                            static_cast<uint8_t>(strokeAlpha * 255)};
   styleKey->write(strokeValues);
   styleKey->write(strokeWidth);
   auto typeface = getFont().getTypeface();
@@ -117,7 +119,8 @@ void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
 }
 
 bool Glyph::isVisible() const {
-  return matrix.invertible() && alpha != 0.0f && !getBounds().isEmpty();
+  return matrix.invertible() && (alpha != 0.0f || fillAlpha != 0.0f || strokeAlpha != 0.0f) &&
+         !getBounds().isEmpty();
 }
 
 tgfx::Matrix Glyph::getTotalMatrix() const {

@@ -63,6 +63,10 @@ PAG_API pag_color pag_text_document_get_fill_color(pag_text_document* document);
 
 PAG_API void pag_text_document_set_fill_color(pag_text_document* document, pag_color fillColor);
 
+PAG_API uint8_t pag_text_document_get_fill_alpha(pag_text_document* document);
+
+PAG_API void pag_text_document_set_fill_alpha(pag_text_document* document, uint8_t fillAlpha);
+
 PAG_API const char* pag_text_document_get_font_family(pag_text_document* document);
 
 PAG_API void pag_text_document_set_font_family(pag_text_document* document, const char* fontFamily);
@@ -78,6 +82,10 @@ PAG_API void pag_text_document_set_font_size(pag_text_document* document, float 
 PAG_API pag_color pag_text_document_get_stroke_color(pag_text_document* document);
 
 PAG_API void pag_text_document_set_stroke_color(pag_text_document* document, pag_color strokeColor);
+
+PAG_API uint8_t pag_text_document_get_stroke_alpha(pag_text_document* document);
+
+PAG_API void pag_text_document_set_stroke_alpha(pag_text_document* document, uint8_t strokeAlpha);
 
 PAG_API bool pag_text_document_get_stroke_over_fill(pag_text_document* document);
 

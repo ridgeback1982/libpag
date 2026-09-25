@@ -1053,11 +1053,13 @@ TextLayer* createTextLayer(const std::string& text, movie::TitileContent* conten
   if (!content->textColor.empty()) {
     auto c = translateColor(content->textColor);
     textData->fillColor = Color{c.r, c.g, c.b};
+    textData->fillAlpha = c.a;
   }
   if (!content->stroke.empty()) {
     textData->applyStroke = true;
     auto c = translateColor(content->stroke);
     textData->strokeColor = Color{c.r, c.g, c.b};
+    textData->strokeAlpha = c.a;
     textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
     textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
     textData->tracking = textData->strokeWidth * 1000 * 0.7 / textData->fontSize;   //横向间距，如果使用了外描边
@@ -1343,17 +1345,20 @@ std::vector<Layer*> createArticleRelatedLayers(movie::ArticleTrack* articleTrack
       if (index == 1) {
         if (content->enableHighLight) {
           textData->fillColor = Color{230, 59, 0};      //first paragraph's color is orange
+          textData->fillAlpha = 255;
           //textData->fillColor = Color{255, 248, 8};   //lime
         }
       } else {
         auto c = translateColor(content->textColor);
         textData->fillColor = Color{c.r, c.g, c.b};
+        textData->fillAlpha = c.a;
       }
     }
     if (!content->stroke.empty()) {
       textData->applyStroke = true;
       auto c = translateColor(content->stroke);
       textData->strokeColor = Color{c.r, c.g, c.b};
+      textData->strokeAlpha = c.a;
       textData->strokeWidth = findValueFromFloatPairSet(strokeWidthSet, content->fontSize);
       textData->strokeOverFill = false; //先描边再填充，这样可以实现外描边效果
     }
@@ -1560,6 +1565,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     if (!content->textColor.empty()) {
       auto c = translateColor(content->textColor);
       textData->fillColor = Color{c.r, c.g, c.b};
+      textData->fillAlpha = c.a;
     }
     textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
     textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);

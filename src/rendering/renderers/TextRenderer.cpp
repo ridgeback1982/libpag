@@ -572,6 +572,17 @@ static std::vector<GlyphHandle> BuildGlyphs(const TextDocument* textDocument) {
 std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
     const TextDocument* textDocument, const TextPathOptions* pathOptions) {
   auto glyphList = BuildGlyphs(textDocument);
+  // 把 TextDocument 的 fill / stroke alpha 应用到每个 glyph。
+  // 这里使用 glyph 的 fillAlpha / strokeAlpha 字段（乘算，会和通用 alpha 配合），
+  // 通用 alpha（glyph->getAlpha()）留给 TextAnimatorRenderer 做动画透明度使用。
+  const float fillAlphaF =
+      std::max(0.0f, std::min(1.0f, static_cast<float>(textDocument->fillAlpha) / 255.0f));
+  const float strokeAlphaF =
+      std::max(0.0f, std::min(1.0f, static_cast<float>(textDocument->strokeAlpha) / 255.0f));
+  for (auto& g : glyphList) {
+    g->setFillAlpha(fillAlphaF);
+    g->setStrokeAlpha(strokeAlphaF);
+  }
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
   // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。

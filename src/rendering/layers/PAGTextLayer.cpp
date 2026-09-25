@@ -75,6 +75,16 @@ void PAGTextLayer::setFillColor(const Color& value) {
   textDocumentForWrite()->fillColor = value;
 }
 
+uint8_t PAGTextLayer::fillAlpha() const {
+  LockGuard autoLock(rootLocker);
+  return textDocumentForRead()->fillAlpha;
+}
+
+void PAGTextLayer::setFillAlpha(uint8_t value) {
+  LockGuard autoLock(rootLocker);
+  textDocumentForWrite()->fillAlpha = value;
+}
+
 PAGFont PAGTextLayer::font() const {
   LockGuard autoLock(rootLocker);
   auto textDocument = textDocumentForRead();
@@ -108,6 +118,16 @@ void PAGTextLayer::setStrokeColor(const Color& color) {
   textDocumentForWrite()->strokeColor = color;
 }
 
+uint8_t PAGTextLayer::strokeAlpha() const {
+  LockGuard autoLock(rootLocker);
+  return textDocumentForRead()->strokeAlpha;
+}
+
+void PAGTextLayer::setStrokeAlpha(uint8_t value) {
+  LockGuard autoLock(rootLocker);
+  textDocumentForWrite()->strokeAlpha = value;
+}
+
 std::string PAGTextLayer::text() const {
   LockGuard autoLock(rootLocker);
   return textDocumentForRead()->text;
@@ -129,10 +149,12 @@ void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
     textDocument->fauxBold = textData->fauxBold;
     textDocument->fauxItalic = textData->fauxItalic;
     textDocument->fillColor = textData->fillColor;
+    textDocument->fillAlpha = textData->fillAlpha;
     textDocument->fontFamily = textData->fontFamily;
     textDocument->fontStyle = textData->fontStyle;
     textDocument->fontSize = textData->fontSize;
     textDocument->strokeColor = textData->strokeColor;
+    textDocument->strokeAlpha = textData->strokeAlpha;
     textDocument->strokeWidth = textData->strokeWidth;
     textDocument->text = textData->text;
     textDocument->backgroundColor = textData->backgroundColor;
