@@ -390,7 +390,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
 
   while (accuSrcFrames < cutTo - cutFrom) {
     if (av_read_frame(fmt_ctx, pkt) < 0) {
-        std::cerr << "Failed to read frame, drains, accuSrcFrames:" << accuSrcFrames << ", cutFrom:" << cutFrom << ", cutTo:" << cutTo << std::endl;
+        // std::cerr << "Failed to read frame, drains, accuSrcFrames:" << accuSrcFrames << ", cutFrom:" << cutFrom << ", cutTo:" << cutTo << std::endl;
         break;
     }
     if (pkt->stream_index == video_stream_index) {
