@@ -354,7 +354,7 @@ namespace movie {
         ArticleContent::to_json(j, a);        
     }
 
-    class FPageContent {
+    class UnderlinedTextContent {
     public:
         std::vector<Sentence> sentences;
         Location location;
@@ -364,8 +364,8 @@ namespace movie {
         float horizontalIndent = 0.5f;           //0.0 - 1.0, times of fontSize
         float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
         float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize
-        ImageContent backgroundImage;           //if not specified, bgc is used
-        static void from_json(const json& j, FPageContent& f) {
+        ImageContent* backgroundImage = nullptr;           //if not specified, bgc is used
+        static void from_json(const json& j, UnderlinedTextContent& f) {
             j.at("sentences").get_to(f.sentences);
             j.at("location").get_to(f.location);
             if (j.contains("fontSize"))
@@ -380,23 +380,33 @@ namespace movie {
                 j.at("verticalSpacing").get_to(f.verticalSpacing);
             if (j.contains("horizontalSpacing"))
                 j.at("horizontalSpacing").get_to(f.horizontalSpacing);
-            if (j.contains("backgroundImage"))
-                j.at("backgroundImage").get_to(f.backgroundImage);
+            if (j.contains("backgroundImage")) {
+                if (f.backgroundImage == nullptr) {
+                    f.backgroundImage = new ImageContent();
+                }
+                j.at("backgroundImage").get_to(*f.backgroundImage);
+            }
         }
-        static void to_json(json& j, const FPageContent& f) {
+        static void to_json(json& j, const UnderlinedTextContent& f) {
             j = {{"sentences", f.sentences}, {"location", f.location}, {"fontSize", f.fontSize}, {"fontFamilyName", f.fontFamilyName}, {"textColor", f.textColor}, 
                  {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing}};
-            if (!f.backgroundImage.path.empty())
-                j["backgroundImage"] = f.backgroundImage;
+            if (f.backgroundImage != nullptr && !f.backgroundImage->path.empty())
+                j["backgroundImage"] = *f.backgroundImage;
         }
 
         int init(const std::string& tmpDir);
+        ~UnderlinedTextContent() {
+            if (backgroundImage != nullptr) {
+                delete backgroundImage;
+                backgroundImage = nullptr;
+            }
+        }
     };
-    void from_json(const json& j, FPageContent& f) {
-        FPageContent::from_json(j, f);
+    void from_json(const json& j, UnderlinedTextContent& f) {
+        UnderlinedTextContent::from_json(j, f);
     }
-    void to_json(json& j, const FPageContent& f) {
-        FPageContent::to_json(j, f);
+    void to_json(json& j, const UnderlinedTextContent& f) {
+        UnderlinedTextContent::to_json(j, f);
     }
 
     class LifeTime {
@@ -597,23 +607,23 @@ namespace movie {
         ArticleTrack::to_json(j, a);
     }
 
-    class FPageTrack : public Track {
+    class UnderlinedTextTrack : public Track {
     public:
-        FPageContent content;
-        static void from_json(const json& j, FPageTrack& f) {
+        UnderlinedTextContent content;
+        static void from_json(const json& j, UnderlinedTextTrack& f) {
             Track::from_json(j, f);
             j.at("content").get_to(f.content);
         }
-        static void to_json(json& j, const FPageTrack& f) {
+        static void to_json(json& j, const UnderlinedTextTrack& f) {
             Track::to_json(j, f);
             j["content"] = f.content;
         }
     };
-    void from_json(const json& j, FPageTrack& f) {
-        FPageTrack::from_json(j, f);
+    void from_json(const json& j, UnderlinedTextTrack& f) {
+        UnderlinedTextTrack::from_json(j, f);
     }
-    void to_json(json& j, const FPageTrack& f) {
-        FPageTrack::to_json(j, f);
+    void to_json(json& j, const UnderlinedTextTrack& f) {
+        UnderlinedTextTrack::to_json(j, f);
     }
 
     ///////////////////////////////////////
@@ -656,9 +666,9 @@ namespace movie {
                     auto t = new ArticleTrack();
                     ArticleTrack::from_json(jtrack, *t);
                     s.tracks.push_back(t);
-                } else if (jtrack.at("type").get<std::string>() == "fpage") {
-                    auto t = new FPageTrack();
-                    FPageTrack::from_json(jtrack, *t);
+                } else if (jtrack.at("type").get<std::string>() == "underlinetext") {
+                    auto t = new UnderlinedTextTrack();
+                    UnderlinedTextTrack::from_json(jtrack, *t);
                     s.tracks.push_back(t);
                 } else {
 
@@ -705,9 +715,9 @@ namespace movie {
                     auto jtrack = json::object();
                     ArticleTrack::to_json(jtrack, *static_cast<ArticleTrack*>(t));
                     tracks.push_back(jtrack);
-                } else if (t->type == "fpage") {
+                } else if (t->type == "underlinetext") {
                     auto jtrack = json::object();
-                    FPageTrack::to_json(jtrack, *static_cast<FPageTrack*>(t));
+                    UnderlinedTextTrack::to_json(jtrack, *static_cast<UnderlinedTextTrack*>(t));
                     tracks.push_back(jtrack);
                 } else {
                 }

@@ -9,6 +9,7 @@
 #include <random>
 #include <set>
 #include <unordered_set>
+#include <regex>
 
 namespace pag {
 
@@ -244,6 +245,24 @@ std::vector<std::string> splitStringBy(const std::string &s, const std::string& 
     }
     flushCurrent(tokens, current);
     return tokens;
+}
+
+std::vector<std::string> splitStringByNewline(const std::string& input) {
+    std::vector<std::string> result;
+    std::regex re("\r\n|\r|\n");  // 处理所有换行符
+    std::sregex_token_iterator it(input.begin(), input.end(), re, -1);
+    std::sregex_token_iterator end;
+
+    while (it != end) {
+        // std::cout << "Line: " << *it << std::endl;
+        std::string line = *it;
+        //erase the very first perticular punctuation (中英文逗号，句号)
+        eraseLeadingPunctuation(line);
+        result.push_back(line);
+        ++it;
+    }
+
+    return result;
 }
 
 bool endsWithPunctuationOrEllipsis(const std::string& s) {

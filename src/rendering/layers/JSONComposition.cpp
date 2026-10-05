@@ -33,6 +33,7 @@
 #include "rendering/utils/media/FFImageReader.h"
 #include "rendering/utils/media/FFFormatUtil.h"
 #include "rendering/graphics/Glyph.h"
+#include "rendering/renderers/TextRenderer.h"
 
 //ffmpeg
 extern "C" {
@@ -403,10 +404,10 @@ int ImageContent::init(const std::string& tmpDir) {
   return 0;
 }
 
-int FPageContent::init(const std::string& tmpDir) {
-  if (!backgroundImage.path.empty()) {
-    if (backgroundImage.init(tmpDir) < 0) {
-      printf("FPageContent::init, backgroundImage init failed\n");
+int UnderlinedTextContent::init(const std::string& tmpDir) {
+  if (backgroundImage != nullptr && !backgroundImage->path.empty()) {
+    if (backgroundImage->init(tmpDir) < 0) {
+      printf("UnderlinedTextContent::init, backgroundImage init failed\n");
       return -1;
     }
   }
@@ -972,24 +973,6 @@ movie::RGBA translateColor(const std::string& color_string) {
   return color;
 }
 
-static std::vector<std::string> splitStringByNewline(const std::string& input) {
-    std::vector<std::string> result;
-    std::regex re("\r\n|\r|\n");  // 处理所有换行符
-    std::sregex_token_iterator it(input.begin(), input.end(), re, -1);
-    std::sregex_token_iterator end;
-
-    while (it != end) {
-        // std::cout << "Line: " << *it << std::endl;
-        std::string line = *it;
-        //erase the very first perticular punctuation (中英文逗号，句号)
-        eraseLeadingPunctuation(line);
-        result.push_back(line);
-        ++it;
-    }
-
-    return result;
-}
-
 //static bool isLineBreak(char32_t unicode) {
 //    return unicode == U'\n' ||   // Line Feed
 //           unicode == U'\r' ||   // Carriage Return
@@ -1129,10 +1112,6 @@ std::vector<TextLayer*> createTextLayers(movie::Track* track, const movie::Movie
     return textLayers;
 }
 
-//use "GetLines" in TextRenderer.cpp to get the precise text lines
-std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
-    const TextDocument* textDocument, const TextPathOptions* pathOptions);
-
 int testTheTextLines(const std::string& fontFamilyName, const std::string& text, int fontSize, int leading, int tracking, int boxWidth) {
   //test to get the exact text lines
   auto textData = new TextDocument();
@@ -1153,7 +1132,8 @@ int testTheTextLines(const std::string& fontFamilyName, const std::string& text,
   textData->boxTextPos = pag::Point::Make((int)(textData->boxTextSize.x*(-0.5)), 0);    //y is top and x is minus center
   textData->firstBaseLine = 0;   //hard code
   textData->avoidFirstPunctuation = true;
-  auto [lines, bounds] = GetLines(textData, nullptr);
+  //use "GetLines" in TextRenderer.cpp to get the precise text lines
+  auto [lines, bounds] = pag::GetLines(textData, nullptr);
   delete textData;
   return (int)lines.size();
 }
@@ -1502,9 +1482,9 @@ ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
   return createImageLayer2(content, track->lifetime, spec);
 }
 
-std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, const movie::MovieSpec& spec) {
+std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack* uTextTrack, const movie::MovieSpec& spec) {
   std::vector<Layer*> layers;
-  movie::FPageContent* content = &fpageTrack->content;
+  movie::UnderlinedTextContent* content = &uTextTrack->content;
   int width = spec.width;
   int height = spec.height;
   int fontSize = std::round(std::min(width, height) * content->fontSize);
@@ -1518,10 +1498,10 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   int regionHeight = std::round(content->location.h * height);
 
   //create image layer as BGI
-  if (fpageTrack->content.backgroundImage.path.empty() == false) {
-    movie::ImageContent& bgi = fpageTrack->content.backgroundImage;
-    fitLocation(bgi.location, bgi.width(), bgi.height(), width, height);
-    auto imageLayer = createImageLayer2(&fpageTrack->content.backgroundImage, fpageTrack->lifetime, spec);
+  if (uTextTrack->content.backgroundImage != nullptr && !uTextTrack->content.backgroundImage->path.empty()) {
+    movie::ImageContent* bgi = uTextTrack->content.backgroundImage;
+    fitLocation(bgi->location, bgi->width(), bgi->height(), width, height);
+    auto imageLayer = createImageLayer2(uTextTrack->content.backgroundImage, uTextTrack->lifetime, spec);
     layers.push_back(imageLayer);
     //create a half-transparent solid layer on the BGI, for good looking
     std::string solidColor = "rgba(255,255,255,0.4)";
@@ -1529,8 +1509,8 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
     auto bgColor = Color{c.r, c.g, c.b};
     auto solidLayer = new SolidLayer();
     solidLayer->id = UniqueID::Next();
-    solidLayer->startTime = TimeToFrame(fpageTrack->lifetime.begin_time, spec.fps);
-    solidLayer->duration = LifetimeToFrameDuration(fpageTrack->lifetime, spec.fps);
+    solidLayer->startTime = TimeToFrame(uTextTrack->lifetime.begin_time, spec.fps);
+    solidLayer->duration = LifetimeToFrameDuration(uTextTrack->lifetime, spec.fps);
     solidLayer->transform = Transform2D::MakeDefault().release();
     solidLayer->transform->anchorPoint->value.set(regionCenterX, regionCenterY);
     solidLayer->transform->position->value.set(regionCenterX, regionCenterY);
@@ -1550,7 +1530,7 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
   int visibleHeight = leadingInP * sentenceCount - std::ceil(content->verticalSpacing * fontSize);
   visibleHeight = ((visibleHeight >> 1) << 1);
   if (visibleHeight > regionHeight) {
-    std::cerr << "FPage content is too big to fit in the region" << std::endl;
+    std::cerr << "UnderlinedText content is too big to fit in the region" << std::endl;
   }
   int x = regionCenterX - visibleWidth/2;
   int y = regionCenterY - visibleHeight/2;
@@ -1573,14 +1553,13 @@ std::vector<Layer*> createFPageRelatedLayers(movie::FPageTrack* fpageTrack, cons
 
     auto textLayer = new TextLayer();
     textLayer->id = UniqueID::Next();
-    textLayer->startTime = TimeToFrame(fpageTrack->lifetime.begin_time, spec.fps);
-    textLayer->duration = LifetimeToFrameDuration(fpageTrack->lifetime, spec.fps);
+    textLayer->startTime = TimeToFrame(uTextTrack->lifetime.begin_time, spec.fps);
+    textLayer->duration = LifetimeToFrameDuration(uTextTrack->lifetime, spec.fps);
     textLayer->transform = Transform2D::MakeDefault().release();
     textLayer->transform->anchorPoint->value.set(0, 0); //hard code
-    //todo: get accurate rect width by calculating each font's width(中文&英文)
-    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-    std::u32string unicodeStr = converter.from_bytes(sentence.text);
-    int sentenceRectWidth = (int)unicodeStr.length() * (trackingInP + fontSize);
+    //use "GetLines" in TextRenderer.cpp to get the precise text lines
+    auto [_, textBounds] = pag::GetLines(textData, nullptr);
+    int sentenceRectWidth = (int)std::ceil(textBounds.width());
     sentenceRectWidth = ((sentenceRectWidth >> 1) << 1);
     int sentenceRectHeight = fontSize;
     sentenceRectHeight = ((sentenceRectHeight >> 1) << 1);
@@ -1683,7 +1662,7 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
   new_text.erase(std::remove(new_text.begin(), new_text.end(), ' '), new_text.end());
 
   //根据换行拆分
-  auto texts = splitStringByNewline(new_text);
+  auto texts = pag::splitStringByNewline(new_text);
 
   //如果一个段落长度过长，插入换行符
   bool supportAutoChangeLine = true;
@@ -1739,7 +1718,7 @@ std::vector<std::string> preProcessArticleText(movie::ArticleTrack* articleTrack
           }
           pos ++;
         }
-        auto sp_texts = splitStringByNewline(converter.to_bytes(unicodeStr));
+        auto sp_texts = pag::splitStringByNewline(converter.to_bytes(unicodeStr));
         // std::cout << "preProcessArticleText, insert split texts, size:" << sp_texts.size() << std::endl;
         ite = texts.insert(ite, sp_texts.begin(), sp_texts.end());  //insert before the next text
         for (int i=0; i<(int)sp_texts.size()-1; i++) {
@@ -2123,13 +2102,13 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
                 jsonComposition->addLayer(pagShapeLayer);
               }
             }
-        } else if (t->type == "fpage") {
-          auto track = static_cast<movie::FPageTrack*>(t);
+        } else if (t->type == "underlinetext") {
+          auto track = static_cast<movie::UnderlinedTextTrack*>(t);
           if (track->content.init(tmpDir) < 0) {
             std::cerr << "Error initializing article track" << std::endl;
             return nullptr;
           }
-          auto layers = createFPageRelatedLayers(track, movie.video);
+          auto layers = createUnderlinedTextRelatedLayers(track, movie.video);
           for (auto layer : layers) {
             vecComposition->layers.push_back(layer);
             if (layer->type() == LayerType::Text) {
