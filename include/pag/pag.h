@@ -1126,12 +1126,14 @@ public:
   int videoEncodeBitrateKPBS() const;
   int isSimpleComposition() const;  //zzy, used to judge deep copy case
   bool isArticleType() const;
+  bool isAntiBookTitle() const;
   ~JSONComposition() override;
 protected:
   JSONComposition(PreComposeLayer* layer);
   int _videoEncodeBitrateKPBS = 0;
   VectorComposition* _vectorComposition = nullptr;
   bool _isArticleType = false;
+  bool _isAntiBookTitle = false;
 };
 
 class PAG_API PAGFile : public PAGComposition {

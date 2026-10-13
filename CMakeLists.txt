@@ -157,6 +157,7 @@ list(APPEND PAG_FILES ${COMMON_FILES})
 
 if (NOT APPLE)
     list(FILTER PAG_FILES EXCLUDE REGEX "CVImageTool\\.mm$")
+    list(FILTER PAG_FILES EXCLUDE REGEX "BookTitleDetector\\.mm$")
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")

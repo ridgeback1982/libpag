@@ -21,6 +21,9 @@ public:
     static bool hasRectFrameInside(const std::string& path);
     static bool hasApproxRectFrameInside(const std::string& path);
     static PAG_API std::vector<Rect> detectSubtitleRegions(CVPixelBufferRef pixelBuffer);
+    static PAG_API std::vector<Rect> detectBookTitleRegions(CVPixelBufferRef pixelBuffer);
+    static PAG_API void blurRegions(CVPixelBufferRef pixelBuffer, const std::vector<Rect>& rects,
+                                    int radius = 8);
 #endif
 };
 

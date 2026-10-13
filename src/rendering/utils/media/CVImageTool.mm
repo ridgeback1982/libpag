@@ -1,4 +1,5 @@
 #include "CVImageTool.h"
+#import "BookTitleDetector.h"
 
 #if defined(__APPLE__) && defined(__MACH__)
 #import <Foundation/Foundation.h>
@@ -361,6 +362,65 @@ std::vector<Rect> CVImageTool::detectSubtitleRegions(CVPixelBufferRef pixelBuffe
                                        VNRequestTextRecognitionLevelAccurate);
     candidates = mergeOverlappingRects(std::move(candidates), 0.35f);
     return candidates;
+}
+
+std::vector<Rect> CVImageTool::detectBookTitleRegions(CVPixelBufferRef pixelBuffer) {
+    std::vector<Rect> result;
+    if (pixelBuffer == nullptr) {
+        return result;
+    }
+    @autoreleasepool {
+        BookTitleDetector* detector = [[BookTitleDetector alloc] init];
+        NSArray<NSValue*>* regions = [detector detectBookTitleRegionsInPixelBuffer:pixelBuffer];
+        for (NSValue* value in regions) {
+            CGRect r = CGRectZero;
+            [value getValue:&r size:sizeof(CGRect)];
+            result.push_back(Rect::MakeLTRB(r.origin.x, r.origin.y, r.origin.x + r.size.width,
+                                            r.origin.y + r.size.height));
+        }
+    }
+    return result;
+}
+
+void CVImageTool::blurRegions(CVPixelBufferRef pixelBuffer, const std::vector<Rect>& rects,
+                              int radius) {
+    if (pixelBuffer == nullptr || rects.empty() || radius <= 0) {
+        return;
+    }
+
+    OSType format = CVPixelBufferGetPixelFormatType(pixelBuffer);
+    if (format != kCVPixelFormatType_32BGRA) {
+        return;
+    }
+
+    if (CVPixelBufferLockBaseAddress(pixelBuffer, 0) != kCVReturnSuccess) {
+        return;
+    }
+
+    int width = (int)CVPixelBufferGetWidth(pixelBuffer);
+    int height = (int)CVPixelBufferGetHeight(pixelBuffer);
+    int bytesPerRow = (int)CVPixelBufferGetBytesPerRow(pixelBuffer);
+    uint8_t* base = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+
+    cv::Mat fullMat(height, width, CV_8UC4, base, bytesPerRow);
+    int ksize = radius * 2 + 1;
+
+    for (const auto& rect : rects) {
+        int left = std::max(0, (int)std::floor(rect.left));
+        int top = std::max(0, (int)std::floor(rect.top));
+        int right = std::min(width, (int)std::ceil(rect.right));
+        int bottom = std::min(height, (int)std::ceil(rect.bottom));
+        int w = right - left;
+        int h = bottom - top;
+        if (w <= 0 || h <= 0) {
+            continue;
+        }
+
+        cv::Mat roi = fullMat(cv::Rect(left, top, w, h));
+        cv::GaussianBlur(roi, roi, cv::Size(ksize, ksize), 0, 0, cv::BORDER_REFLECT_101);
+    }
+
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
 }  // namespace pag

@@ -1972,6 +1972,12 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
         if (t->type == "article") {
             jsonComposition->_isArticleType = true;
             break;
+        } else if (t->type == "video") {
+          auto track = static_cast<movie::VideoTrack*>(t);
+          if (track->content.effect == "anti-animeinfo") {
+            jsonComposition->_isAntiBookTitle = true;
+            break;
+          }
         }
     }
 
@@ -2381,5 +2387,10 @@ int JSONComposition::isSimpleComposition() const {
 bool JSONComposition::isArticleType() const {
   return _isArticleType;
 }
+
+bool JSONComposition::isAntiBookTitle() const {
+  return _isAntiBookTitle;
+}
+
 
 }  // namespace pag
