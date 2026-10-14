@@ -26,7 +26,11 @@ extern "C" {
     #include <libavformat/avformat.h>
     #include <libavutil/avutil.h>
     #include <libavutil/display.h>
+    #include <libswscale/swscale.h>
 }
+#if defined(__APPLE__) && defined(__MACH__)
+#include "rendering/utils/media/CVImageTool.h"
+#endif
 
 namespace pag {
 VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
@@ -240,7 +244,7 @@ found:
     return best_pts;
 }
 
-VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo) {
+VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int cutFrom, const int cutTo, const std::string& effect) {
   //printf("ReadVideoSequenceFromFile: %s, cutFrom:%d, cutTo:%d\n", filePath.c_str(), cutFrom, cutTo);
   AVFormatContext *fmt_ctx = NULL;
   AVCodecContext *codec_ctx = NULL;
@@ -435,6 +439,65 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
       }
     }
     av_packet_unref(pkt);
+  }
+
+  if (effect == "anti-animeinfo") {
+#if defined(__APPLE__) && defined(__MACH__)
+    if (!sequence->frames.empty()) {
+      avcodec_flush_buffers(codec_ctx);
+      av_seek_frame(fmt_ctx, video_stream_index, startPTS, AVSEEK_FLAG_BACKWARD);
+
+      AVFrame* ocrFrame = av_frame_alloc();
+      AVPacket* ocrPkt = av_packet_alloc();
+      bool gotFrame = false;
+      int frameCount = 0;
+
+      while (av_read_frame(fmt_ctx, ocrPkt) >= 0) {
+        if (ocrPkt->stream_index == video_stream_index) {
+          avcodec_send_packet(codec_ctx, ocrPkt);
+          if (avcodec_receive_frame(codec_ctx, ocrFrame) == 0) {
+            frameCount++;
+            if (frameCount == 10) {   //pick the special frame for book title detection
+              gotFrame = true;
+              break;
+            }
+          }
+        }
+        av_packet_unref(ocrPkt);
+      }
+
+      if (gotFrame) {
+        struct SwsContext* swsCtx = sws_getContext(
+            ocrFrame->width, ocrFrame->height, (AVPixelFormat)ocrFrame->format,
+            ocrFrame->width, ocrFrame->height, AV_PIX_FMT_BGRA,
+            SWS_BILINEAR, nullptr, nullptr, nullptr);
+        if (swsCtx) {
+          std::vector<uint8_t> bgraData((size_t)ocrFrame->width * ocrFrame->height * 4);
+          uint8_t* dstData[1] = {bgraData.data()};
+          int dstLinesize[1] = {ocrFrame->width * 4};
+          sws_scale(swsCtx, ocrFrame->data, ocrFrame->linesize, 0, ocrFrame->height,
+                    dstData, dstLinesize);
+          sws_freeContext(swsCtx);
+
+          CVPixelBufferRef pixelBuffer = nullptr;
+          CVPixelBufferCreateWithBytes(kCFAllocatorDefault, ocrFrame->width, ocrFrame->height,
+                                      kCVPixelFormatType_32BGRA, bgraData.data(),
+                                      ocrFrame->width * 4, nullptr, nullptr, nullptr, &pixelBuffer);
+          if (pixelBuffer) {
+            sequence->eraseRegions = CVImageTool::detectBookTitleRegions(pixelBuffer);
+            for (const auto& r : sequence->eraseRegions) {
+              std::cout << "BookTitle detected: " << r.left << ", " << r.top << ", "
+                        << r.width() << "x" << r.height() << std::endl;
+            }
+            CVPixelBufferRelease(pixelBuffer);
+          }
+        }
+      }
+
+      av_frame_free(&ocrFrame);
+      av_packet_free(&ocrPkt);
+    }
+#endif
   }
 
   // 清理资源

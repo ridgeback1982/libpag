@@ -52,6 +52,31 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
     LOGE("GaussianBlurFilter::draw() failed to create an Image from the backend texture!");
     return;
   }
+
+  if (!blurEffect->regions.empty()) {
+    targetCanvas->save();
+    targetCanvas->setMatrix(ToMatrix(target));
+    targetCanvas->drawImage(image, 0, 0);
+
+    tgfx::Point offset = tgfx::Point::Zero();
+    auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    auto blurredImage = image->makeWithFilter(std::move(blurFilter), &offset);
+    if (blurredImage) {
+      for (const auto& region : blurEffect->regions) {
+        auto regionRect = tgfx::Rect::MakeLTRB(region.left, region.top, region.right, region.bottom);
+        auto subsetRect = regionRect;
+        subsetRect.offset(-offset.x, -offset.y);
+        auto subsetImage = blurredImage->makeSubset(subsetRect);
+        if (subsetImage) {
+          targetCanvas->drawImage(std::move(subsetImage), region.left, region.top);
+        }
+      }
+    }
+    targetCanvas->restore();
+    targetSurface->flush();
+    return;
+  }
+
   tgfx::Point offset = tgfx::Point::Zero();
   if (repeatEdgePixels) {
     auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);

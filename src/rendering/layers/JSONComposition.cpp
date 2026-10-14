@@ -741,7 +741,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     int ogDuration = (track->lifetime.end_time - track->lifetime.begin_time) * track->content.speed;
     auto videoSequence = ReadVideoSequenceFromFile(track->content.localPath(), 
       TimeToFrame(ogCutFrom, video_fps),
-      TimeToFrame(ogCutFrom + ogDuration, video_fps));
+      TimeToFrame(ogCutFrom + ogDuration, video_fps), track->content.effect);
     if (videoSequence == nullptr) {
         std::cerr << "Error reading video file" << std::endl;
         return nullptr;
@@ -915,6 +915,15 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
         cornerpin->lowerRight = new Property<Point>(pag::Point::Make(video_width, video_height + random_height_offset_2));
       }
       vidPreComposeLayer->effects.push_back(cornerpin);
+    } else if (track->content.effect == "anti-animeinfo") {
+      if (videoSequence && !videoSequence->eraseRegions.empty()) {
+        auto* fastBlur = new pag::FastBlurEffect();
+        fastBlur->blurriness = new pag::Property<float>(20.0f);
+        fastBlur->blurDimensions = new pag::Property<pag::Enum>(0);
+        fastBlur->repeatEdgePixels = new pag::Property<bool>(true);
+        fastBlur->regions = videoSequence->eraseRegions;
+        vidPreComposeLayer->effects.push_back(fastBlur);
+      }
     }
 
     return vidPreComposeLayer;
@@ -1973,11 +1982,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             jsonComposition->_isArticleType = true;
             break;
         } else if (t->type == "video") {
-          auto track = static_cast<movie::VideoTrack*>(t);
-          if (track->content.effect == "anti-animeinfo") {
-            jsonComposition->_isAntiBookTitle = true;
-            break;
-          }
+          // auto track = static_cast<movie::VideoTrack*>(t);
+          // if (track->content.effect == "anti-animeinfo") {
+          //   jsonComposition->_isAntiBookTitle = true;
+          //   break;
+          // }
         }
     }
 
@@ -2286,7 +2295,7 @@ std::shared_ptr<JSONComposition> JSONComposition::LoadTest(const std::string& js
   vidComposition->duration = TEST_DURATION;       //set by json
   vidComposition->frameRate = TEST_FPS;           //set by json
   vidComposition->backgroundColor = {0, 0, 0};     //hard code
-  auto videoSequence = ReadVideoSequenceFromFile(tokens[2], 0, TEST_DURATION);
+  auto videoSequence = ReadVideoSequenceFromFile(tokens[2], 0, TEST_DURATION, "");
   // TimeRange range = {0, TEST_DURATION - 1};      //set by json, the range is probably not same as video composition
   // videoSequence->staticTimeRanges.push_back(range);
   videoSequence->composition = vidComposition;
@@ -2388,9 +2397,9 @@ bool JSONComposition::isArticleType() const {
   return _isArticleType;
 }
 
-bool JSONComposition::isAntiBookTitle() const {
-  return _isAntiBookTitle;
-}
+// bool JSONComposition::isAntiBookTitle() const {
+//   return _isAntiBookTitle;
+// }
 
 
 }  // namespace pag

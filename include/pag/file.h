@@ -794,6 +794,8 @@ class PAG_API FastBlurEffect : public Effect {
   Property<Enum>* blurDimensions = nullptr;
   Property<bool>* repeatEdgePixels = nullptr;
 
+  std::vector<Rect> regions;  //new add by zzy
+
   RTTR_ENABLE(Effect)
 };
 
@@ -2489,6 +2491,8 @@ class PAG_API VideoSequence : public Sequence {
   VideoCodecType codecType = VideoCodecType::AVC;
   //zzy
   float rotation = 0;
+
+  std::vector<Rect> eraseRegions;
 
   RTTR_ENABLE(Sequence)
 };
