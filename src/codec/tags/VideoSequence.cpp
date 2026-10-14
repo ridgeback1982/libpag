@@ -441,7 +441,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
     av_packet_unref(pkt);
   }
 
-  if (effect == "anti-animeinfo") {
+  if (effect == "anti-anime-info" || effect == "anti-anime-watermark") {
 #if defined(__APPLE__) && defined(__MACH__)
     if (!sequence->frames.empty()) {
       avcodec_flush_buffers(codec_ctx);

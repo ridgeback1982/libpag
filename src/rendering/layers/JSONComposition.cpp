@@ -799,22 +799,11 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
 #if 1
-      //白噪声
-      // auto noise = new pag::WhiteNoiseEffect();
-      // float intensity = 0.6;
-      // float opacity = 0.5;
-      // intensity = std::max(0.0f, std::min(1.0f, intensity));
-      // opacity = std::max(0.0f, std::min(1.0f, opacity));
-      // noise->noiseIntensity = new pag::Property<float>(intensity);
-      // noise->effectOpacity = new pag::Property<pag::Opacity>(
-      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
-      // vidPreComposeLayer->effects.push_back(noise);
-
-      //朦胧雾化（全局，类似“眼睛没揉开”的朦胧 + 发白）
+      //朦胧雾化（全局，类似“眼睛没揉开”的朦胧 + 发白）。经过测试，可以去除暗水印
       // auto haze = new pag::EllipseHazeEffect();
       // float blurRadius = 2.0f;  //（边界软化半径，像素）
-      // float bloom = 0.6f;   //（泛光/朦胧强度，0~1）
-      // float whiten = 0.45f; //（发白/白雾强度，0~1）
+      // float bloom = 0.6f;   //（泛光/朦胧强度，0~1），0.6f
+      // float whiten = 0.45f; //（发白/白雾强度，0~1）, 0.45f
       // float opacity = 1.0f;
       // blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
       // bloom = std::max(0.0f, std::min(1.0f, bloom));
@@ -827,37 +816,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
       // vidPreComposeLayer->effects.push_back(haze);
 
-      //白纱
-      // float strength = 0.6f;   //白纱“厚度/发白程度”
-      // float opacity = 0.60f;    //混合透明度（最终叠加强度）
-      // bool uniform = true;    //色块均匀
-      // strength = std::max(0.0f, std::min(1.0f, strength));
-      // opacity = std::max(0.0f, std::min(1.0f, opacity));
-      // auto veil = new pag::WhiteVeilEffect();
-      // veil->strength = new pag::Property<float>(strength);
-      // veil->uniform = new pag::Property<bool>(uniform);
-      // veil->effectOpacity = new pag::Property<pag::Opacity>(
-      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
-      // vidPreComposeLayer->effects.push_back(veil);
-
-      //毛玻璃
-      // float translucency = 0.25f;
-      // float colorBleed = 0.75f;  //颜色外溢
-      // float blurRadius = 1.0f;   //模糊半径，像素
-      // translucency = std::max(0.0f, std::min(1.0f, translucency));
-      // colorBleed = std::max(0.0f, std::min(2.0f, colorBleed));
-      // blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
-      // auto frosted = new pag::FrostedGlassEffect();
-      // frosted->blurRadius = new pag::Property<float>(blurRadius);
-      // frosted->translucency = new pag::Property<float>(translucency);
-      // frosted->colorBleed = new pag::Property<float>(colorBleed);
-      // frosted->effectOpacity = new pag::Property<pag::Opacity>(255);
-      // vidPreComposeLayer->effects.push_back(frosted);
-
-      //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用）
+      //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用），strength = 0.7f
       auto bleed = new pag::LowFreqBleedEffect();
       float radius = 400.0f;
-      float strength = 0.3f;  //0.7f
+      float strength = 0.3f;  //经过测试，0.3是最小值，0.2可能会被识别出暗水印
       radius = std::max(0.0f, std::min(400.0f, radius));
       strength = std::max(0.0f, std::min(1.0f, strength));
       bleed->radius = new pag::Property<float>(radius);
@@ -933,7 +895,29 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       }
       vidPreComposeLayer->effects.push_back(cornerpin);
 #endif
-    } else if (track->content.effect == "anti-animeinfo") {
+    } else if (track->content.effect == "anti-anime-watermark") {
+      //ReadVideoSequenceFromFile happens ahead
+      if (videoSequence && !videoSequence->eraseRegions.empty()) {
+        auto* fastBlur = new pag::FastBlurEffect();
+        fastBlur->blurriness = new pag::Property<float>(20.0f);
+        fastBlur->blurDimensions = new pag::Property<pag::Enum>(0);
+        fastBlur->repeatEdgePixels = new pag::Property<bool>(true);
+        fastBlur->regions = videoSequence->eraseRegions;
+        vidPreComposeLayer->effects.push_back(fastBlur);
+      }
+
+      //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用）
+      auto bleed = new pag::LowFreqBleedEffect();
+      float radius = 400.0f;
+      float strength = 0.3f;  //0.7f
+      radius = std::max(0.0f, std::min(400.0f, radius));
+      strength = std::max(0.0f, std::min(1.0f, strength));
+      bleed->radius = new pag::Property<float>(radius);
+      bleed->strength = new pag::Property<float>(strength);
+      bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(bleed);
+    } else if (track->content.effect == "anti-anime-info") {
+      //ReadVideoSequenceFromFile happens ahead
       if (videoSequence && !videoSequence->eraseRegions.empty()) {
         auto* fastBlur = new pag::FastBlurEffect();
         fastBlur->blurriness = new pag::Property<float>(20.0f);
@@ -2000,11 +1984,6 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             jsonComposition->_isArticleType = true;
             break;
         } else if (t->type == "video") {
-          // auto track = static_cast<movie::VideoTrack*>(t);
-          // if (track->content.effect == "anti-animeinfo") {
-          //   jsonComposition->_isAntiBookTitle = true;
-          //   break;
-          // }
         }
     }
 
