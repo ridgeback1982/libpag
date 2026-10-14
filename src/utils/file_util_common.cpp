@@ -1,4 +1,5 @@
 #include "file_util.h"
+#include <cstdio>
 
 namespace pag {
 
@@ -54,17 +55,31 @@ std::string getFileNameWithoutExtension(const std::string& filePath) {
 
 std::string getFileNameFromUrl(const std::string& url) {
   size_t pos1 = url.find_last_of('/');
+  std::string fileName;
   if (pos1 != std::string::npos && pos1 + 1 < url.size()) {
       size_t pos2 = url.find_last_of('?');
       if (pos2 != std::string::npos && pos1 < pos2) {
           //zzy, must drop words after "?" e.g. 1e491415e4c9.webp?time=1734489926920
           //because it will cause file auto deleted by sysmtem on windows
-          return url.substr(pos1 + 1, pos2 - pos1 - 1);
+          fileName = url.substr(pos1 + 1, pos2 - pos1 - 1);
       } else {
-          return url.substr(pos1 + 1);
+          fileName = url.substr(pos1 + 1);
       }
   }
-  return ""; // 没有后缀名时返回空字符串
+  // URL like https://host/path/?query has no filename part, fall back to a
+  // deterministic hash of the whole URL so the local path stays valid and
+  // identical URLs reuse the same cached file.
+  if (fileName.empty()) {
+      uint64_t hash = 14695981039346656037ULL;
+      for (char c : url) {
+          hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+          hash *= 1099511628211ULL;
+      }
+      char buf[17];
+      std::snprintf(buf, sizeof(buf), "%016llx", static_cast<unsigned long long>(hash));
+      fileName = buf;
+  }
+  return fileName;
 }
 
 bool remove_directory(const std::string& directory_path) {
