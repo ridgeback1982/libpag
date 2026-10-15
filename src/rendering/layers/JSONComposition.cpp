@@ -716,7 +716,7 @@ void fitLocation(movie::Location& location, int obj_width, int obj_height, int s
   return;
 }
 
-PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec) {
+PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSpec& spec, std::shared_ptr<JSONComposition>& jsonComposition) {
     int visual_width = spec.width * track->content.location.w;   //visual width, not video og width
     int visual_height = spec.height * track->content.location.h;
     volatile int video_width = track->content.width();
@@ -926,6 +926,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
         fastBlur->regions = videoSequence->eraseRegions;
         vidPreComposeLayer->effects.push_back(fastBlur);
       }
+    }
+
+    if (track->content.effect.empty() == false) {
+      jsonComposition->setVideoLogBitrate(videoSequence->bitRate);
     }
 
     return vidPreComposeLayer;
@@ -1984,6 +1988,11 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             jsonComposition->_isArticleType = true;
             break;
         } else if (t->type == "video") {
+            auto track = static_cast<movie::VideoTrack*>(t);
+            if (track->content.effect.empty() == false) {
+                jsonComposition->_isDeepCopy = true;
+                break;
+            }
         }
     }
 
@@ -1998,7 +2007,7 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               return nullptr;
             }
             //printf("video track, path:%s\n", track->content.path.c_str());
-            auto vidPreComposeLayer = createVideoLayer(track, movie.video);
+            auto vidPreComposeLayer = createVideoLayer(track, movie.video, jsonComposition);
             if (vidPreComposeLayer != nullptr) {
               vecComposition->layers.push_back(vidPreComposeLayer);
               //zzy, must set "containingComposition" for fps sampler
@@ -2394,9 +2403,9 @@ bool JSONComposition::isArticleType() const {
   return _isArticleType;
 }
 
-// bool JSONComposition::isAntiBookTitle() const {
-//   return _isAntiBookTitle;
-// }
+bool JSONComposition::isDeepCopy() const {
+  return _isDeepCopy;
+}
 
 
 }  // namespace pag

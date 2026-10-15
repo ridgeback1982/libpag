@@ -2491,6 +2491,8 @@ class PAG_API VideoSequence : public Sequence {
   VideoCodecType codecType = VideoCodecType::AVC;
   //zzy
   float rotation = 0;
+  //zzy, bits per second
+  int64_t bitRate = 0;
 
   std::vector<Rect> eraseRegions;
 

@@ -335,6 +335,7 @@ VideoSequence* ReadVideoSequenceFromFile(const std::string& filePath, const int 
   sequence->width = video_stream->codecpar->width;
   sequence->height = video_stream->codecpar->height;
   sequence->frameRate = video_stream->avg_frame_rate.num / video_stream->avg_frame_rate.den;
+  sequence->bitRate = codec_ctx->bit_rate > 0 ? codec_ctx->bit_rate : video_stream->codecpar->bit_rate;
 
   if (video_stream->nb_frames > 0 && video_stream->duration > 0) {
     frame_interval = (video_stream->duration / video_stream->nb_frames);
