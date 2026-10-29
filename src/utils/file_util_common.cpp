@@ -66,10 +66,19 @@ std::string getFileNameFromUrl(const std::string& url) {
           fileName = url.substr(pos1 + 1);
       }
   }
-  // URL like https://host/path/?query has no filename part, fall back to a
-  // deterministic hash of the whole URL so the local path stays valid and
-  // identical URLs reuse the same cached file.
-  if (fileName.empty()) {
+  // Fall back to a deterministic hash of the whole URL when there is no
+  // filename part (e.g. https://host/path/?query) or when the extracted name
+  // is too long to be a valid local file name (most file systems limit a
+  // single name component to 255 bytes). Using a hash keeps the local path
+  // valid and lets identical URLs reuse the same cached file.
+  constexpr size_t kMaxFileNameLength = 200;
+  if (fileName.empty() || fileName.size() > kMaxFileNameLength) {
+      // keep the extension when it is short and meaningful
+      std::string extension;
+      auto dot = fileName.find_last_of('.');
+      if (dot != std::string::npos && fileName.size() - dot <= 10) {
+          extension = fileName.substr(dot);
+      }
       uint64_t hash = 14695981039346656037ULL;
       for (char c : url) {
           hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
@@ -77,7 +86,7 @@ std::string getFileNameFromUrl(const std::string& url) {
       }
       char buf[17];
       std::snprintf(buf, sizeof(buf), "%016llx", static_cast<unsigned long long>(hash));
-      fileName = buf;
+      fileName = std::string(buf) + extension;
   }
   return fileName;
 }
