@@ -836,49 +836,15 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 #if 1
       //非线形变换
       //1. 水波纹（对于去水印，测吃有用）
-      auto ripple = new pag::RippleEffect();
-      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
-      ripple->radius = new Property<float>(1280.0f);  //水波纹的作用半径，覆盖整个视频，大于640
-      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）1.5f
-      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
-      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
-      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
-      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
-      vidPreComposeLayer->effects.push_back(ripple);
-
-      //2. 马赛克（对于去水印，测吃过没用）
-      // auto mosaic1 = new pag::MosaicEffect();
-      // mosaic1->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      // mosaic1->verticalBlocks = new pag::Property<uint16_t>(50);
-      // mosaic1->sharpColors = new pag::Property<bool>(false);
-      // mosaic1->center = new pag::Property<pag::Point>(pag::Point::Make(0.0f, 0.0f));  // 设置中心点
-      // mosaic1->radius = new pag::Property<float>(200.0f);  // 设置半径
-      // mosaic1->effectOpacity = new pag::Property<pag::Opacity>(255);
-      // vidPreComposeLayer->effects.push_back(mosaic1);
-      // auto mosaic2 = new pag::MosaicEffect();
-      // mosaic2->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      // mosaic2->verticalBlocks = new pag::Property<uint16_t>(50);
-      // mosaic2->sharpColors = new pag::Property<bool>(false);
-      // mosaic2->center = new pag::Property<pag::Point>(pag::Point::Make(0.0f, 1280.0f));  // 设置中心点
-      // mosaic2->radius = new pag::Property<float>(200.0f);  // 设置半径
-      // mosaic2->effectOpacity = new pag::Property<pag::Opacity>(255);
-      // vidPreComposeLayer->effects.push_back(mosaic2);
-      // auto mosaic3 = new pag::MosaicEffect();
-      // mosaic3->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      // mosaic3->verticalBlocks = new pag::Property<uint16_t>(50);
-      // mosaic3->sharpColors = new pag::Property<bool>(false);
-      // mosaic3->center = new pag::Property<pag::Point>(pag::Point::Make(720.0f, 0.0f));  // 设置中心点
-      // mosaic3->radius = new pag::Property<float>(200.0f);  // 设置半径
-      // mosaic3->effectOpacity = new pag::Property<pag::Opacity>(255);
-      // vidPreComposeLayer->effects.push_back(mosaic3);
-      // auto mosaic4 = new pag::MosaicEffect();
-      // mosaic4->horizontalBlocks = new pag::Property<uint16_t>(50);     //马赛克块的个数
-      // mosaic4->verticalBlocks = new pag::Property<uint16_t>(50);
-      // mosaic4->sharpColors = new pag::Property<bool>(false);
-      // mosaic4->center = new pag::Property<pag::Point>(pag::Point::Make(720.0f, 1280.0f));  // 设置中心点
-      // mosaic4->radius = new pag::Property<float>(200.0f);  // 设置半径
-      // mosaic4->effectOpacity = new pag::Property<pag::Opacity>(255);
-      // vidPreComposeLayer->effects.push_back(mosaic4);
+      // auto ripple = new pag::RippleEffect();
+      // ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
+      // ripple->radius = new Property<float>(1280.0f);  //水波纹的作用半径，覆盖整个视频，大于640
+      // ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）1.5f
+      // ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
+      // ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
+      // ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
+      // ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
+      // vidPreComposeLayer->effects.push_back(ripple);
 
       //3. 位置变换（对于去水印，测吃有用）
       CornerPinEffect* cornerpin = new CornerPinEffect();
