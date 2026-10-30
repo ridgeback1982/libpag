@@ -733,7 +733,9 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
     if (track->content.effect == "anti-watermark") {
       //test speed
-      track->content.speed *= 1.05f;
+      track->content.speed *= 1.05f;    //抽帧
+      visual_width *= 1.05f;   //等比例变大
+      visual_height *= 1.05f;  //等比例变大
     }
 
     int video_fps = track->content.fps();
