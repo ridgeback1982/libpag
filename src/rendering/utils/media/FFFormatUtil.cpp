@@ -128,6 +128,12 @@ FFFormatUtil::FFFormatUtil(const std::string& url) {
     AVRational frame_rate = video_stream->avg_frame_rate;
     _fps = (frame_rate.den && frame_rate.num) ? 
                  static_cast<double>(frame_rate.num) / frame_rate.den : 0;
+
+    // 码率（bit/s）：优先取视频流，取不到时退回容器总码率（含音频）
+    _bit_rate = codec_params->bit_rate;
+    if (_bit_rate <= 0) {
+      _bit_rate = _fmt_ctx->bit_rate;
+    }
 }
 
 FFFormatUtil::~FFFormatUtil() {

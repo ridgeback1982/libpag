@@ -21,6 +21,8 @@ public:
     int width() { return _width; }
     int height() { return _height; }
     int fps() { return _fps; }
+    // 码率，单位 bit/s
+    int64_t bitRate() { return _bit_rate; }
     int durationMS() { return std::floor(_duration * 1000); }
 
     int writeVideoThumbnail(int width, int height, const std::string filePath);
@@ -31,6 +33,7 @@ private:
     int _width = 0;
     int _height = 0;
     int _fps = 0;
+    int64_t _bit_rate = 0;
     float _duration = 0.0f;
 };
 
