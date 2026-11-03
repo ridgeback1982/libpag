@@ -469,14 +469,14 @@ static HSV rgbToHsv(const RGB& rgb) {
     return hsv;
 }
 
-static bool isReddish(float h, float s, [[maybe_unused]]float v, float satThresh = 0.2f) {
+static bool isReddish(float h, float s, [[maybe_unused]]float v, float satThresh = 0.5f) {
   if (s < satThresh) {
       // 饱和度太低，不算偏红
       return false;
   }
-  //比较宽泛的红色
-  return (h >= 0 && h <= 60) || (h >= 280 && h <= 360);
+  //比较严格的红色：仅保留色相接近 0/360 度的纯红，排除橙、黄、粉、紫等近似色
   //https://zh.rakko.tools/tools/30/
+  return (h >= 0 && h <= 20) || (h >= 340 && h <= 360);
 }
 
 // HSV 转 RGB
@@ -736,7 +736,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
     if (track->content.effect == "anti-watermark") {
       //test speed
-      track->content.speed *= 0.95f;    //抽帧
+      track->content.speed *= 1.05f;    //抽帧
       visual_width *= 0.95f;   //等比例变大
       visual_height *= 0.95f;  //等比例变大
     }
@@ -808,7 +808,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
-#if 1
+#if 0
       //朦胧雾化（全局，类似“眼睛没揉开”的朦胧 + 发白）。经过测试，可以去除暗水印。曾经可以过暗水印，现在巨量升级了检测，一个都过不了了。
       // auto haze = new pag::EllipseHazeEffect();
       // float blurRadius = 2.0f;  //（边界软化半径，像素）
@@ -826,32 +826,32 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
       // vidPreComposeLayer->effects.push_back(haze);
 
-      if (lowBitrateVideo) {
-        //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用），strength = 0.7f
-        auto bleed = new pag::LowFreqBleedEffect();
-        float radius = 400.0f;
-        float strength = 0.5f;  //经过测试，0.5都不行了，我哭了，暗水印看来攻克不下了
-        radius = std::max(0.0f, std::min(400.0f, radius));
-        strength = std::max(0.0f, std::min(1.0f, strength));
-        bleed->radius = new pag::Property<float>(radius);
-        bleed->strength = new pag::Property<float>(strength);
-        bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
-        vidPreComposeLayer->effects.push_back(bleed);
-      }
+      //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用），strength = 0.7f
+      auto bleed = new pag::LowFreqBleedEffect();
+      float radius = 400.0f;
+      float strength = 0.5f;  //经过测试，0.5都不行了，我哭了，暗水印看来攻克不下了
+      radius = std::max(0.0f, std::min(400.0f, radius));
+      strength = std::max(0.0f, std::min(1.0f, strength));
+      bleed->radius = new pag::Property<float>(radius);
+      bleed->strength = new pag::Property<float>(strength);
+      bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(bleed);
 #endif
 
-#if 0
+#if 1
       //非线形变换
-      //1. 水波纹（对于去水印，测吃有用）
-      auto ripple = new pag::RippleEffect();
-      ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
-      ripple->radius = new Property<float>(1280.0f);  //水波纹的作用半径，覆盖整个视频，大于640
-      ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）1.5f
-      ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
-      ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
-      ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
-      ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
-      vidPreComposeLayer->effects.push_back(ripple);
+      if (lowBitrateVideo) {
+        //1. 水波纹（对于去水印，测吃有用）
+        auto ripple = new pag::RippleEffect();
+        ripple->rippleCenter = new Property<Point>(pag::Point::Make(360, 640));  //水波纹的中心点坐标
+        ripple->radius = new Property<float>(1280.0f);  //水波纹的作用半径，覆盖整个视频，大于640
+        ripple->amplitude = new Property<float>(1.5f);  //波动的振幅（高度）1.5f
+        ripple->wavelength = new Property<float>(100.0f);  //波长（波纹之间的距离）
+        ripple->pinning = new Property<bool>(false);  //是否固定边缘（防止边缘像素被拉扯出透明区域）
+        ripple->phase = new Property<float>(0.0f);  //相位（用于控制波动动画，通常对其做关键帧动画）
+        ripple->useFalloff = new Property<bool>(false);  //是否使用振幅衰减，测试用
+        vidPreComposeLayer->effects.push_back(ripple);
+      }
 #endif
 
 #if 1
