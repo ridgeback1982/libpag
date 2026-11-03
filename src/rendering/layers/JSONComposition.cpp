@@ -573,7 +573,7 @@ int ArticleContent::init(const std::string& tmpDir) {
           if (hsv.v < 0.42) {
             //dark image
             textColor = "rgba(255,255,255,1.0)";    //use white font color
-            backgroundColor = "rgba(255,255,255,0.0)";  //set bgc to transparent
+            backgroundColor = "rgba(0,0,0,0.5)";  //set bgc to transparent
           } else {
             //just set red font color as highlight, so if bgi is red, avoid highlight
             if (isReddish(hsv.h, hsv.s, hsv.v)) {
