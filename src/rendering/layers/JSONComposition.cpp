@@ -1605,6 +1605,7 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
     }
     if (!content->textColor.empty()) {
       if (content->enableHighLight && index == 0) {
+        std::cout << "use orange highlight for underline text" << std::endl;
         textData->fillColor = Color{230, 59, 0};      //first paragraph's color is orange
         textData->fillAlpha = 255;
         //textData->fillColor = Color{255, 248, 8};   //lime
@@ -2015,10 +2016,13 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story->duration : 0;   //set by json
     
-    //check if article track exists
+    //check the track type
     for (auto& t : story->tracks) {
         if (t->type == "article") {
             jsonComposition->_isArticleType = true;
+            break;
+        } else if (t->type == "underlinetext") {
+            jsonComposition->_isUnderlineTextType = true;
             break;
         } else if (t->type == "video") {
             auto track = static_cast<movie::VideoTrack*>(t);
@@ -2432,6 +2436,10 @@ int JSONComposition::isSimpleComposition() const {
 
 bool JSONComposition::isArticleType() const {
   return _isArticleType;
+}
+
+bool JSONComposition::isUnderlineTextType() const {
+  return _isUnderlineTextType;
 }
 
 bool JSONComposition::isDeepCopy() const {
