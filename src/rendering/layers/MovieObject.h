@@ -1,10 +1,16 @@
 #pragma once
 
 #include "nlohmann/json.hpp"
+#include "pag/defines.h"
 using json = nlohmann::json;
 
 
 namespace movie {
+
+    //zzy, 分析背景图颜色并返回推荐的文字颜色：暗背景用白字，亮背景用黑字
+    //url 为远端地址时会先下载到临时目录再分析，取色失败时返回默认白字
+    PAG_API int analyzeTextColor(const std::string& url, std::string& textColor, std::string& backgroundColor);
+
     class Location {
     public:
         float w = 0;
@@ -360,11 +366,12 @@ namespace movie {
         Location location;
         float fontSize = 0.05f;
         std::string fontFamilyName;
-        std::string textColor;
+        std::string textColor = "rgb(0,0,0)";
+        std::string backgroundColor = "rgba(255,255,255,0.7)";  //default value
         float horizontalIndent = 0.5f;           //0.0 - 1.0, times of fontSize
         float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
         float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize
-        ImageContent* backgroundImage = nullptr;           //if not specified, bgc is used
+        bool enableHighLight = false;    //default value is true
         static void from_json(const json& j, UnderlinedTextContent& f) {
             j.at("sentences").get_to(f.sentences);
             j.at("location").get_to(f.location);
@@ -380,26 +387,16 @@ namespace movie {
                 j.at("verticalSpacing").get_to(f.verticalSpacing);
             if (j.contains("horizontalSpacing"))
                 j.at("horizontalSpacing").get_to(f.horizontalSpacing);
-            if (j.contains("backgroundImage")) {
-                if (f.backgroundImage == nullptr) {
-                    f.backgroundImage = new ImageContent();
-                }
-                j.at("backgroundImage").get_to(*f.backgroundImage);
-            }
+            if (j.contains("backgroundColor"))
+                j.at("backgroundColor").get_to(f.backgroundColor);
         }
         static void to_json(json& j, const UnderlinedTextContent& f) {
             j = {{"sentences", f.sentences}, {"location", f.location}, {"fontSize", f.fontSize}, {"fontFamilyName", f.fontFamilyName}, {"textColor", f.textColor}, 
-                 {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing}};
-            if (f.backgroundImage != nullptr && !f.backgroundImage->path.empty())
-                j["backgroundImage"] = *f.backgroundImage;
+                 {"horizontalIndent", f.horizontalIndent}, {"verticalSpacing", f.verticalSpacing}, {"horizontalSpacing", f.horizontalSpacing}, {"backgroundColor", f.backgroundColor}};
         }
 
         int init(const std::string& tmpDir);
         ~UnderlinedTextContent() {
-            if (backgroundImage != nullptr) {
-                delete backgroundImage;
-                backgroundImage = nullptr;
-            }
         }
     };
     void from_json(const json& j, UnderlinedTextContent& f) {

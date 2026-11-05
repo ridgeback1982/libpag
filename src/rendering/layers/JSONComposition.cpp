@@ -404,13 +404,9 @@ int ImageContent::init(const std::string& tmpDir) {
   return 0;
 }
 
-int UnderlinedTextContent::init(const std::string& tmpDir) {
-  if (backgroundImage != nullptr && !backgroundImage->path.empty()) {
-    if (backgroundImage->init(tmpDir) < 0) {
-      printf("UnderlinedTextContent::init, backgroundImage init failed\n");
-      return -1;
-    }
-  }
+int UnderlinedTextContent::init([[maybe_unused]]const std::string& tmpDir) {
+  
+  
   return 0;
 }
 
@@ -514,6 +510,52 @@ static RGB hsvToRgb(const HSV& hsv) {
     return rgb;
 }
 
+// 分析背景图颜色，返回推荐的文字颜色：暗背景用白字，亮背景用黑字
+// 逻辑参考 ArticleContent::init 中的取色逻辑
+// url 为远端地址时，会先下载到临时目录再分析
+PAG_API int analyzeTextColor(const std::string& url, std::string& textColor, std::string& backgroundColor) {
+  textColor = "rgb(255,255,255)";    //默认白字
+  backgroundColor = "rgba(255,255,255,0.7)";    //默认半透明白色背景
+  if (url.empty()) {
+    return 0;
+  }
+
+  //远端图片先下载到本地
+  bool remote = pag::starts_with(url, "http://") || pag::starts_with(url, "https://");
+  std::string localPath = url;
+  fs::path tmpDir;
+  if (remote) {
+    tmpDir = pag::create_temp_directory("analyze_color_");
+    localPath = (tmpDir / pag::getFileNameFromUrl(url)).string();
+    printf("analyzeTextColor, will download %s\n", url.c_str());
+    if (curlDownload(url, localPath) < 0) {
+      printf("analyzeTextColor, download failed, use default text color:%s\n", textColor.c_str());
+      fs::remove_all(tmpDir);
+      return 0;
+    }
+  }
+
+  uint8_t r, g, b;
+  if (pickCenterColorFromImage(localPath, &r, &g, &b) == 0) {
+    RGB rgb = {(double)r, (double)g, (double)b};
+    HSV hsv = rgbToHsv(rgb);
+    if (hsv.v < 0.42) {
+      textColor = "rgba(255,255,255,1.0)";    //dark image, use white font color
+      backgroundColor = "rgba(0,0,0,0.6)";  //use semi-transparent black background
+    } else {
+      textColor = "rgba(0,0,0,1.0)";          //light image, use black font color
+      backgroundColor = "rgba(255,255,255,0.7)";  //use semi-transparent white background
+    }
+  } else {
+    printf("analyzeTextColor, pick center color failed, use default text color:%s\n", textColor.c_str());
+  }
+
+  if (remote) {
+    fs::remove_all(tmpDir);   //分析结束，清理下载的临时文件
+  }
+  return 1;
+}
+
 int ArticleContent::init(const std::string& tmpDir) {
   std::string bgcLocalPath;
   if (!_bgcImageUrl.empty()) {
@@ -592,7 +634,7 @@ int ArticleContent::init(const std::string& tmpDir) {
   }
   //final protection
   if (backgroundColor == "auto") {
-    backgroundColor = "rgba(255,255,255,0.5)";
+    backgroundColor = "rgba(255,255,255,0.7)";
     printf("ArticleContent::init, bgc final protection\n");
   }
   
@@ -1481,7 +1523,7 @@ ImageLayer* createImageLayer(movie::Track* track, const movie::MovieSpec& spec) 
   return createImageLayer2(content, track->lifetime, spec);
 }
 
-std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack* uTextTrack, const movie::MovieSpec& spec) {
+std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack* uTextTrack, const movie::MovieSpec& spec, bool need_bgc) {
   std::vector<Layer*> layers;
   movie::UnderlinedTextContent* content = &uTextTrack->content;
   int width = spec.width;
@@ -1495,32 +1537,51 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
   int regionCenterY = std::round(content->location.center_y * height);
   int regionWidth = std::round(content->location.w * width);
   int regionHeight = std::round(content->location.h * height);
+  //bgc params
+  float bgcLeft = 0.05f;
+  float bgcRight = 0.95f;
+  float bgcTop = 0.25f;       //tested value
+  float bgcBottom = 0.75f;    //tested value
+  int bgcMiddleX = std::round(width * (bgcLeft + bgcRight) / 2);
+  int bgcMiddleY = std::round(height * (bgcTop + bgcBottom) / 2);
 
-  //create image layer as BGI
-  if (uTextTrack->content.backgroundImage != nullptr && !uTextTrack->content.backgroundImage->path.empty()) {
-    movie::ImageContent* bgi = uTextTrack->content.backgroundImage;
-    fitLocation(bgi->location, bgi->width(), bgi->height(), width, height);
-    auto imageLayer = createImageLayer2(uTextTrack->content.backgroundImage, uTextTrack->lifetime, spec);
-    layers.push_back(imageLayer);
-    //create a half-transparent solid layer on the BGI, for good looking
-    std::string solidColor = "rgba(255,255,255,0.4)";
-    auto c = translateColor(solidColor);
-    auto bgColor = Color{c.r, c.g, c.b};
-    auto solidLayer = new SolidLayer();
-    solidLayer->id = UniqueID::Next();
-    solidLayer->startTime = TimeToFrame(uTextTrack->lifetime.begin_time, spec.fps);
-    solidLayer->duration = LifetimeToFrameDuration(uTextTrack->lifetime, spec.fps);
-    solidLayer->transform = Transform2D::MakeDefault().release();
-    solidLayer->transform->anchorPoint->value.set(regionCenterX, regionCenterY);
-    solidLayer->transform->position->value.set(regionCenterX, regionCenterY);
-    solidLayer->transform->opacity = new Property<Opacity>(c.a);      //hard code
-    solidLayer->timeRemap = new Property<float>(0);      //hard code
-    solidLayer->name = "纯色背景";
-    solidLayer->solidColor = bgColor;
-    solidLayer->width = width;
-    solidLayer->height = height;
+  //create bgc layer(background color), for good looking
+  if (need_bgc) {
+    //only add underline background color shape layer once, or it will be added multiple times
+    if (!content->backgroundColor.empty()) {
+      auto c = translateColor(content->backgroundColor);
+      auto bgColor = Color{c.r, c.g, c.b};
+      auto solidLayer = new SolidLayer();
+      solidLayer->id = UniqueID::Next();
+      solidLayer->startTime = 0;      //hard code
+      solidLayer->duration = TimeToFrame(spec.stories[0].duration, spec.fps);
+      solidLayer->transform = Transform2D::MakeDefault().release();
+      solidLayer->transform->anchorPoint->value.set(bgcMiddleX, bgcMiddleY);
+      solidLayer->transform->position->value.set(bgcMiddleX, bgcMiddleY);
+      solidLayer->transform->opacity = new Property<Opacity>(c.a);      //hard code
+      solidLayer->timeRemap = new Property<float>(0);      //hard code
+      solidLayer->name = "纯色背景";
+      //暂时忽略蒙板masks，来年再做
+      auto maskData = new MaskData();
+      maskData->id = UniqueID::Next();
+      auto pathData = std::make_shared<PathData>();
+      pathData->moveTo(width * bgcLeft, height * bgcTop);
+      pathData->lineTo(width * bgcRight, height * bgcTop);
+      pathData->lineTo(width * bgcRight, height * bgcBottom);
+      pathData->lineTo(width * bgcLeft, height * bgcBottom);
+      pathData->close();  //close will make it a closed path
       
-    layers.push_back(solidLayer);
+      maskData->maskPath = new Property<PathHandle>(pathData);
+      maskData->maskOpacity = new Property<Opacity>(255);      //hard code
+      maskData->maskExpansion = new Property<float>(0);      //hard code
+      solidLayer->masks.push_back(maskData);
+
+      solidLayer->solidColor = bgColor;
+      solidLayer->width = width;
+      solidLayer->height = height;
+        
+      layers.push_back(solidLayer);
+    }
   }
 
   //modify vertical indent
@@ -1533,6 +1594,7 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
   }
   int x = regionCenterX - visibleWidth/2;
   int y = regionCenterY - visibleHeight/2;
+  int index = 0;
   for (auto& sentence : content->sentences) {
     //step 1: create text layer
     auto textData = new TextDocument();
@@ -1542,9 +1604,15 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
       textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
-      auto c = translateColor(content->textColor);
-      textData->fillColor = Color{c.r, c.g, c.b};
-      textData->fillAlpha = c.a;
+      if (content->enableHighLight && index == 0) {
+        textData->fillColor = Color{230, 59, 0};      //first paragraph's color is orange
+        textData->fillAlpha = 255;
+        //textData->fillColor = Color{255, 248, 8};   //lime
+      } else {
+        auto c = translateColor(content->textColor);
+        textData->fillColor = Color{c.r, c.g, c.b};
+        textData->fillAlpha = c.a;
+      }
     }
     textData->justification = pag::ParagraphJustification::CenterJustify;   //hard code
     textData->tracking = std::max(std::min((int)std::round(trackingInP * 1000.0f / fontSize), 1000), 0);
@@ -1569,15 +1637,15 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
     layers.push_back(textLayer);
 
     //step 2: create shape layer as 画线
-    auto shapeLayer = new ShapeLayer();
-    shapeLayer->id = UniqueID::Next();
-    shapeLayer->startTime = TimeToFrame(sentence.begin_time, spec.fps);
-    shapeLayer->duration = TimeToFrame(sentence.end_time, spec.fps) - TimeToFrame(sentence.begin_time, spec.fps);
-    shapeLayer->transform = Transform2D::MakeDefault().release();
-    shapeLayer->transform->anchorPoint->value.set(0, 0);                //hard code
-    shapeLayer->transform->position->value.set(0, 0);
-    shapeLayer->timeRemap = new Property<float>(0);                     //hard code
-    shapeLayer->name = "文字划线";
+    auto lineLayer = new ShapeLayer();
+    lineLayer->id = UniqueID::Next();
+    lineLayer->startTime = TimeToFrame(sentence.begin_time, spec.fps);
+    lineLayer->duration = TimeToFrame(sentence.end_time, spec.fps) - TimeToFrame(sentence.begin_time, spec.fps);
+    lineLayer->transform = Transform2D::MakeDefault().release();
+    lineLayer->transform->anchorPoint->value.set(0, 0);                //hard code
+    lineLayer->transform->position->value.set(0, 0);
+    lineLayer->timeRemap = new Property<float>(0);                     //hard code
+    lineLayer->name = "文字划线";
     auto shapeElement = new ShapeGroupElement();
     shapeElement->transform = new ShapeTransform();
     shapeElement->transform->anchorPoint = new Property<Point>(pag::Point::Make(0, 0));      //hard code
@@ -1600,8 +1668,8 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
     auto trimPathsElement = new TrimPathsElement();
     trimPathsElement->start = new Property<float>(0);           //hard code
     auto keyFrame = new SingleEaseKeyframe<float>();
-    keyFrame->startTime = shapeLayer->startTime;
-    keyFrame->endTime = shapeLayer->startTime + shapeLayer->duration;
+    keyFrame->startTime = lineLayer->startTime;
+    keyFrame->endTime = lineLayer->startTime + lineLayer->duration;
     keyFrame->startValue = 0.0f;          //hard code
     keyFrame->endValue = 0.5f;  //zzy, it's wired, it should be 1.0f, but the moving effect is abnormal. Then I tried, and find 0.5 is a good value
     keyFrame->interpolationType = KeyframeInterpolationType::Linear;  //hard code
@@ -1619,10 +1687,11 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
     strokeElement->dashes.push_back(new Property<float>(10));                   //虚线密度
     shapeElement->elements.push_back(strokeElement);
 
-    shapeLayer->contents.push_back(shapeElement);
-    layers.push_back(shapeLayer);
+    lineLayer->contents.push_back(shapeElement);
+    layers.push_back(lineLayer);
     
     y += leadingInP;
+    index ++;
   }
 
   return layers;
@@ -1799,7 +1868,7 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
   printf("prepareAllTracks, duration:%d\n", story->duration);
 
   int articleDuration = 0;
-  // bool anti_watermark = false;
+  bool underlineText = false;
   for (auto& track : story->tracks) {
     if (track->type == "article") {
       //check if article track exists
@@ -1822,11 +1891,13 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
       }
     } else if (track->type == "video") {
       if (((movie::VideoTrack*)track)->content.effect == "anti-watermark") {
-        // anti_watermark = true;
       }
+    } else if (track->type == "underlinetext") {
+      underlineText = true;
     }
   }
-  //modify lifetime and duration, if article exists
+
+  //article case: modify lifetime and duration
   if (articleDuration > 0) {
     int totalDuration = articleDuration;
     for (auto& track : story->tracks) {
@@ -1848,61 +1919,37 @@ void prepareAllTracks(movie::Story* story, int width, int height, [[maybe_unused
     story->duration = totalDuration;
   }
 
-  //if anti_watermark, add an image track to the corners
-  // if (anti_watermark) {
-  //   //add an image track into story
-  //   auto imageTrack1 = new movie::ImageTrack();
-  //   imageTrack1->type = "image";
-  //   imageTrack1->zorder = 3;
-  //   imageTrack1->lifetime.begin_time = 0;
-  //   imageTrack1->lifetime.end_time = story->duration;
-  //   imageTrack1->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-  //   imageTrack1->content.location.center_x = 0.9f;
-  //   imageTrack1->content.location.center_y = 0.1f;
-  //   imageTrack1->content.location.w = 0.4f;
-  //   imageTrack1->content.location.h = 0.4f;
-  //   imageTrack1->content.location.fitMode = "center-contain";
-  //   story->tracks.push_back(imageTrack1);
-
-  //   auto imageTrack2 = new movie::ImageTrack();
-  //   imageTrack2->type = "image";
-  //   imageTrack2->zorder = 3;
-  //   imageTrack2->lifetime.begin_time = 0;
-  //   imageTrack2->lifetime.end_time = story->duration;
-  //   imageTrack2->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-  //   imageTrack2->content.location.center_x = 0.1f;
-  //   imageTrack2->content.location.center_y = 0.1f;
-  //   imageTrack2->content.location.w = 0.4f;
-  //   imageTrack2->content.location.h = 0.4f;
-  //   imageTrack2->content.location.fitMode = "center-contain";
-  //   story->tracks.push_back(imageTrack2);
-
-  //   auto imageTrack3 = new movie::ImageTrack();
-  //   imageTrack3->type = "image";
-  //   imageTrack3->zorder = 3;
-  //   imageTrack3->lifetime.begin_time = 0;
-  //   imageTrack3->lifetime.end_time = story->duration;
-  //   imageTrack3->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-  //   imageTrack3->content.location.center_x = 0.1f;
-  //   imageTrack3->content.location.center_y = 0.9f;
-  //   imageTrack3->content.location.w = 0.4f;
-  //   imageTrack3->content.location.h = 0.4f;
-  //   imageTrack3->content.location.fitMode = "center-contain";
-  //   story->tracks.push_back(imageTrack3);
-
-  //   auto imageTrack4 = new movie::ImageTrack();
-  //   imageTrack4->type = "image";
-  //   imageTrack4->zorder = 3;
-  //   imageTrack4->lifetime.begin_time = 0;
-  //   imageTrack4->lifetime.end_time = story->duration;
-  //   imageTrack4->content.path = "http://synology.zeniq.net:5005/webDAV_share/material/c2245f07-06af-4d48-afc2-893d061879f4.png";
-  //   imageTrack4->content.location.center_x = 0.9f;
-  //   imageTrack4->content.location.center_y = 0.9f;
-  //   imageTrack4->content.location.w = 0.4f;
-  //   imageTrack4->content.location.h = 0.4f;
-  //   imageTrack4->content.location.fitMode = "center-contain";
-  //   story->tracks.push_back(imageTrack4);
-  // }
+  //underline text case: detect text color
+  if (underlineText) {
+    for (auto& track : story->tracks) {
+      if (track->type == "image") {
+        auto imageTrack = static_cast<movie::ImageTrack*>(track);
+        auto location = imageTrack->content.location;
+        if (
+            (std::abs(location.center_x - 0.5f) < 0.01f && std::abs(location.center_y - 0.5f) < 0.01f) &&
+            (std::abs(location.w - 1.0f) < 0.01f && std::abs(location.h - 1.0f) < 0.01f)
+        ) {
+          //find the possible background image
+          std::string textColor;
+          std::string backgroundColor;
+          if (movie::analyzeTextColor(imageTrack->content.path, textColor, backgroundColor)) {
+            for (auto& track : story->tracks) {
+              if (track->type == "underlinetext") {
+                auto underlineTextTrack = static_cast<movie::UnderlinedTextTrack*>(track);
+                if (underlineTextTrack->content.textColor == "auto") {
+                  underlineTextTrack->content.textColor = textColor;
+                  underlineTextTrack->content.backgroundColor = backgroundColor;
+                }
+              }
+            }
+          } else {
+            std::cerr << "分析背景图颜色失败" << std::endl;
+          }
+          break;
+        }
+      }
+    }
+  }
 
   //check duration of all tracks
   for (auto& t : story->tracks) {
@@ -1937,6 +1984,8 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
       tmpDir = tmp_dir;
       printf("customer tmp dir: %s\n", tmpDir.c_str());
     }
+    bool need_underline_bgc = true;   //it is a urgly variable for adding underline background color shape layer 
+    bool need_underline_highlight = true;   //still urgly variable for first underline text's highlight color
 
     //prepare all tracks for rendering(including article tracks and water mark)
     prepareAllTracks(story, movie.video.width, movie.video.height, movie.video.fps, tmpDir);
@@ -2113,7 +2162,8 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             std::cerr << "Error initializing article track" << std::endl;
             return nullptr;
           }
-          auto layers = createUnderlinedTextRelatedLayers(track, movie.video);
+          track->content.enableHighLight = need_underline_highlight;
+          auto layers = createUnderlinedTextRelatedLayers(track, movie.video, need_underline_bgc);
           for (auto layer : layers) {
             vecComposition->layers.push_back(layer);
             if (layer->type() == LayerType::Text) {
@@ -2131,13 +2181,10 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
               //zzy, must set frame rate in case of null PAGFile
               pagShapeLayer->setFrameRate(movie.video.fps);
               jsonComposition->addLayer(pagShapeLayer);
-            } else if (layer->type() == LayerType::Image) {
-              auto pagImageLayer = std::make_shared<PAGImageLayer>(nullptr, (ImageLayer*)layer);
-              //zzy, must set frame rate in case of null PAGFile
-              pagImageLayer->setFrameRate(movie.video.fps); 
-              jsonComposition->addLayer(pagImageLayer);
             }
           }
+          need_underline_bgc = false;
+          need_underline_highlight = false;
         }
         if (progressCB) {
           progressCB(tCount++ * 100 / story->tracks.size());
