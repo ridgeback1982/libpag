@@ -1594,7 +1594,6 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
   }
   int x = regionCenterX - visibleWidth/2;
   int y = regionCenterY - visibleHeight/2;
-  int index = 0;
   for (auto& sentence : content->sentences) {
     //step 1: create text layer
     auto textData = new TextDocument();
@@ -1604,7 +1603,7 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
       textData->fontFamily = findEnglishFontName(pag::getFileNameWithoutExtension(content->fontFamilyName));     //set by json
     }
     if (!content->textColor.empty()) {
-      if (content->enableHighLight && index == 0) {
+      if (sentence.begin_time < 2000) {
         std::cout << "use orange highlight for underline text" << std::endl;
         textData->fillColor = Color{230, 59, 0};      //first paragraph's color is orange
         textData->fillAlpha = 255;
@@ -1692,7 +1691,6 @@ std::vector<Layer*> createUnderlinedTextRelatedLayers(movie::UnderlinedTextTrack
     layers.push_back(lineLayer);
     
     y += leadingInP;
-    index ++;
   }
 
   return layers;
@@ -1986,7 +1984,6 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
       printf("customer tmp dir: %s\n", tmpDir.c_str());
     }
     bool need_underline_bgc = true;   //it is a urgly variable for adding underline background color shape layer 
-    bool need_underline_highlight = true;   //still urgly variable for first underline text's highlight color
 
     //prepare all tracks for rendering(including article tracks and water mark)
     prepareAllTracks(story, movie.video.width, movie.video.height, movie.video.fps, tmpDir);
@@ -2166,7 +2163,6 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             std::cerr << "Error initializing article track" << std::endl;
             return nullptr;
           }
-          track->content.enableHighLight = need_underline_highlight;
           auto layers = createUnderlinedTextRelatedLayers(track, movie.video, need_underline_bgc);
           for (auto layer : layers) {
             vecComposition->layers.push_back(layer);
@@ -2188,7 +2184,6 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
             }
           }
           need_underline_bgc = false;
-          need_underline_highlight = false;
         }
         if (progressCB) {
           progressCB(tCount++ * 100 / story->tracks.size());

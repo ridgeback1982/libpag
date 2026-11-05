@@ -371,7 +371,6 @@ namespace movie {
         float horizontalIndent = 0.5f;           //0.0 - 1.0, times of fontSize
         float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
         float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize
-        bool enableHighLight = false;    //default value is true
         static void from_json(const json& j, UnderlinedTextContent& f) {
             j.at("sentences").get_to(f.sentences);
             j.at("location").get_to(f.location);
