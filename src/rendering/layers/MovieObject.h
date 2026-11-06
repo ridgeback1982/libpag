@@ -367,7 +367,7 @@ namespace movie {
         float fontSize = 0.05f;
         std::string fontFamilyName;
         std::string textColor = "rgb(0,0,0)";
-        std::string backgroundColor = "rgba(255,255,255,0.7)";  //default value
+        std::string backgroundColor = "rgba(255,255,255,0.8)";  //default value
         float horizontalIndent = 0.5f;           //0.0 - 1.0, times of fontSize
         float verticalSpacing = 0.75f;           //0.0 - 1.0, times of fontSize
         float horizontalSpacing = 0.05f;         //0.0 - 1.0, times of fontSize

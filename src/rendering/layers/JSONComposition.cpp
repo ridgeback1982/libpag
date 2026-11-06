@@ -515,7 +515,7 @@ static RGB hsvToRgb(const HSV& hsv) {
 // url 为远端地址时，会先下载到临时目录再分析
 PAG_API int analyzeTextColor(const std::string& url, std::string& textColor, std::string& backgroundColor) {
   textColor = "rgb(255,255,255)";    //默认白字
-  backgroundColor = "rgba(255,255,255,0.7)";    //默认半透明白色背景
+  backgroundColor = "rgba(255,255,255,0.8)";    //默认半透明白色背景
   if (url.empty()) {
     return 0;
   }
@@ -541,10 +541,10 @@ PAG_API int analyzeTextColor(const std::string& url, std::string& textColor, std
     HSV hsv = rgbToHsv(rgb);
     if (hsv.v < 0.42) {
       textColor = "rgba(255,255,255,1.0)";    //dark image, use white font color
-      backgroundColor = "rgba(0,0,0,0.6)";  //use semi-transparent black background
+      backgroundColor = "rgba(0,0,0,0.7)";  //use semi-transparent black background
     } else {
       textColor = "rgba(0,0,0,1.0)";          //light image, use black font color
-      backgroundColor = "rgba(255,255,255,0.7)";  //use semi-transparent white background
+      backgroundColor = "rgba(255,255,255,0.8)";  //use semi-transparent white background
     }
   } else {
     printf("analyzeTextColor, pick center color failed, use default text color:%s\n", textColor.c_str());
@@ -619,7 +619,7 @@ int ArticleContent::init(const std::string& tmpDir) {
           if (hsv.v < 0.42) {
             //dark image
             textColor = "rgba(255,255,255,1.0)";    //use white font color
-            backgroundColor = "rgba(0,0,0,0.5)";  //set bgc to transparent
+            backgroundColor = "rgba(0,0,0,0.7)";  //set bgc to transparent
           } else {
             //just set red font color as highlight, so if bgi is red, avoid highlight
             if (isReddish(hsv.h, hsv.s, hsv.v)) {
