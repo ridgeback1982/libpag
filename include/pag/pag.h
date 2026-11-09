@@ -35,6 +35,10 @@ class ImageInfo;
 namespace pag {
 class Recorder;
 
+class Modifier;
+
+class TransitionFrameCache;
+
 class RenderCache;
 
 class Drawable;
@@ -1123,6 +1127,13 @@ public:
   static std::shared_ptr<JSONComposition> LoadTest(const std::string& json);
   static std::shared_ptr<JSONComposition> Load(const std::string& json, std::string tmp_dir="", const std::function<void(int)>& progressCB = nullptr);
 
+  //zzy, 转场动画窗口，单位为帧，窗口为 [startFrame, endFrame)
+  struct VideoTransitionSpec {
+    int startFrame = 0;
+    int endFrame = 0;
+    std::string effect;
+  };
+
   int videoEncodeBitrateKPBS() const;
   int isSimpleComposition() const;  //zzy, used to judge deep copy case
   bool isArticleType() const;
@@ -1139,6 +1150,14 @@ protected:
   bool _isUnderlineTextType = false;
   bool _isDeepCopy = false;
   int64_t _videoLogBitrate = 0;     //only used for deep copy
+
+  //zzy, 转场动画：挂在 UnderlinedTextTrack 的 lifetime 结束处
+  std::vector<VideoTransitionSpec> _videoTransitions;
+  mutable std::shared_ptr<TransitionFrameCache> _transitionCache;
+  mutable int _activeTransitionIndex = -1;
+  mutable int _lastTransitionFrame = -1;
+
+  void draw(Recorder* recorder) override;
 };
 
 class PAG_API PAGFile : public PAGComposition {

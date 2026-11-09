@@ -33,6 +33,8 @@
 #include "rendering/utils/media/FFImageReader.h"
 #include "rendering/utils/media/FFFormatUtil.h"
 #include "rendering/graphics/Glyph.h"
+#include "rendering/graphics/Modifier.h"
+#include "rendering/graphics/Recorder.h"
 #include "rendering/renderers/TextRenderer.h"
 
 //ffmpeg
@@ -2012,6 +2014,48 @@ std::shared_ptr<JSONComposition> JSONComposition::Load(const std::string& json_s
     jsonComposition->_vectorComposition = vecComposition;
     jsonComposition->rootLocker = std::make_shared<std::mutex>();
     jsonComposition->_videoEncodeBitrateKPBS = movie.video.fileSizeLimit > 0 ? movie.video.fileSizeLimit*8 / story->duration : 0;   //set by json
+
+    //zzy, 收集 story 级的转场动画（独立于 track 的时间线事件）
+    {
+      auto fps = movie.video.fps;
+      for (auto& transition : story->videoTransitions) {
+        if (transition.duration <= 0) {
+          continue;
+        }
+        //转场窗口以 time 为中心：[time - duration/2, time + duration/2]，单位毫秒
+        //注意：这里的时间必须是 int，才能匹配本文件的 TimeToFrame(int, float)（毫秒语义），
+        //否则会落到 TimeUtil.h 的 TimeToFrame(int64_t, double)（微秒语义）。
+        int centerTime = transition.time;                   //ms
+        int halfDuration = transition.duration / 2;         //ms
+        int beginTime = std::max(0, centerTime - halfDuration);
+        int finishTime = std::min(story->duration, centerTime + halfDuration);
+        if (finishTime <= beginTime) {
+          continue;
+        }
+        JSONComposition::VideoTransitionSpec spec;
+        spec.startFrame = TimeToFrame(beginTime, fps);
+        spec.endFrame = TimeToFrame(finishTime, fps);
+        spec.effect = transition.effect;
+        if (spec.endFrame <= spec.startFrame) {
+          continue;
+        }
+        jsonComposition->_videoTransitions.push_back(spec);
+      }
+      //按起始帧排序，并保证同一时刻只保留一个转场
+      std::sort(jsonComposition->_videoTransitions.begin(), jsonComposition->_videoTransitions.end(),
+                [](const JSONComposition::VideoTransitionSpec& a,
+                   const JSONComposition::VideoTransitionSpec& b) {
+                  return a.startFrame < b.startFrame;
+                });
+      std::vector<JSONComposition::VideoTransitionSpec> nonOverlapping = {};
+      for (auto& spec : jsonComposition->_videoTransitions) {
+        if (!nonOverlapping.empty() && spec.startFrame < nonOverlapping.back().endFrame) {
+          continue;
+        }
+        nonOverlapping.push_back(spec);
+      }
+      jsonComposition->_videoTransitions = std::move(nonOverlapping);
+    }
     
     //check the track type
     for (auto& t : story->tracks) {
@@ -2439,6 +2483,41 @@ bool JSONComposition::isUnderlineTextType() const {
 
 bool JSONComposition::isDeepCopy() const {
   return _isDeepCopy;
+}
+
+void JSONComposition::draw(Recorder* recorder) {
+  std::shared_ptr<Modifier> modifier = nullptr;
+  if (!_videoTransitions.empty()) {
+    auto frame = static_cast<int>(contentFrame);
+    for (size_t i = 0; i < _videoTransitions.size(); i++) {
+      auto& spec = _videoTransitions[i];
+      if (frame < spec.startFrame || frame >= spec.endFrame) {
+        continue;
+      }
+      if (_activeTransitionIndex != static_cast<int>(i) || frame < _lastTransitionFrame) {
+        // 进入新的转场窗口或时间回退，重新创建缓存以便重新冻结旧画面 A。
+        _transitionCache = std::make_shared<TransitionFrameCache>();
+        _activeTransitionIndex = static_cast<int>(i);
+      }
+      _lastTransitionFrame = frame;
+      auto total = static_cast<float>(spec.endFrame - spec.startFrame);
+      auto progress = static_cast<float>(frame - spec.startFrame) / total;
+      modifier = Modifier::MakeTransition(spec.effect, _transitionCache, progress);
+      break;
+    }
+    if (modifier == nullptr) {
+      _activeTransitionIndex = -1;
+      _transitionCache = nullptr;
+      _lastTransitionFrame = -1;
+    }
+  }
+  if (modifier != nullptr) {
+    recorder->saveLayer(modifier);
+  }
+  PAGComposition::draw(recorder);
+  if (modifier != nullptr) {
+    recorder->restore();
+  }
 }
 
 

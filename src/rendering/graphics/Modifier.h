@@ -21,6 +21,7 @@
 #include "rendering/graphics/Canvas.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 
 namespace pag {
@@ -28,12 +29,29 @@ class Graphic;
 
 class RenderCache;
 
+/**
+ * zzy, 转场动画的逐帧缓存：保存转场窗口首帧冻结下来的旧画面 A。
+ * 每进入一次转场窗口都需要重新创建，以便重新冻结。
+ */
+class TransitionFrameCache {
+ public:
+  std::shared_ptr<tgfx::Image> fromImage = nullptr;
+};
+
 class Modifier {
  public:
   static std::shared_ptr<Modifier> MakeBlend(float alpha, tgfx::BlendMode blendMode);
   static std::shared_ptr<Modifier> MakeClip(const tgfx::Path& clip);
   static std::shared_ptr<Modifier> MakeMask(std::shared_ptr<Graphic> graphic, bool inverted,
                                             bool useLuma);
+
+  /**
+   * zzy, 创建「冻结旧画面 -> 溶解」的转场 modifier。progress 为 0 时输出旧画面 A，为 1 时输出
+   * 新画面 B，中间按 effect 指定的特效插值。
+   */
+  static std::shared_ptr<Modifier> MakeTransition(const std::string& effect,
+                                                  std::shared_ptr<TransitionFrameCache> cache,
+                                                  float progress);
 
   virtual ~Modifier() = default;
 

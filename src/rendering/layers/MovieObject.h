@@ -603,6 +603,31 @@ namespace movie {
         ArticleTrack::to_json(j, a);
     }
 
+    //zzy, 转场动画描述：属于整条 story 的独立时间线事件，与具体 track 无关
+    class VideoTransition {
+    public:
+        int time = 0;       //转场中心时间点，单位毫秒
+        int duration = 0;   //转场时长，单位毫秒
+        std::string effect;      //特效名，具体 GLSL 实现由渲染层决定
+        static void from_json(const json& j, VideoTransition& v) {
+            if (j.contains("time"))
+                j.at("time").get_to(v.time);
+            if (j.contains("duration"))
+                j.at("duration").get_to(v.duration);
+            if (j.contains("effect"))
+                j.at("effect").get_to(v.effect);
+        }
+        static void to_json(json& j, const VideoTransition& v) {
+            j = {{"time", v.time}, {"duration", v.duration}, {"effect", v.effect}};
+        }
+    };
+    void from_json(const json& j, VideoTransition& v) {
+        VideoTransition::from_json(j, v);
+    }
+    void to_json(json& j, const VideoTransition& v) {
+        VideoTransition::to_json(j, v);
+    }
+
     class UnderlinedTextTrack : public Track {
     public:
         UnderlinedTextContent content;
@@ -627,6 +652,7 @@ namespace movie {
     public:
         int duration = 0;
         std::vector<Track*> tracks;
+        std::vector<VideoTransition> videoTransitions;   //zzy, 整条 story 的转场动画列表
         static void from_json(const json& j, Story& s) {
             //j.at("tracks").get_to(s.tracks);
             for (auto& jtrack : j.at("tracks")) {
@@ -672,11 +698,15 @@ namespace movie {
             }
             if (j.contains("duration"))
                 j.at("duration").get_to(s.duration);
+            if (j.contains("videoTransitions"))
+                j.at("videoTransitions").get_to(s.videoTransitions);
         }
 
         static void to_json(json& j, const Story& s) {
             if (s.duration > 0)
                 j["duration"] = s.duration;
+            if (!s.videoTransitions.empty())
+                j["videoTransitions"] = s.videoTransitions;
             auto tracks = json::array();
             for (auto& t : s.tracks) {
                 if (t->type == "video") {
@@ -723,6 +753,7 @@ namespace movie {
 
         void Destroy() {
             duration = 0;
+            videoTransitions.clear();
             for (auto& t : tracks) {
                 if (t) {
                     delete t;

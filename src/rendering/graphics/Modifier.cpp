@@ -131,6 +131,49 @@ class MaskModifier : public Modifier {
   bool useLuma = false;
 };
 
+class TransitionModifier : public Modifier {
+ public:
+  TransitionModifier(std::string effect, std::shared_ptr<TransitionFrameCache> cache,
+                     float progress)
+      : effect(std::move(effect)), cache(std::move(cache)), progress(progress) {
+  }
+
+  ID type() const override {
+    static const auto TypeID = UniqueID::Next();
+    return TypeID;
+  }
+
+  bool isEmpty() const override {
+    return false;
+  }
+
+  bool hitTest(RenderCache*, float, float) const override {
+    return true;
+  }
+
+  void prepare(RenderCache*) const override {
+  }
+
+  void applyToBounds(tgfx::Rect*) const override {
+  }
+
+  bool applyToPath(tgfx::Path*) const override {
+    // 转场需要采样前后两幅画面，无法退化为路径处理，必须走 applyToGraphic 的离屏合成。
+    return false;
+  }
+
+  void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const override;
+
+  std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {
+    return nullptr;
+  }
+
+ private:
+  std::string effect;
+  std::shared_ptr<TransitionFrameCache> cache = nullptr;
+  float progress = 0.0f;
+};
+
 //================================================================================
 
 std::shared_ptr<Modifier> Modifier::MakeBlend(float alpha, tgfx::BlendMode blendMode) {
@@ -162,6 +205,15 @@ std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, b
     return Modifier::MakeClip(clipPath);
   }
   return std::make_shared<MaskModifier>(graphic, inverted, useLuma);
+}
+
+std::shared_ptr<Modifier> Modifier::MakeTransition(const std::string& effect,
+                                                   std::shared_ptr<TransitionFrameCache> cache,
+                                                   float progress) {
+  if (cache == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<TransitionModifier>(effect, std::move(cache), progress);
 }
 
 //================================================================================
@@ -296,6 +348,57 @@ void MaskModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graph
   }
   paint.setMaskFilter(tgfx::MaskFilter::MakeShader(std::move(shader), inverted));
   canvas->drawImage(image, &paint);
+  canvas->restore();
+}
+
+void TransitionModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const {
+  if (cache == nullptr) {
+    graphic->draw(canvas);
+    return;
+  }
+  tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
+  graphic->measureBounds(&bounds);
+  if (bounds.isEmpty()) {
+    return;
+  }
+  // roundOut() prevents resampling when the graphic's content needs to be cropped.
+  bounds.roundOut();
+  auto contentSurface = SurfaceUtil::MakeContentSurface(canvas, bounds, FLT_MAX);
+  if (contentSurface == nullptr) {
+    return;
+  }
+  Canvas contentCanvas(contentSurface.get(), canvas->getCache());
+  auto contentMatrix = contentCanvas.getMatrix();
+  graphic->draw(&contentCanvas);
+  auto toImage = contentSurface->makeImageSnapshot();
+  if (toImage == nullptr) {
+    return;
+  }
+  auto scaleFactor = GetMaxScaleFactor(contentMatrix);
+  auto matrix = tgfx::Matrix::MakeScale(1.0f / scaleFactor);
+  matrix.postTranslate(bounds.x(), bounds.y());
+  canvas->save();
+  canvas->concat(matrix);
+  if (cache->fromImage == nullptr || progress <= 0.0f) {
+    // 转场窗口首帧：冻结当前画面作为旧画面 A，并直接输出当前画面。
+    cache->fromImage = toImage;
+    canvas->drawImage(std::move(toImage));
+    canvas->restore();
+    return;
+  }
+  auto fromShader = tgfx::Shader::MakeImageShader(cache->fromImage);
+  auto toShader = tgfx::Shader::MakeImageShader(toImage);
+  auto shader = tgfx::Shader::MakeTransition(effect, std::move(fromShader), std::move(toShader),
+                                             progress);
+  if (shader == nullptr) {
+    canvas->restore();
+    return;
+  }
+  tgfx::Paint paint;
+  paint.setShader(std::move(shader));
+  canvas->drawRect(tgfx::Rect::MakeWH(static_cast<float>(contentSurface->width()),
+                                      static_cast<float>(contentSurface->height())),
+                   paint);
   canvas->restore();
 }
 }  // namespace pag
