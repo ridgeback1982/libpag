@@ -787,6 +787,9 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       track->content.speed *= 1.05f;    //抽帧
       visual_width *= 0.95f;   //等比例变大
       visual_height *= 0.95f;  //等比例变大
+    } else if (track->content.effect == "anti-duplicate") {
+      //test speed
+      track->content.speed *= 1.05f;    //抽帧
     }
 
     int video_fps = track->content.fps();
