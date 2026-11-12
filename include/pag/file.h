@@ -446,6 +446,7 @@ enum class EffectType {
   Mosaic,
   BrightnessContrast,
   HueSaturation,
+  FallingStars, //zzy
 };
 
 class PAG_API Effect {
@@ -1024,6 +1025,29 @@ class PAG_API HueSaturationEffect : public Effect {
   Property<float>* colorizeHue = nullptr;
   Property<float>* colorizeSaturation = nullptr;
   Property<float>* colorizeLightness = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+//zzy: 天上掉下很多一闪一闪的星星
+class PAG_API FallingStarsEffect : public Effect {
+ public:
+  ~FallingStarsEffect() override;
+
+  EffectType type() const override {
+    return EffectType::FallingStars;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* starCount = nullptr;     // 星星数量（网格密度）
+  Property<float>* starSize = nullptr;      // 星星大小
+  Property<float>* fallSpeed = nullptr;     // 下落速度
+  Property<float>* twinkleSpeed = nullptr;  // 闪烁频率
 
   RTTR_ENABLE(Effect)
 };

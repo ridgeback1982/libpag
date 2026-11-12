@@ -22,6 +22,7 @@
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
 #include "EllipseHazeFilter.h"
+#include "FallingStarsFilter.h"
 #include "FrostedGlassFilter.h"
 #include "GradientOverlayFilter.h"
 #include "HueSaturationFilter.h"
@@ -196,6 +197,9 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::HueSaturation:
       filter = new HueSaturationFilter(effect);
+      break;
+    case EffectType::FallingStars:
+      filter = new FallingStarsFilter(effect);
       break;
     default:
       break;

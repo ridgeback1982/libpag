@@ -780,7 +780,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
     }
 
     pag::FFFormatUtil ffutil(track->content.path);
-    bool lowBitrateVideo = ffutil.bitRate() < 1200000;    //1.2Mbps as low bitrate video, I use it to judge 滚屏 or else not
+    [[maybe_unused]]bool lowBitrateVideo = ffutil.bitRate() < 1200000;    //1.2Mbps as low bitrate video, I use it to judge 滚屏 or else not
 
     if (track->content.effect == "anti-watermark") {
       //test speed
@@ -859,37 +859,29 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
 
       vidPreComposeLayer->effects.push_back(cornerpin);
     } else if (track->content.effect == "anti-watermark") {
-#if 0
-      //朦胧雾化（全局，类似“眼睛没揉开”的朦胧 + 发白）。经过测试，可以去除暗水印。曾经可以过暗水印，现在巨量升级了检测，一个都过不了了。
-      // auto haze = new pag::EllipseHazeEffect();
-      // float blurRadius = 2.0f;  //（边界软化半径，像素）
-      // float bloom = 0.6f;   //（泛光/朦胧强度，0~1），0.6f
-      // float whiten = 0.45f; //（发白/白雾强度，0~1）, 0.45f
-      // float opacity = 1.0f;
-      // blurRadius = std::max(0.0f, std::min(64.0f, blurRadius));
-      // bloom = std::max(0.0f, std::min(1.0f, bloom));
-      // whiten = std::max(0.0f, std::min(1.0f, whiten));
-      // opacity = std::max(0.0f, std::min(1.0f, opacity));
-      // haze->blurRadius = new pag::Property<float>(blurRadius);
-      // haze->bloom = new pag::Property<float>(bloom);
-      // haze->whiten = new pag::Property<float>(whiten);
-      // haze->effectOpacity = new pag::Property<pag::Opacity>(
-      //     static_cast<pag::Opacity>(std::max(0, std::min(255, static_cast<int>(opacity * 255.0f)))));
-      // vidPreComposeLayer->effects.push_back(haze);
-
+#if 1
       //颜色外溢，这个终于达到了《爱在诀别前重生》的特效了（对于去水印，测吃有用），strength = 0.7f
-      auto bleed = new pag::LowFreqBleedEffect();
-      float radius = 400.0f;
-      float strength = 0.5f;  //经过测试，0.5都不行了，我哭了，暗水印看来攻克不下了
-      radius = std::max(0.0f, std::min(400.0f, radius));
-      strength = std::max(0.0f, std::min(1.0f, strength));
-      bleed->radius = new pag::Property<float>(radius);
-      bleed->strength = new pag::Property<float>(strength);
-      bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
-      vidPreComposeLayer->effects.push_back(bleed);
+      // auto bleed = new pag::LowFreqBleedEffect();
+      // float radius = 400.0f;
+      // float strength = 0.5f;  //经过测试，0.5都不行了，我哭了，暗水印看来攻克不下了
+      // radius = std::max(0.0f, std::min(400.0f, radius));
+      // strength = std::max(0.0f, std::min(1.0f, strength));
+      // bleed->radius = new pag::Property<float>(radius);
+      // bleed->strength = new pag::Property<float>(strength);
+      // bleed->effectOpacity = new pag::Property<pag::Opacity>(255);
+      // vidPreComposeLayer->effects.push_back(bleed);
+
+      //天上掉下很多一闪一闪的星星
+      auto stars = new pag::FallingStarsEffect();
+      stars->starCount = new pag::Property<float>(4.0f);     //星星数量（网格密度）
+      stars->starSize = new pag::Property<float>(0.04f);     //星星大小
+      stars->fallSpeed = new pag::Property<float>(0.05f);    //下落速度
+      stars->twinkleSpeed = new pag::Property<float>(6.0f);  //闪烁频率
+      stars->effectOpacity = new pag::Property<pag::Opacity>(255);
+      vidPreComposeLayer->effects.push_back(stars);
 #endif
 
-#if 1
+#if 0
       //非线形变换
       if (lowBitrateVideo) {
         //1. 水波纹（对于去水印，测吃有用）
@@ -909,10 +901,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       //3. 位置变换（对于去水印，测吃有用）
       CornerPinEffect* cornerpin = new CornerPinEffect();
       int random_seed = pag::get_random_int(0, 100);
-      int random_height_offset_1 = pag::get_random_int(10, 20);
-      int random_height_offset_2 = pag::get_random_int(10, 20);
-      int random_width_offset_1 = pag::get_random_int(10, 20);
-      int random_width_offset_2 = pag::get_random_int(10, 20);
+      int random_height_offset_1 = pag::get_random_int(5, 10);
+      int random_height_offset_2 = pag::get_random_int(5, 10);
+      int random_width_offset_1 = pag::get_random_int(5, 10);
+      int random_width_offset_2 = pag::get_random_int(5, 10);
       if (random_seed < 50) {
         cornerpin->upperLeft = new Property<Point>(pag::Point::Make(0 - random_width_offset_1, 0 - random_height_offset_1));
         cornerpin->upperRight = new Property<Point>(pag::Point::Make(video_width + random_width_offset_2, 0 + random_width_offset_2));
