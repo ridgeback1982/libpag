@@ -8,3 +8,4 @@
 
 #define NAS_VIDEO_UPLOAD_PATH   "http://synology.zeniq.net:5005/webDAV_share/tos_video"
 #define NAS_AI_BGI_UPLOAD_PATH   "http://synology.zeniq.net:5005/webDAV_share/ai_bgi"
+#define NAS_COMIC_UPLOAD_PATH   "http://synology.zeniq.net:5005/webDAV_share/tos_comic"
