@@ -643,6 +643,307 @@ int ArticleContent::init(const std::string& tmpDir) {
   return 0;
 }
 
+//zzy, 探测源素材的容器层特征：顶层 major brand（ftyp）以及 moov/mdat 的先后顺序。
+//只顺序扫描顶层 box 的头部，不解析 moov 内部，开销极小。返回 0 表示探测成功。
+static int probeSourceMux(const std::string& path, std::string& majorBrand, int& moovBeforeMdat) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f.is_open()) {
+    return -1;
+  }
+  f.seekg(0, std::ios::end);
+  uint64_t fileSize = (uint64_t)f.tellg();
+  majorBrand.clear();
+  moovBeforeMdat = -1;   //-1 未知, 0 moov 在 mdat 之后, 1 moov 在 mdat 之前
+  bool mdatSeen = false;
+  uint64_t offset = 0;
+  while (offset + 8 <= fileSize) {
+    f.seekg((std::streamoff)offset, std::ios::beg);
+    unsigned char hdr[16] = {0};
+    f.read((char*)hdr, 8);
+    if (f.gcount() != 8) {
+      break;
+    }
+    uint64_t size = ((uint64_t)hdr[0] << 24) | ((uint64_t)hdr[1] << 16) | ((uint64_t)hdr[2] << 8) | hdr[3];
+    std::string type((char*)hdr + 4, 4);
+    uint64_t headerSize = 8;
+    if (size == 1) {
+      //64 位扩展长度
+      f.read((char*)hdr + 8, 8);
+      if (f.gcount() != 8) {
+        break;
+      }
+      size = 0;
+      for (int i = 0; i < 8; i++) {
+        size = (size << 8) | hdr[8 + i];
+      }
+      headerSize = 16;
+    } else if (size == 0) {
+      //延续到文件末尾（通常是最后一个 mdat）
+      size = fileSize - offset;
+    }
+    if (size < headerSize || offset + size > fileSize) {
+      break;
+    }
+    if (type == "ftyp") {
+      unsigned char b[4] = {0};
+      f.read((char*)b, 4);
+      if (f.gcount() == 4 && majorBrand.empty()) {
+        majorBrand.assign((char*)b, 4);
+      }
+    } else if (type == "moov") {
+      moovBeforeMdat = mdatSeen ? 0 : 1;
+    } else if (type == "mdat") {
+      mdatSeen = true;
+    }
+    offset += size;
+  }
+  return 0;
+}
+
+//从候选集合里随机挑一个；集合为空时返回 fallback
+template <typename T>
+static T pickRandomValue(const std::vector<T>& candidates, const T& fallback) {
+  if (candidates.empty()) {
+    return fallback;
+  }
+  static thread_local std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<size_t> dist(0, candidates.size() - 1);
+  return candidates[dist(rng)];
+}
+
+//生成随机的 mp4 创建时间（ISO8601 UTC），用于让同源多次输出在文件层略有不同
+static std::string randomCreationTime() {
+  static thread_local std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<int> year(2005, 2035), month(1, 12), day(1, 28);
+  std::uniform_int_distribution<int> hour(0, 23), minute(0, 59), second(0, 59);
+  char buf[32] = {0};
+  snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+           year(rng), month(rng), day(rng), hour(rng), minute(rng), second(rng));
+  return std::string(buf);
+}
+
+//zzy, twin-copy：最小视频衍生方案
+//音频与视频均不重新编码，只重写 mp4 容器层（major brand / faststart / timescale / 创建时间等），
+//使输出的文件层结构与原始素材不同，而音视频码流逐包保持一致。
+PAG_API int remuxTwinCopy(const std::string& srcUrl, const std::string& tmpDir, const std::string& dstPath) {
+  if (srcUrl.empty() || dstPath.empty()) {
+    std::cerr << "remuxTwinCopy, invalid arguments" << std::endl;
+    return -1;
+  }
+
+  //1. 远端素材先下载到本地（复用已有的 curlDownload）
+  std::string srcPath = srcUrl;
+  bool remote = pag::starts_with(srcUrl, "http://") || pag::starts_with(srcUrl, "https://");
+  fs::path downloadDir;
+  bool removeDownloadDir = false;
+  if (remote) {
+    if (tmpDir.empty()) {
+      downloadDir = pag::create_temp_directory("twin_copy_");
+      removeDownloadDir = true;
+    } else {
+      downloadDir = fs::path(tmpDir);
+    }
+    srcPath = (downloadDir / pag::getFileNameFromUrl(srcUrl)).string();
+    printf("remuxTwinCopy, will download %s\n", srcUrl.c_str());
+    if (curlDownload(srcUrl, srcPath) < 0) {
+      printf("remuxTwinCopy, download failed: %s\n", srcUrl.c_str());
+      if (removeDownloadDir) {
+        fs::remove_all(downloadDir);
+      }
+      return -2;
+    }
+  }
+
+  //2. 打开输入并探测流信息
+  AVFormatContext* inCtx = nullptr;
+  if (avformat_open_input(&inCtx, srcPath.c_str(), nullptr, nullptr) < 0) {
+    std::cerr << "remuxTwinCopy, avformat_open_input failed: " << srcPath << std::endl;
+    return -3;
+  }
+  if (avformat_find_stream_info(inCtx, nullptr) < 0) {
+    std::cerr << "remuxTwinCopy, avformat_find_stream_info failed" << std::endl;
+    avformat_close_input(&inCtx);
+    return -4;
+  }
+
+  //3. 创建 mp4 输出上下文
+  AVFormatContext* outCtx = nullptr;
+  if (avformat_alloc_output_context2(&outCtx, nullptr, "mp4", dstPath.c_str()) < 0 || outCtx == nullptr) {
+    std::cerr << "remuxTwinCopy, avformat_alloc_output_context2 failed" << std::endl;
+    avformat_close_input(&inCtx);
+    return -5;
+  }
+
+  //4. 仅复制音视频流的编码参数，不重新编码
+  std::vector<int> streamMapping(inCtx->nb_streams, -1);
+  bool hasValidStream = false;
+  for (unsigned int i = 0; i < inCtx->nb_streams; i++) {
+    AVStream* inStream = inCtx->streams[i];
+    if (inStream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
+        inStream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
+      continue;
+    }
+    AVStream* outStream = avformat_new_stream(outCtx, nullptr);
+    if (outStream == nullptr) {
+      std::cerr << "remuxTwinCopy, avformat_new_stream failed" << std::endl;
+      avformat_free_context(outCtx);
+      avformat_close_input(&inCtx);
+      return -6;
+    }
+    if (avcodec_parameters_copy(outStream->codecpar, inStream->codecpar) < 0) {
+      std::cerr << "remuxTwinCopy, avcodec_parameters_copy failed" << std::endl;
+      avformat_free_context(outCtx);
+      avformat_close_input(&inCtx);
+      return -7;
+    }
+    outStream->codecpar->codec_tag = 0;
+    outStream->time_base = inStream->time_base;
+    outStream->avg_frame_rate = inStream->avg_frame_rate;
+    streamMapping[i] = outStream->index;
+    hasValidStream = true;
+  }
+  if (!hasValidStream) {
+    std::cerr << "remuxTwinCopy, no audio/video stream found" << std::endl;
+    avformat_free_context(outCtx);
+    avformat_close_input(&inCtx);
+    return -8;
+  }
+
+  //5. 容器层差异化：先探测源的 mux 特征，再随机选取与源不同的目标值；
+  //同一源多次 twin-copy 会因随机化而在文件层结构上略有不同。
+  std::string srcBrand;
+  int moovBeforeMdat = -1;
+  probeSourceMux(srcPath, srcBrand, moovBeforeMdat);
+  int srcVideoTimescale = 0;
+  for (unsigned int i = 0; i < inCtx->nb_streams; i++) {
+    if (inCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      AVRational tb = inCtx->streams[i]->time_base;
+      srcVideoTimescale = (tb.num > 0 && tb.den > 0) ? (tb.num == 1 ? tb.den : tb.den / tb.num) : 0;
+      break;
+    }
+  }
+
+  //major brand：从与源不同的候选中随机取
+  std::vector<std::string> brandCandidates;
+  for (const char* b : {"mp42", "isom", "mp41"}) {
+    if (srcBrand != b) {
+      brandCandidates.emplace_back(b);
+    }
+  }
+  std::string targetBrand = pickRandomValue(brandCandidates, std::string("mp42"));
+
+  //视频轨 timescale：从与源不同的候选中随机取
+  std::vector<int> tsCandidates;
+  for (int cand : {30000, 15360, 90000, 24000, 60000}) {
+    if (cand != srcVideoTimescale) {
+      tsCandidates.push_back(cand);
+    }
+  }
+  int targetVideoTimescale = pickRandomValue(tsCandidates, 30000);
+
+  //movie（mvhd）timescale：随机取
+  std::vector<int> movieTsCandidates = {1000, 600, 30000, 90000, 24000, 10000};
+  int targetMovieTimescale = pickRandomValue(movieTsCandidates, 1000);
+
+  //顶层 box 布局：源已 faststart（moov 在 mdat 前）时输出普通布局，反之输出 faststart
+  std::string targetMovflags = (moovBeforeMdat == 1) ? "" : "+faststart";
+
+  //创建时间：随机取，保证每次输出在 mvhd/udta 层不同
+  std::string targetCreationTime = randomCreationTime();
+
+  printf("remuxTwinCopy, source mux: brand=%s, videoTimescale=%d, moovBeforeMdat=%d => target: brand=%s, videoTimescale=%d, movieTimescale=%d, movflags='%s', creationTime=%s\n",
+         srcBrand.c_str(), srcVideoTimescale, moovBeforeMdat, targetBrand.c_str(), targetVideoTimescale,
+         targetMovieTimescale, targetMovflags.c_str(), targetCreationTime.c_str());
+
+  AVDictionary* muxOpts = nullptr;
+  av_dict_set(&muxOpts, "brand", targetBrand.c_str(), 0);
+  av_dict_set(&muxOpts, "video_track_timescale", std::to_string(targetVideoTimescale).c_str(), 0);
+  av_dict_set(&muxOpts, "movie_timescale", std::to_string(targetMovieTimescale).c_str(), 0);
+  if (!targetMovflags.empty()) {
+    av_dict_set(&muxOpts, "movflags", targetMovflags.c_str(), 0);
+  }
+  av_dict_set(&outCtx->metadata, "creation_time", targetCreationTime.c_str(), 0);
+
+  //6. 打开输出文件并写 header
+  if (!(outCtx->oformat->flags & AVFMT_NOFILE)) {
+    fs::path parent = fs::path(dstPath).parent_path();
+    if (!parent.empty()) {
+      std::error_code ec;
+      fs::create_directories(parent, ec);
+    }
+    if (avio_open(&outCtx->pb, dstPath.c_str(), AVIO_FLAG_WRITE) < 0) {
+      std::cerr << "remuxTwinCopy, avio_open failed: " << dstPath << std::endl;
+      av_dict_free(&muxOpts);
+      avformat_free_context(outCtx);
+      avformat_close_input(&inCtx);
+      return -9;
+    }
+  }
+  if (avformat_write_header(outCtx, &muxOpts) < 0) {
+    std::cerr << "remuxTwinCopy, avformat_write_header failed" << std::endl;
+    av_dict_free(&muxOpts);
+    if (!(outCtx->oformat->flags & AVFMT_NOFILE) && outCtx->pb) {
+      avio_closep(&outCtx->pb);
+    }
+    avformat_free_context(outCtx);
+    avformat_close_input(&inCtx);
+    return -10;
+  }
+  av_dict_free(&muxOpts);
+
+  //7. 逐包重封装（不做任何解码/编码）
+  int ret = 0;
+  AVPacket* pkt = av_packet_alloc();
+  if (pkt == nullptr) {
+    std::cerr << "remuxTwinCopy, av_packet_alloc failed" << std::endl;
+    ret = -11;
+  } else {
+    while (av_read_frame(inCtx, pkt) >= 0) {
+      int inIdx = pkt->stream_index;
+      if (inIdx < 0 || (size_t)inIdx >= streamMapping.size() || streamMapping[inIdx] < 0) {
+        av_packet_unref(pkt);
+        continue;
+      }
+      int outIdx = streamMapping[inIdx];
+      av_packet_rescale_ts(pkt, inCtx->streams[inIdx]->time_base, outCtx->streams[outIdx]->time_base);
+      pkt->stream_index = outIdx;
+      pkt->pos = -1;
+      int wret = av_interleaved_write_frame(outCtx, pkt);
+      av_packet_unref(pkt);
+      if (wret < 0) {
+        std::cerr << "remuxTwinCopy, av_interleaved_write_frame failed: " << wret << std::endl;
+        ret = -12;
+        break;
+      }
+    }
+    av_packet_free(&pkt);
+  }
+
+  //8. 写 trailer 并释放资源
+  if (av_write_trailer(outCtx) < 0 && ret == 0) {
+    std::cerr << "remuxTwinCopy, av_write_trailer failed" << std::endl;
+    ret = -13;
+  }
+  if (!(outCtx->oformat->flags & AVFMT_NOFILE) && outCtx->pb) {
+    avio_closep(&outCtx->pb);
+  }
+  avformat_free_context(outCtx);
+  avformat_close_input(&inCtx);
+
+  if (removeDownloadDir) {
+    fs::remove_all(downloadDir);
+  }
+
+  if (ret != 0) {
+    //失败时清理半成品
+    std::error_code ec;
+    fs::remove(dstPath, ec);
+  } else {
+    printf("remuxTwinCopy, done: %s -> %s\n", srcUrl.c_str(), dstPath.c_str());
+  }
+  return ret;
+}
+
 }  // namespace movie
 
 
@@ -805,6 +1106,7 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
       TimeToFrame(ogCutFrom + ogDuration, video_fps), track->content.effect);
     if (videoSequence == nullptr) {
         std::cerr << "Error reading video file" << std::endl;
+        delete vidComposition;
         return nullptr;
     }
     videoSequence->frameRate = vidComposition->frameRate;   //modify fps of video sequence
@@ -949,6 +1251,10 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
         fastBlur->regions = videoSequence->eraseRegions;
         vidPreComposeLayer->effects.push_back(fastBlur);
       }
+    } else {
+      delete vidPreComposeLayer;    //连带释放 transform / rotation / timeRemap / effects
+      delete vidComposition;        //连带释放 sequences(videoSequence)
+      return nullptr;
     }
 
     if (track->content.effect.empty() == false) {

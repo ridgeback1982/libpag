@@ -11,6 +11,12 @@ namespace movie {
     //url 为远端地址时会先下载到临时目录再分析，取色失败时返回默认白字
     PAG_API int analyzeTextColor(const std::string& url, std::string& textColor, std::string& backgroundColor);
 
+    //zzy, twin-copy：最小视频衍生方案。音频与视频均不重新编码，只重写 mp4 容器层，
+    //先探测源素材的 mux 特征，再随机选取与源不同的目标值（brand/faststart/timescale/创建时间等），
+    //既保证输出与源的文件层结构不同，又使同一源多次调用产生的 mux 层略有差异。
+    //srcUrl 为远端地址时先下载到 tmpDir，dstPath 为输出 mp4 路径。成功返回 0。
+    PAG_API int remuxTwinCopy(const std::string& srcUrl, const std::string& tmpDir, const std::string& dstPath);
+
     class Location {
     public:
         float w = 0;
