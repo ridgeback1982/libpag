@@ -1251,10 +1251,8 @@ PreComposeLayer* createVideoLayer(movie::VideoTrack* track, const movie::MovieSp
         fastBlur->regions = videoSequence->eraseRegions;
         vidPreComposeLayer->effects.push_back(fastBlur);
       }
-    } else {
-      delete vidPreComposeLayer;    //连带释放 transform / rotation / timeRemap / effects
-      delete vidComposition;        //连带释放 sequences(videoSequence)
-      return nullptr;
+    } else if (!track->content.effect.empty()) {
+      std::cout << "Unknown effect: " << track->content.effect << std::endl;
     }
 
     if (track->content.effect.empty() == false) {
